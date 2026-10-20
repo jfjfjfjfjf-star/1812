@@ -17,6 +17,12 @@ const GOODS = {
 };
 const START = { money: 30 };
 
+// Сцена: координаты МИРА в пикселях (экран 320x180 показывает часть лавки, камера следует за Андреем).
+// worldW — ширина лавки, lane — линия пола, counter — зона у прилавка (осмотр товаров),
+// customerX и motherX — где стоят покупатель и мать, talkRange — на каком расстоянии можно заговорить.
+const SCENE = { worldW: 640, lane: 151, startX: 60, walkMin: 16, talkRange: 23,
+                customerX: 430, motherX: 120, counter: { l: 300, r: 630 } };
+
 // Покупатели (приходят по очереди). Правило торга одно для всех, без случайности:
 // согласен, если цена за единицу <= maxUnit И сумма <= budget; иначе предлагает wantUnit за единицу.
 // После трёх неудачных предложений уходит (leaveNode).
@@ -29,7 +35,7 @@ const CUSTOMERS = [
     openNode: 'darya_open', soldNode: 'darya_sold', refusedNode: 'darya_refused', leaveNode: 'darya_leave',
     priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] }
 ];
-const MOTHER = { name: 'Мать', color: '#8a5a5a' };
+const MOTHER = { name: 'Мать', color: '#8a5a5a', node: 'mother_hub' };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {

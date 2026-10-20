@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Летописи: 1812</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0805; overflow: hidden; font-family: Georgia, serif; }
+  /* Сцена всегда в целое число раз больше 320x180 (переменная --s): пиксели остаются чёткими */
+  #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+           width: calc(var(--s) * 320px); height: calc(var(--s) * 180px); }
+  canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  #hud, #hint, #newgame, #dbg { position: absolute; color: #f0e2c0; font-size: calc(var(--s) * 5px); text-shadow: 1px 1px #000; }
+  #hud { right: calc(var(--s) * 4px); top: calc(var(--s) * 3px); }
+  #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
+  #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
+             font-family: inherit; opacity: .6; cursor: pointer; }
+  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 13px); color: #f08a8a; }
+  #dlg { position: absolute; left: 0; right: 0; bottom: 0; display: none; }
+  #choices { display: flex; flex-direction: column; gap: calc(var(--s) * 2px); margin: 0 20% calc(var(--s) * 3px); }
+  #choices button { font: inherit; font-size: calc(var(--s) * 6px); padding: calc(var(--s) * 2px); cursor: pointer;
+                    background: #2a1a0e; color: #f0e2c0; border: 2px solid #c9a96a; }
+  #choices button:disabled { opacity: .4; cursor: not-allowed; }
+  #box { background: rgba(20,12,6,.92); border-top: 2px solid #c9a96a; color: #f0e2c0;
+         padding: calc(var(--s) * 4px) calc(var(--s) * 8px); min-height: calc(var(--s) * 30px);
+         font-size: calc(var(--s) * 7px); line-height: 1.35; }
+  #who { color: #e8c36a; font-weight: bold; min-height: 1.35em; }
+  #box { white-space: pre-line; }
+  #mid { display: flex; align-items: flex-end; }
+  #choices { margin: 0 0 calc(var(--s) * 3px) 4%; flex: 1; }
+  #panel { display: none; width: 42%; margin: 0 calc(var(--s) * 4px) calc(var(--s) * 3px) 0; box-sizing: border-box;
+           background: rgba(20,12,6,.92); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--s) * 3px);
+           font-size: calc(var(--s) * 5px); line-height: 1.4; }
+  #panel i { opacity: .7; } #panel button { font: inherit; padding: 0 calc(var(--s) * 3px); cursor: pointer; }
+  #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--s) * 24px); display: none;
+           background: rgba(20,12,6,.92); border: 2px solid #e8c36a; color: #f0e2c0; padding: calc(var(--s) * 2px) calc(var(--s) * 6px);
+           font-size: calc(var(--s) * 6px); }
+  #notes { position: absolute; inset: calc(var(--s) * 10px) calc(var(--s) * 30px); display: none; overflow: auto; box-sizing: border-box;
+           background: rgba(20,12,6,.96); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--s) * 4px) calc(var(--s) * 8px);
+           font-size: calc(var(--s) * 6px); line-height: 1.35; }
+  #notes h3 { margin: 0 0 calc(var(--s) * 3px); } #notes p { margin: 0 0 calc(var(--s) * 3px); }
+  #notesbtn { position: absolute; left: calc(var(--s) * 52px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
+              color: #f0e2c0; font-family: inherit; font-size: calc(var(--s) * 5px); opacity: .6; cursor: pointer; }
+  #dlg { padding: 0 calc(var(--s) * 4px) calc(var(--s) * 4px); box-sizing: border-box; align-items: flex-end; gap: calc(var(--s) * 3px); }
+  #portrait { display: none; flex: none; width: calc(var(--s) * 40px); height: calc(var(--s) * 40px); border: 2px solid #c9a96a;
+              align-items: center; justify-content: center; font-size: calc(var(--s) * 20px); color: #f0e2c0aa; }
+  #col { flex: 1; display: flex; flex-direction: column; gap: calc(var(--s) * 2px); min-width: 0; }
+  #box { border: 2px solid #c9a96a; min-height: calc(var(--s) * 28px); }
+  #choices { flex-direction: row; flex-wrap: wrap; margin: 0; gap: calc(var(--s) * 2px); }
+  #panel { flex: none; width: calc(var(--s) * 100px); margin: 0; font-size: calc(var(--s) * 6px); }
+  #pact { display: flex; flex-direction: column; gap: calc(var(--s) * 2px); margin-top: calc(var(--s) * 2px); }
+  #pact button { font: inherit; font-size: calc(var(--s) * 6px); padding: calc(var(--s) * 2px); cursor: pointer;
+                 background: #2a1a0e; color: #f0e2c0; border: 2px solid #c9a96a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><div id="toast"></div><div id="notes"></div>
+  <div id="hud"></div>
+  <div id="hint"></div>
+  <div id="dbg"></div>
+  <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
+</div>
+<script src="data.js"></script>
+<script>
+// ================= НАСТРОЙКИ ЭКРАНА =================
+const W = 320, H = 180;                                // утверждённая сетка пикселей (экран)
+const WORLD_W = SCENE.worldW, LANE = SCENE.lane;       // ширина лавки и линия пола берутся из data.js (ходьба только влево-вправо)
+const FLOOR = { l: SCENE.walkMin, r: SCENE.worldW - SCENE.walkMin };
+
+// ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
+const C = () => CUSTOMERS[state.visit];                // текущий покупатель (undefined, когда очередь кончилась)
+const deal = () => state.deals[C().id];
+const G = () => GOODS[C().want];
+const total = d => C().qty * d.price;
+const profit = d => C().qty * (d.price - G().cost);
+const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
+const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
+const heard = id => !!state.heard[id];
+const okChoice = c => (!c.need || !c.need.heard || heard(c.need.heard)) && !(c.once && c.id && state.asked[c.id]);
+
+function learn(id) {                                   // запись о сведении появляется один раз
+  if (!id || heard(id)) return;
+  state.heard[id] = { n: Object.keys(state.heard).length + 1, visit: state.visit, ctx: [] };
+  if (RUMORS[id].toast) toast(RUMORS[id].toast);
+  save();
+}
+function learnContext(id) {                            // дополняет существующую запись, не создаёт новую
+  const x = CONTEXT[id];
+  if (!x || state.ctx[id] || !heard(x.to)) return;
+  state.ctx[id] = true; state.heard[x.to].ctx.push(x.text); toast('Запись дополнена'); save();
+}
+function showNode(id) { const n = NODES[id]; learn(n.learn); learnContext(n.context); dlg = { node: n }; renderDlg(); }
+function showTrade(msg) { if (msg) deal().msg = msg; dlg = { trade: true }; renderDlg(); }
+function leave(nodeId) { const d = deal(); d.stage = 'after'; d.afterNode = nodeId; save(); showNode(nodeId); }
+function sell() {                                      // деньги и товар меняются только здесь и один раз
+  const c = C(), d = deal();
+  if (d.stage === 'after' || d.stage === 'done') return;
+  if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
+  d.stage = 'after'; d.afterNode = c.soldNode;
+  state.money += total(d); state.stock[c.want] -= c.qty;
+  save(); showNode(c.soldNode);
+}
+// Согласие возможно, только если одновременно: цена за единицу <= предела, сумма <= бюджета, товар есть в лавке.
+function verdict(c, d) {
+  if (!Number.isInteger(d.price) || d.price < 1) return 'bad';
+  if (state.stock[c.want] < c.qty) return 'nostock';
+  return d.price <= c.maxUnit && total(d) <= c.budget ? 'yes' : 'no';
+}
+function settle(d) {                                   // единый путь к сделке: и для предложения, и для принятия встречной
+  const c = C(), v = verdict(c, d);
+  if (v === 'bad') return showTrade('Цена должна быть целым числом, не меньше 1.');
+  if (v === 'nostock') return showTrade('В лавке не хватает товара: нужно ' + c.qty + ', есть ' + state.stock[c.want] + '.');   // попытку не тратим
+  if (v === 'yes') return sell();                      // успешное предложение принимается до проверки ухода
+  if (++d.fails >= 3) return leave(c.leaveNode);
+  d.counterUnit = Math.max(1, Math.min(c.wantUnit, c.maxUnit, Math.floor(c.budget / c.qty)));
+  d.counter = d.counterUnit * c.qty;
+  save(); showTrade(fmt(c.counterMsg, { counter: d.counter }));
+}
+const offer = () => settle(deal());
+function step(k) { const d = deal(); d.price = Math.max(1, Math.min(99, d.price + k)); save(); renderDlg(); }
+function tradeChoices() {
+  const c = C(), d = deal(), l = [{ text: 'Предложить цену' + (profit(d) < 0 ? ' (убыток)' : ''), do: 'offer' }];
+  if (d.counter) l.push({ text: 'Принять ' + d.counter, do: 'accept' });
+  return l.concat(c.tradeTalk.filter(okChoice), [{ text: 'Отказаться', do: 'refuse' }]);
+}
+function inspect() {
+  const t = Object.keys(GOODS).map(k => GOODS[k].name + ': ' + state.stock[k] + ' (закупка ' + GOODS[k].cost + ', цена ' + GOODS[k].price + ')').join('\n');
+  dlg = { node: { who: 'Прилавок', text: t, choices: [{ text: 'Закрыть', do: 'end' }] } }; renderDlg();
+}
+function act(c) {
+  if (c.id) state.asked[c.id] = true;
+  if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
+  const op = c.do || '', cu = C(), d = cu && deal();
+  if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back'].includes(op)) { dlg = null; renderDlg(); return; }   // покупателей больше нет
+  if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
+  if (op === 'offer') return offer();
+  if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
+  if (op === 'refuse') return leave(cu.refusedNode);
+  if (op === 'back') return d.stage === 'open' ? showNode(cu.openNode) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
+  if (op === 'finish' && d && d.stage === 'after') { d.stage = 'done'; state.visit++; }   // следующий покупатель
+  if (c.goto) { save(); return showNode(c.goto); }
+  save(); dlg = null; renderDlg();
+}
+
+// ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
+const SAVE_KEY = 'letopisi1812_save_v6';
+const newState = () => ({ money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
+  stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
+  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '' }])) });
+let state = load() || newState();
+let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
+
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && typeof s.money === 'number' && typeof s.visit === 'number' && s.heard && s.asked && s.promises && s.ctx &&
+        Object.keys(GOODS).every(k => typeof s.stock[k] === 'number') &&
+        CUSTOMERS.every(c => s.deals[c.id] && typeof s.deals[c.id].price === 'number')) return s;
+  } catch (e) {}
+  return null;
+}
+
+// ================= ЭКРАН =================
+const $ = id => document.getElementById(id);
+const canvas = $('game'); canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+function fit() {
+  const s = Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H)));
+  $('stage').style.setProperty('--s', s);
+}
+addEventListener('resize', fit); fit();
+
+// ================= ЗАГРУЗКА СПРАЙТОВ =================
+// Если файла нет или у него не тот размер, спрайт не используется, рисуется заглушка,
+// а причина выводится красным текстом в углу экрана.
+const spr = {}, problems = [];
+function loadSprite(key, src, w, h) {
+  const im = new Image(); im.ok = false; spr[key] = im;
+  im.onload = () => {
+    if (im.width === w && im.height === h) im.ok = true;
+    else problems.push(src + ': размер ' + im.width + '×' + im.height + ', нужен ' + w + '×' + h);
+  };
+  im.onerror = () => problems.push(src + ' не найден, показана заглушка');
+  im.src = src;
+}
+loadSprite('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH);
+loadSprite('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
+
+// ================= ПЕРСОНАЖИ И ЗОНЫ =================
+const player = { y: LANE, speed: 47 };
+function resetPlayer() { Object.assign(player, { x: SCENE.startX, dist: 0, dir: 1, moving: false }); }   // «Новая игра» вызывает то же самое
+resetPlayer();
+const cameraX = () => Math.max(0, Math.min(WORLD_W - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
+const near = x => Math.abs(player.x - x) < SCENE.talkRange;
+const nearCust = () => !dlg && !!C() && near(SCENE.customerX);
+const nearMom = () => !dlg && near(SCENE.motherX);
+const nearCounter = () => !dlg && !nearCust() && player.x >= SCENE.counter.l && player.x <= SCENE.counter.r;
+
+// ================= УПРАВЛЕНИЕ =================
+const keys = {};
+addEventListener('keydown', e => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.repeat) return;                                // удержание клавиши не повторяет действие (заметки не мигают)
+  if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
+  if (e.code !== 'KeyE' || notesOpen) return;
+  if (nearCust()) { const d = deal(); d.stage === 'price' ? showTrade() : showNode(d.stage === 'open' ? C().openNode : d.afterNode); }
+  else if (nearMom()) showNode(MOTHER.node);
+  else if (nearCounter()) inspect();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+$('newgame').onclick = e => { state = newState(); dlg = null; notesOpen = false; resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
+
+// ================= ДИАЛОГ, ПАНЕЛЬ ЦЕНЫ, ЗАМЕТКИ (интерфейс — слой поверх сцены 320×180) =================
+function toast(t) {
+  const el = $('toast'); el.textContent = t; el.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+function renderDlg() {
+  const box = $('dlg'), ch = $('choices'), pn = $('panel'), pt = $('portrait');
+  ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none';
+  if (!dlg) { box.style.display = 'none'; return; }
+  const c = C(), d = c ? deal() : null; let who, text, list, target = ch;
+  if (dlg.trade) {
+    who = c.name; text = d.msg; list = tradeChoices(); target = null;
+    const pf = profit(d);
+    pn.style.display = 'block';
+    pn.innerHTML = '<b>' + G().name + ' ×' + c.qty + '</b><br>Остаток: ' + state.stock[c.want] + ' <i>— столько есть в лавке</i><br>' +
+      'Закупка: ' + G().cost + ' <i>— за сколько купили</i><br>Цена за ' + G().unit + ': <button id="pm">−</button> <b>' + d.price +
+      '</b> <button id="pp">+</button><br>Всего: <b>' + total(d) + '</b><br>' + (pf < 0 ? 'Убыток: <b>' + (-pf) : 'Прибыль: <b>' + pf) +
+      '</b> <i>— выручка минус закупка проданного</i><div id="pact"></div>';
+    $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
+  } else {
+    who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
+    if (c && who === c.name && d.stage !== 'after') {   // краткое предложение остаётся справа во время разговора
+      pn.style.display = 'block';
+      pn.innerHTML = '<b>' + G().name + ' ×' + c.qty + '</b><br>Цена: ' + d.price + '<br>Всего: ' + total(d);
+    }
+  }
+  const sp = [...CUSTOMERS, MOTHER].find(x => x.name === who);
+  pt.style.display = sp ? 'flex' : 'none'; pt.style.background = sp ? sp.color : ''; pt.textContent = sp ? sp.name[0] : '';
+  box.style.display = 'flex';
+  $('who').textContent = who; $('text').textContent = text;
+  list.forEach(x => { const b = document.createElement('button'); b.textContent = x.text; b.onclick = () => act(x); target.appendChild(b); });
+}
+function renderNotes() {
+  const el = $('notes'); el.style.display = notesOpen ? 'block' : 'none';
+  if (!notesOpen) return;
+  const rows = Object.keys(state.heard).sort((a, b) => state.heard[a].n - state.heard[b].n).map(k => {
+    const r = RUMORS[k], h = state.heard[k];
+    return '<p><b>' + r.title + '</b><br>' + r.note + '<br><i>Сообщил: ' + r.who + '. Источник: ' + r.source + ' (' + r.kind + ')</i>' +
+      h.ctx.map(t => '<br>' + t).join('') + '</p>';
+  });
+  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — не выполнено</p>');
+  el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';
+}
+
+// ================= ОБНОВЛЕНИЕ =================
+function update(dt) {
+  player.moving = false;
+  if (dlg || notesOpen) return;                        // во время диалога и заметок движение заблокировано
+  const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const nx = Math.min(Math.max(player.x + dx * player.speed * dt, FLOOR.l), FLOOR.r);
+  const d = Math.abs(nx - player.x);
+  player.x = nx;
+  if (d > 0) { player.moving = true; player.dist += d; }
+  if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)
+}
+
+// ================= РИСОВАНИЕ =================
+const rect = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+function shelf(x, y, n) {
+  const cols = ['#a33', '#c93', '#5a8', '#ca8'];
+  for (let r = 0; r < 3; r++) {
+    rect('#2a1a0e', x, y + 9 + r * 20, n * 13 + 5, 2);
+    for (let i = 0; i < n; i++) rect(cols[(i + r) % 4], x + 4 + i * 13, y + r * 20, 5, 9);
+  }
+}
+// Заглушка-человечек (ростом ~66 px, как будущие спрайты). Нужна для покупателей и пока нет картинок Андрея.
+function person(x, y, color, swing, dir) {
+  x = Math.round(x); y = Math.round(y);
+  rect('#1d1510', x - 8 + swing, y - 22, 6, 22);
+  rect('#1d1510', x + 2 - swing, y - 22, 6, 22);
+  rect(color, x - 11, y - 50, 22, 28);
+  rect('#e0b890', x - 7, y - 66, 14, 16);
+  rect('#2a1a0e', x + (dir > 0 ? 2 : -7), y - 60, 5, 3);
+  rect('#d8d0b0', x - 2 - swing, y - 48, 5, 20);
+}
+function drawAndrey() {
+  const A = ANDREY, p = player, img = p.moving ? spr.walk : spr.idle;
+  const cycle = (p.dist / A.cycleDistance) % 1;            // 0..1 внутри цикла ходьбы
+  if (!img.ok) {                                           // картинки нет — заглушка
+    person(p.x, p.y, '#6b8a3a', p.moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, p.dir);
+    return;
+  }
+  const f = p.moving ? Math.floor(cycle * A.walk.frames) : 0;
+  const px = Math.round(p.x), py = Math.round(p.y) - A.floorY;
+  ctx.save();
+  ctx.translate(px, 0);
+  if (p.dir < 0) ctx.scale(-1, 1);                         // влево — зеркало (вправо рисуем как есть)
+  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -A.anchorX, py, A.cellW, A.cellH);
+  ctx.restore();
+}
+function drawGoods() {                                 // каждая единица товара — квадрат на прилавке
+  Object.keys(GOODS).forEach((k, i) => {
+    for (let n = 0; n < state.stock[k]; n++)
+      rect(GOODS[k].color, 330 + i * 60 + (n % 5) * 4, 95 - Math.floor(n / 5) * 4, 3, 3);
+  });
+}
+function draw() {
+  const cam = cameraX();
+  rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120);
+  ctx.save(); ctx.translate(-cam, 0);
+  rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
+  shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
+  rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);                  // прилавок
+  drawGoods();
+  rect('#f0b04a', 520, 90, 2, 8); rect('rgba(255,170,60,.12)', 490, 70, 62, 54);    // свеча: тёплый янтарный свет
+  rect('#8a2a2a', 150, 159, 330, 8);                   // ковёр
+  person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
+  if (C()) person(SCENE.customerX, LANE, C().color, 0, -1);   // ушедший покупатель (visit уже вырос) не рисуется
+  drawAndrey();
+  rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25);      // передний план
+  ctx.restore();
+  $('hud').textContent = 'Монет: ' + state.money;
+  $('dbg').textContent = problems.join(' | ');
+  const h = $('hint');
+  const msg = nearCust() || nearMom() ? 'E — Поговорить' : nearCounter() ? 'E — осмотреть товары' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
+  h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
+}
+
+// ================= ГЛАВНЫЙ ЦИКЛ =================
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  update(dt); draw(); requestAnimationFrame(loop);
+}
+renderDlg(); renderNotes(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
