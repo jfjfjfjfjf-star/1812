@@ -3,55 +3,64 @@
 // Историческую дату, валюту, меры и обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 7;
+const DATA_VERSION = 8;
 
-// Графика окружения. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
-// background — цельный фон лавки в координатах мира, размер ровно SCENE.worldW × 180 (сейчас 640×180), без прозрачности.
-//   Когда фон подключён, старые окна, полки, прилавок, свеча и ковёр из прямоугольников не рисуются.
-// foreground — необязательный передний план (бочки, ящики), тот же размер, с прозрачностью; рисуется поверх персонажей.
-//   Имя файла foreground — предложение, при необходимости его можно поменять здесь.
-// stockMarks — временные квадратики остатка товара на прилавке (одна штука товара — один квадрат). Рисуются один раз за кадр
-//   поверх фона. Когда настоящая графика сама показывает остаток, поставить show: false.
+// Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
+// background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (640×180), без прозрачности.
+//   Когда фон подключён, старые окна, полки, прилавок и ковёр из прямоугольников не рисуются.
+// counterFront — передняя часть прилавка отдельным слоем: рисуется ПОВЕРХ Андрея, когда он стоит за прилавком, и ПОД покупателем.
+//   Файл 640×180 с прозрачностью (непрозрачна только область прилавка, пиксели те же, что в фоне, поэтому дыр и двойных контуров нет).
+//   Если файла нет, а фон есть, слой вырезается из фона по прямоугольнику rect (координаты мира).
+// foreground — необязательный передний план (бочки, ящики), 640×180 с прозрачностью; рисуется поверх всех персонажей.
+// portrait — размер крупного портрета в режиме обслуживания (пути портретов лежат у персонажей); goodsIcon — размер значка товара в панели.
+// stockMarks — временные квадратики остатка товара: show 'auto' = рисовать только пока фон ещё заглушка; true/false — принудительно.
+//   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
 const ART = {
-  background: { src: 'assets/backgrounds/shop.png' },
-  foreground: { src: 'assets/backgrounds/shop_front.png' },
-  stockMarks: { show: true, x: 330, y: 95, groupStep: 60, perRow: 5, gap: 4, size: 3 }
+  background:   { src: 'assets/backgrounds/shop.png' },
+  counterFront: { src: 'assets/backgrounds/shop_counter.png', rect: { x: 250, y: 92, w: 330, h: 51 } },
+  foreground:   { src: 'assets/backgrounds/shop_front.png' },
+  portrait:  { w: 120, h: 136 },
+  goodsIcon: { w: 24, h: 24 },
+  stockMarks: { show: 'auto', x: 330, y: 95, groupStep: 60, perRow: 5, gap: 4, size: 3 }
 };
 
 const ANDREY = {                      // утверждённые параметры первого теста
   cellW: 96, cellH: 80, anchorX: 48, floorY: 76,
-  walk: { src: 'assets/characters/andrey_walk.png', frames: 8 },
+  walk: { src: 'assets/characters/andrey_walk.png', frames: 8 },   // пока нет файла: при ходьбе показывается статичный кадр покоя (НЕ готовая анимация)
   idle: { src: 'assets/characters/andrey_idle.png' },
   cycleDistance: 40                   // ПРОВИЗОРНО: подобрать по готовой анимации
 };
 
 // Товары: unit — единица, stock — остаток на старте, cost — закупка за единицу, price — начальная цена продажи
 const GOODS = {
-  grain:  { name: 'Крупа',          unit: 'мешочек', stock: 10, cost: 6, price: 10, color: '#c9893a' },
-  bread:  { name: 'Хлеб',           unit: 'буханку', stock: 8,  cost: 3, price: 5,  color: '#a8672a' },
-  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0' }
+  grain:  { name: 'Крупа',          unit: 'мешочек', stock: 10, cost: 6, price: 10, color: '#c9893a', icon: 'assets/goods/grain.png' },
+  bread:  { name: 'Хлеб',           unit: 'буханку', stock: 8,  cost: 3, price: 5,  color: '#a8672a', icon: 'assets/goods/bread.png' },
+  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0', icon: 'assets/goods/apples.png' }
 };
 const START = { money: 30 };
 
 // Сцена: координаты МИРА в пикселях (экран 320x180 показывает часть лавки, камера следует за Андреем).
-// worldW — ширина лавки, lane — линия пола, counter — зона у прилавка (осмотр товаров),
-// customerX и motherX — где стоят покупатель и мать, talkRange — на каком расстоянии можно заговорить.
+// worldW — ширина лавки, lane — линия пола перед прилавком (по ней Андрей ходит свободно),
+// workX — рабочее место: здесь подсказка «E — Встать за прилавок» и здесь Андрей стоит за прилавком (ноги на линии serviceY);
+// customerX — где стоит покупатель (перед прилавком), motherX — мать, talkRange — на каком расстоянии можно заговорить,
+// counter — границы прилавка (нужны только для заглушки).
 const SCENE = { worldW: 640, lane: 151, startX: 60, walkMin: 16, talkRange: 23,
-                customerX: 430, motherX: 120, counter: { l: 300, r: 630 } };
+                workX: 540, serviceY: 120, customerX: 480, motherX: 120, counter: { l: 250, r: 580 } };
 
 // Покупатели (приходят по очереди). Правило торга одно для всех, без случайности:
 // согласен, если цена за единицу <= maxUnit И сумма <= budget; иначе предлагает wantUnit за единицу.
 // После трёх неудачных предложений уходит (leaveNode).
 const CUSTOMERS = [
-  { id: 'pavel', name: 'Павел', color: '#4a5a3a', want: 'grain', qty: 2, budget: 18, wantUnit: 8, maxUnit: 9,
+  { id: 'pavel', name: 'Павел', kind: 'story', portrait: 'assets/portraits/pavel.png', color: '#4a5a3a', want: 'grain', qty: 2, budget: 18, wantUnit: 8, maxUnit: 9,
     openNode: 'pavel_open', soldNode: 'pavel_sold', refusedNode: 'pavel_refused', leaveNode: 'pavel_leave',
     priceMsg: 'Два мешочка крупы. Почём?', counterMsg: 'За {counter} отдашь? Ещё дорогу оплачивать.',
     tradeTalk: [{ text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true }] },
-  { id: 'darya', name: 'Дарья', color: '#7a4a6b', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
+  { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
     openNode: 'darya_open', soldNode: 'darya_sold', refusedNode: 'darya_refused', leaveNode: 'darya_leave',
     priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] }
 ];
-const MOTHER = { name: 'Мать', color: '#8a5a5a', node: 'mother_hub' };
+// kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
+const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/portraits/mother.png', color: '#8a5a5a', node: 'mother_hub' };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {
@@ -78,7 +87,7 @@ const NODES = {
     { text: 'Понятно. Вернёмся к покупке.', do: 'back' }] },
   pavel_src: { who: 'Павел', text: 'Нет, сам не говорил. Всё от соседа.', choices: [
     { text: 'Понятно. Вернёмся к покупке.', do: 'back' }] },
-  pavel_sold: { who: 'Павел', text: 'Спасибо. Если узнаешь, кто за перевозку берётся, скажи.\nВыручка {rev} — получили от покупателя. Прибыль {profit} — выручка минус закупочная стоимость проданного. Остаток: {left}.', choices: [
+  pavel_sold: { who: 'Павел', text: 'Спасибо. Если узнаешь, кто за перевозку берётся, скажи.', choices: [
     { text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true },
     { text: 'Если узнаю — передам.', do: 'finish', promise: 'tell_pavel_carrier' },
     { text: 'Обещать не стану.', do: 'finish' }] },
@@ -88,7 +97,7 @@ const NODES = {
   pavel_leave: { who: 'Павел', text: 'Так не пойдёт. Я заканчиваю разговор, пойду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_open: { who: 'Дарья', text: 'Две буханки, пожалуйста.', choices: [
     { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
-  darya_sold: { who: 'Дарья', text: 'Спасибо.\nВыручка {rev} — получили от покупателя. Прибыль {profit} — выручка минус закупочная стоимость проданного. Остаток: {left}.',
+  darya_sold: { who: 'Дарья', text: 'Спасибо.',
     choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_refused: { who: 'Дарья', text: 'Жаль. Зайду позже.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_leave: { who: 'Дарья', text: 'Нет, так не пойдёт. Я заканчиваю разговор.', choices: [{ text: 'До свидания.', do: 'finish' }] },

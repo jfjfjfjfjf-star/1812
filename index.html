@@ -9,62 +9,73 @@
   #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
            width: calc(var(--s) * 320px); height: calc(var(--s) * 180px); }
   canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
-  #hud, #hint, #newgame, #dbg { position: absolute; color: #f0e2c0; font-size: calc(var(--s) * 5px); text-shadow: 1px 1px #000; }
+  #hud, #hint, #newgame, #dbg, #back { position: absolute; color: #f0e2c0; font-size: calc(var(--s) * 5px); text-shadow: 1px 1px #000; }
   #hud { right: calc(var(--s) * 4px); top: calc(var(--s) * 3px); }
   #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
   #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
              font-family: inherit; opacity: .6; cursor: pointer; }
-  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 13px); color: #c9b98a; opacity: .75; }
-  #dlg { position: absolute; left: 0; right: 0; bottom: 0; display: none; }
-  #choices { display: flex; flex-direction: column; gap: calc(var(--s) * 2px); margin: 0 20% calc(var(--s) * 3px); }
-  #choices button { font: inherit; font-size: calc(var(--s) * 6px); padding: calc(var(--s) * 2px); cursor: pointer;
-                    background: #2a1a0e; color: #f0e2c0; border: 2px solid #c9a96a; }
-  #choices button:disabled { opacity: .4; cursor: not-allowed; }
-  #box { background: rgba(20,12,6,.92); border-top: 2px solid #c9a96a; color: #f0e2c0;
-         padding: calc(var(--s) * 4px) calc(var(--s) * 8px); min-height: calc(var(--s) * 30px);
-         font-size: calc(var(--s) * 7px); line-height: 1.35; }
-  #who { color: #e8c36a; font-weight: bold; min-height: 1.35em; }
-  #box { white-space: pre-line; }
-  #mid { display: flex; align-items: flex-end; }
-  #choices { margin: 0 0 calc(var(--s) * 3px) 4%; flex: 1; }
-  #panel { display: none; width: 42%; margin: 0 calc(var(--s) * 4px) calc(var(--s) * 3px) 0; box-sizing: border-box;
-           background: rgba(20,12,6,.92); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--s) * 3px);
-           font-size: calc(var(--s) * 5px); line-height: 1.4; }
-  #panel i { opacity: .7; } #panel button { font: inherit; padding: 0 calc(var(--s) * 3px); cursor: pointer; }
-  #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--s) * 24px); display: none;
+  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 15px); color: #c9b98a; opacity: .75; }
+  #back { display: none; left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); font-family: inherit; cursor: pointer; text-shadow: none;
+          background: rgba(20,12,6,.92); border: calc(var(--s) * 1px) solid #8c7647; padding: calc(var(--s) * 1.5px) calc(var(--s) * 5px); }
+  body.serving #newgame, body.serving #notesbtn { display: none; }
+  #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--s) * 24px); display: none; z-index: 5;
            background: rgba(20,12,6,.92); border: 2px solid #e8c36a; color: #f0e2c0; padding: calc(var(--s) * 2px) calc(var(--s) * 6px);
            font-size: calc(var(--s) * 6px); }
-  #notes { position: absolute; inset: calc(var(--s) * 10px) calc(var(--s) * 30px); display: none; overflow: auto; box-sizing: border-box;
+  #notes { position: absolute; inset: calc(var(--s) * 10px) calc(var(--s) * 30px); display: none; overflow: auto; box-sizing: border-box; z-index: 4;
            background: rgba(20,12,6,.96); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--s) * 4px) calc(var(--s) * 8px);
            font-size: calc(var(--s) * 6px); line-height: 1.35; }
   #notes h3 { margin: 0 0 calc(var(--s) * 3px); } #notes p { margin: 0 0 calc(var(--s) * 3px); }
   #notesbtn { position: absolute; left: calc(var(--s) * 52px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
               color: #f0e2c0; font-family: inherit; font-size: calc(var(--s) * 5px); opacity: .6; cursor: pointer; }
-  #dlg { padding: 0 calc(var(--s) * 4px) calc(var(--s) * 4px); box-sizing: border-box; align-items: flex-end; gap: calc(var(--s) * 3px); }
-  #portrait { display: none; flex: none; width: calc(var(--s) * 40px); height: calc(var(--s) * 40px); border: 2px solid #c9a96a;
-              align-items: center; justify-content: center; font-size: calc(var(--s) * 20px); color: #f0e2c0aa; }
-  #col { flex: 1; display: flex; flex-direction: column; gap: calc(var(--s) * 2px); min-width: 0; }
-  #box { border: 2px solid #c9a96a; min-height: calc(var(--s) * 28px); }
-  #choices { flex-direction: row; flex-wrap: wrap; margin: 0; gap: calc(var(--s) * 2px); }
-  #panel { flex: none; width: calc(var(--s) * 100px); margin: 0; font-size: calc(var(--s) * 6px); }
-  #pact { display: flex; flex-direction: column; gap: calc(var(--s) * 2px); margin-top: calc(var(--s) * 2px); }
-  #pact button { font: inherit; font-size: calc(var(--s) * 6px); padding: calc(var(--s) * 2px); cursor: pointer;
-                 background: #2a1a0e; color: #f0e2c0; border: 2px solid #c9a96a; }
+  /* Режим обслуживания (по макету): портрет слева внизу, реплика внизу, панель справа. Всё размещено в долях сетки 320x180. */
+  #dlg { position: absolute; inset: 0; display: none; pointer-events: none; }
+  #dlg > * { pointer-events: auto; }
+  #portrait { position: absolute; left: 0; bottom: 0; width: calc(var(--s) * 120px); height: calc(var(--s) * 136px); display: none; pointer-events: none; }
+  #portrait img { width: 100%; height: 100%; display: block; image-rendering: pixelated; object-fit: contain; object-position: left bottom; }
+  #portrait .ph { position: absolute; left: 0; bottom: 0; width: 62%; height: 80%; opacity: .8; display: flex; align-items: center; justify-content: center;
+                  font-size: calc(var(--s) * 40px); color: #f0e2c0aa; border: calc(var(--s) * 1px) solid #8c7647; border-bottom: 0; box-sizing: border-box; }
+  #col { position: absolute; left: calc(var(--s) * 118px); right: calc(var(--s) * 4px); bottom: calc(var(--s) * 4px); display: flex; flex-direction: column; gap: calc(var(--s) * 2px); }
+  body.paneled #col { right: calc(var(--s) * 92px); }
+  #box { background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0; white-space: pre-line;
+         padding: calc(var(--s) * 3px) calc(var(--s) * 6px); min-height: calc(var(--s) * 22px); font-size: calc(var(--s) * 6px); line-height: 1.35; }
+  #who { color: #e8c36a; font-weight: bold; font-size: calc(var(--s) * 7px); }
+  #who:empty { display: none; }
+  #choices { display: flex; flex-wrap: wrap; gap: calc(var(--s) * 2px); }
+  #choices button, #pact button { font: inherit; font-size: calc(var(--s) * 5.5px); padding: calc(var(--s) * 2px) calc(var(--s) * 3px); cursor: pointer;
+                  background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--s) * 1px) solid #8c7647; flex: 1 1 auto; }
+  #choices button:hover, #pact button:hover, #back:hover { border-color: #e8c36a; }
+  #choices button:disabled { opacity: .4; cursor: not-allowed; }
+  #pact button:first-child.main { background: #c9a96a; color: #1a1008; font-weight: bold; }
+  #panel { position: absolute; right: calc(var(--s) * 4px); top: calc(var(--s) * 11px); width: calc(var(--s) * 84px); box-sizing: border-box; display: none;
+           flex-direction: column; background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0;
+           padding: calc(var(--s) * 2.5px); font-size: calc(var(--s) * 5.5px); line-height: 1.25; }
+  #panel.full { bottom: calc(var(--s) * 3px); overflow-y: auto; }
+  #panel i { opacity: .7; font-size: calc(var(--s) * 4.5px); line-height: 1.15; display: block; }
+  #panel .head { display: flex; gap: calc(var(--s) * 3px); align-items: center; margin-bottom: calc(var(--s) * 2px); }
+  #panel .gi { flex: none; width: calc(var(--s) * 20px); height: calc(var(--s) * 20px); border: calc(var(--s) * 1px) solid #8c7647; box-sizing: border-box; }
+  #panel .gi img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  #panel .row { display: flex; justify-content: space-between; align-items: center; }
+  #panel .step { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--s) * 1px) 0; }
+  #panel .step button { font: inherit; font-size: calc(var(--s) * 6px); width: calc(var(--s) * 14px); cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--s) * 1px) solid #8c7647; }
+  #panel .step b { font-size: calc(var(--s) * 8px); }
+  #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--s) * 1.5px); padding-top: calc(var(--s) * 2px); }
+  #pact button { padding: calc(var(--s) * 1.5px) calc(var(--s) * 3px); }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
-  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><div id="toast"></div><div id="notes"></div>
+  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="back">← Отойти от прилавка</button>
   <div id="hud"></div>
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
+  <div id="toast"></div><div id="notes"></div>
 </div>
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 7) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 8) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -111,7 +122,7 @@ function sell() {                                      // деньги и тов
   const c = C(), d = deal();
   if (d.stage === 'after' || d.stage === 'done') return;
   if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
-  d.stage = 'after'; d.afterNode = c.soldNode;
+  d.stage = 'after'; d.afterNode = c.soldNode; d.sold = true;
   state.money += total(d); state.stock[c.want] -= c.qty;
   save(); showNode(c.soldNode);
 }
@@ -136,17 +147,35 @@ function step(k) { const d = deal(); d.price = Math.max(1, Math.min(99, d.price 
 function tradeChoices() {
   const c = C(), d = deal(), l = [{ text: 'Предложить цену' + (profit(d) < 0 ? ' (убыток)' : ''), do: 'offer' }];
   if (d.counter) l.push({ text: 'Принять ' + d.counter, do: 'accept' });
-  return l.concat(c.tradeTalk.filter(okChoice), [{ text: 'Отказаться', do: 'refuse' }]);
+  return l.concat(c.kind === 'story' ? c.tradeTalk.filter(okChoice) : [], [{ text: 'Отказаться', do: 'refuse' }]);
 }
-function inspect() {
-  const t = Object.keys(GOODS).map(k => GOODS[k].name + ': ' + state.stock[k] + ' (закупка ' + GOODS[k].cost + ', цена ' + GOODS[k].price + ')').join('\n');
-  dlg = { node: { who: 'Прилавок', text: t, choices: [{ text: 'Закрыть', do: 'end' }] } }; renderDlg();
+// ----- Режим обслуживания: Андрей занимает место за прилавком (переход между двумя заранее заданными позициями) -----
+let serving = false;                                   // не сохраняется: после загрузки Андрей стоит перед прилавком, сделка продолжается
+function openCustomer() {                              // показывает текущего покупателя с того места, где сделка остановилась
+  const c = C();
+  if (!c) { dlg = { idle: true }; return renderDlg(); }
+  const d = deal();
+  if (d.stage === 'price') return showTrade();
+  showNode(d.stage === 'open' ? c.openNode : d.afterNode);
 }
+function enterService() {
+  if (dlg || notesOpen || serving) return;
+  serving = true; player.x = SCENE.workX; player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
+  openCustomer();
+}
+function stepAway() {                                  // сделка не продаётся и не отменяется: условия остаются в state.deals
+  if (!serving) return;
+  serving = false; dlg = null; player.x = SCENE.workX; player.moving = false;     // свободная позиция перед рабочим местом
+  save(); renderDlg();
+}
+const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
 function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
   const op = c.do || '', cu = C(), d = cu && deal();
-  if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back'].includes(op)) { dlg = null; renderDlg(); return; }   // покупателей больше нет
+  if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
+  if (op === 'next') return openCustomer();
+  if (op === 'leave') return stepAway();   // покупателей больше нет
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
@@ -154,24 +183,33 @@ function act(c) {
   if (op === 'back') return d.stage === 'open' ? showNode(cu.openNode) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
   if (op === 'finish' && d && d.stage === 'after') { d.stage = 'done'; state.visit++; }   // следующий покупатель
   if (c.goto) { save(); return showNode(c.goto); }
-  save(); dlg = null; renderDlg();
+  save(); endDlg();
 }
 
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
 const SAVE_KEY = 'letopisi1812_save_v6';
 const newState = () => ({ money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
-  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '' }])) });
+  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false }])) });
 let state = load() || newState();
 let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
 
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
-function load() {
+function load() {                                      // старое сохранение: недостающие поля добавляются, нелепые значения — отказ
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && typeof s.money === 'number' && typeof s.visit === 'number' && s.heard && s.asked && s.promises && s.ctx &&
-        Object.keys(GOODS).every(k => typeof s.stock[k] === 'number') &&
-        CUSTOMERS.every(c => s.deals[c.id] && typeof s.deals[c.id].price === 'number')) return s;
+    const num = v => typeof v === 'number' && isFinite(v);
+    if (s && num(s.money) && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= CUSTOMERS.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
+        Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
+        CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
+      CUSTOMERS.forEach(c => {                         // миграция: у сделки появился признак «продано»
+        const d = s.deals[c.id];
+        if (typeof d.sold !== 'boolean') d.sold = d.stage !== 'open' && d.stage !== 'price' && d.afterNode === c.soldNode;
+        if (!num(d.fails)) d.fails = 0;
+        if (typeof d.msg !== 'string') d.msg = '';
+      });
+      return s;
+    }
   } catch (e) {}
   return null;
 }
@@ -191,22 +229,26 @@ addEventListener('resize', fit); fit();
 // Подробности (какой файл, какой размер) — только в консоли браузера (F12); на экране при необходимости
 // одна короткая надпись «Временная графика». Необязательный слой (передний план) надписи не вызывает, если его просто нет.
 const spr = {}, problems = [];
-function loadImage(key, src, w, h, optional) {
+function loadImage(key, src, w, h, optional, note) {
   const im = new Image(); im.ok = false; spr[key] = im;
   im.onload = () => {
     if (im.width === w && im.height === h) im.ok = true;
-    else { problems.push(src); console.warn('[графика] ' + src + ': размер ' + im.width + '×' + im.height + ', нужен ' + w + '×' + h + '. Показана заглушка.'); }
+    else { if (!optional) problems.push(src); console.warn('[графика] ' + src + ': размер ' + im.width + '×' + im.height + ', нужен ' + w + '×' + h + '. ' + (note || 'Показана заглушка.')); }
   };
   im.onerror = () => {
-    if (optional) console.info('[графика] ' + src + ' не найден (необязательный слой).');
-    else { problems.push(src); console.warn('[графика] ' + src + ' не найден. Показана заглушка.'); }
+    if (optional) console.info('[графика] ' + src + ' не найден (необязательный файл).');
+    else { problems.push(src); console.warn('[графика] ' + src + ' не найден. ' + (note || 'Показана заглушка.')); }
   };
   im.src = src;
 }
-loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH);
+loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH, false,
+  'Покадровой ходьбы пока нет: при ходьбе показывается статичный кадр покоя (это НЕ готовая анимация).');
 loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
+loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
+[...CUSTOMERS, MOTHER].forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
+Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 47 };
@@ -214,9 +256,8 @@ function resetPlayer() { Object.assign(player, { x: SCENE.startX, dist: 0, dir: 
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(WORLD_W - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
 const near = x => Math.abs(player.x - x) < SCENE.talkRange;
-const nearCust = () => !dlg && !!C() && near(SCENE.customerX);
-const nearMom = () => !dlg && near(SCENE.motherX);
-const nearCounter = () => !dlg && !nearCust() && player.x >= SCENE.counter.l && player.x <= SCENE.counter.r;
+const nearMom = () => !dlg && !serving && near(SCENE.motherX);
+const nearWork = () => !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
@@ -225,14 +266,15 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.repeat) return;                                // удержание клавиши не повторяет действие (заметки не мигают)
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
+  if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
-  if (nearCust()) { const d = deal(); d.stage === 'price' ? showTrade() : showNode(d.stage === 'open' ? C().openNode : d.afterNode); }
-  else if (nearMom()) showNode(MOTHER.node);
-  else if (nearCounter()) inspect();
+  if (nearMom()) showNode(MOTHER.node);
+  else if (nearWork()) enterService();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { state = newState(); dlg = null; notesOpen = false; resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
 
 // ================= ДИАЛОГ, ПАНЕЛЬ ЦЕНЫ, ЗАМЕТКИ (интерфейс — слой поверх сцены 320×180) =================
@@ -240,32 +282,59 @@ function toast(t) {
   const el = $('toast'); el.textContent = t; el.style.display = 'block';
   clearTimeout(toast.t); toast.t = setTimeout(() => { el.style.display = 'none'; }, 3500);
 }
+function goodsIcon(k) {                                // значок товара: картинка или нейтральный цветной квадрат
+  return spr['g_' + k] && spr['g_' + k].ok ? '<img src="' + GOODS[k].icon + '" alt="">' : '<div style="width:100%;height:100%;background:' + GOODS[k].color + '"></div>';
+}
+function setPortrait(sp) {
+  const pt = $('portrait'); pt.innerHTML = '';
+  if (!sp) { pt.style.display = 'none'; return; }
+  pt.style.display = 'block';
+  if (spr['p_' + sp.id] && spr['p_' + sp.id].ok) { const im = document.createElement('img'); im.src = sp.portrait; im.alt = ''; pt.appendChild(im); }
+  else { const ph = document.createElement('div'); ph.className = 'ph'; ph.style.background = sp.color; ph.textContent = sp.name[0]; pt.appendChild(ph); }   // запасной вариант
+}
+function stockList() { return Object.keys(GOODS).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
 function renderDlg() {
-  const box = $('dlg'), ch = $('choices'), pn = $('panel'), pt = $('portrait');
-  ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none';
+  const box = $('dlg'), ch = $('choices'), pn = $('panel');
+  ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none'; pn.className = '';
+  document.body.classList.toggle('serving', serving); $('back').style.display = serving ? 'block' : 'none';
+  document.body.classList.remove('paneled');
   if (!dlg) { box.style.display = 'none'; return; }
-  const c = C(), d = c ? deal() : null; let who, text, list, target = ch;
-  if (dlg.trade) {
-    who = c.name; text = d.msg; list = tradeChoices(); target = null;
+  const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
+  if (dlg.idle) {                                      // между покупателями или пустая очередь
+    who = ''; text = c ? 'Следующий покупатель ждёт у прилавка.' : 'Пока покупателей нет.';
+    list = (c ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Отойти от прилавка', do: 'leave' }]);
+    pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
+  } else if (dlg.trade) {
+    who = c.name; text = d.msg; list = tradeChoices(); sp = c;
     const pf = profit(d);
-    pn.style.display = 'block';
-    pn.innerHTML = '<b>' + G().name + ' ×' + c.qty + '</b><br>Остаток: ' + state.stock[c.want] + ' <i>— столько есть в лавке</i><br>' +
-      'Закупка: ' + G().cost + ' <i>— за сколько купили</i><br>Цена за ' + G().unit + ': <button id="pm">−</button> <b>' + d.price +
-      '</b> <button id="pp">+</button><br>Всего: <b>' + total(d) + '</b><br>' + (pf < 0 ? 'Убыток: <b>' + (-pf) : 'Прибыль: <b>' + pf) +
-      '</b> <i>— выручка минус закупка проданного</i><div id="pact"></div>';
+    pn.style.display = 'flex'; pn.className = 'full';
+    pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>' + G().name + ' × ' + c.qty + '</b></div></div>' +
+      '<div class="row">Остаток: <b>' + state.stock[c.want] + '</b></div><i>столько есть в лавке</i>' +
+      '<div style="margin-top:' + 1 + 'px">Цена за ' + G().unit + '</div><div class="step"><button id="pm">−</button><b>' + d.price + '</b><button id="pp">+</button></div>' +
+      '<div class="row">Всего: <b>' + total(d) + '</b></div>' +
+      '<div class="row">Закупка: <b>' + (c.qty * G().cost) + '</b></div><i>за сколько купили</i>' +
+      '<div class="row">' + (pf < 0 ? 'Убыток' : 'Прибыль') + ': <b>' + Math.abs(pf) + '</b></div><i>выручка минус закупка проданного</i><div id="pact"></div>';
     $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
   } else {
     who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
-    if (c && who === c.name && d.stage !== 'after') {   // краткое предложение остаётся справа во время разговора
-      pn.style.display = 'block';
-      pn.innerHTML = '<b>' + G().name + ' ×' + c.qty + '</b><br>Цена: ' + d.price + '<br>Всего: ' + total(d);
+    sp = [...CUSTOMERS, MOTHER].find(x => x.name === who) || null;
+    if (c && who === c.name && d.stage === 'after' && d.sold) {          // итог продажи — в интерфейсе, а не в речи покупателя
+      pn.style.display = 'flex';
+      pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>Продано</b><br>' + G().name + ' × ' + c.qty + '</div></div>' +
+        '<div class="row">Выручка: <b>' + total(d) + '</b></div><i>получили от покупателя</i>' +
+        '<div class="row">Прибыль: <b>' + profit(d) + '</b></div><i>выручка минус закупка проданного</i>' +
+        '<div class="row">Остаток: <b>' + state.stock[c.want] + '</b></div><i>столько осталось в лавке</i>';
+    } else if (c && who === c.name && d.stage !== 'after') {            // условия остаются видны во время разговора
+      pn.style.display = 'flex';
+      pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>' + G().name + ' × ' + c.qty + '</b></div></div>' +
+        '<div class="row">Цена: <b>' + d.price + '</b></div><div class="row">Всего: <b>' + total(d) + '</b></div>';
     }
   }
-  const sp = [...CUSTOMERS, MOTHER].find(x => x.name === who);
-  pt.style.display = sp ? 'flex' : 'none'; pt.style.background = sp ? sp.color : ''; pt.textContent = sp ? sp.name[0] : '';
-  box.style.display = 'flex';
+  setPortrait(sp);
+  document.body.classList.toggle('paneled', pn.style.display === 'flex');
+  box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
-  list.forEach(x => { const b = document.createElement('button'); b.textContent = x.text; b.onclick = () => act(x); target.appendChild(b); });
+  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
 }
 function renderNotes() {
   const el = $('notes'); el.style.display = notesOpen ? 'block' : 'none';
@@ -282,7 +351,7 @@ function renderNotes() {
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt) {
   player.moving = false;
-  if (dlg || notesOpen) return;                        // во время диалога и заметок движение заблокировано
+  if (dlg || notesOpen || serving) return;             // во время диалога, заметок и обслуживания движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   const nx = Math.min(Math.max(player.x + dx * player.speed * dt, FLOOR.l), FLOOR.r);
   const d = Math.abs(nx - player.x);
@@ -310,23 +379,22 @@ function person(x, y, color, swing, dir) {
   rect('#2a1a0e', x + (dir > 0 ? 2 : -7), y - 60, 5, 3);
   rect('#d8d0b0', x - 2 - swing, y - 48, 5, 20);
 }
-function drawAndrey() {
-  const A = ANDREY, p = player, img = p.moving ? spr.walk : spr.idle;
-  const cycle = (p.dist / A.cycleDistance) % 1;            // 0..1 внутри цикла ходьбы
-  if (!(spr.walk.ok && spr.idle.ok)) {                     // нет одного из двух файлов — заглушка целиком
-    person(p.x, p.y, '#6b8a3a', p.moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, p.dir);
-    return;
-  }
-  const f = p.moving ? Math.floor(cycle * A.walk.frames) : 0;
-  const px = Math.round(p.x), py = Math.round(p.y) - A.floorY;
+// Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Файла ходьбы пока нет — при движении показывается тот же статичный
+// кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
+function drawAndrey(x, y, dir, moving) {
+  const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
+  if (!spr.idle.ok) { person(x, y, '#6b8a3a', moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, dir); return; }
+  const useWalk = moving && spr.walk.ok, img = useWalk ? spr.walk : spr.idle;
+  const f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
   ctx.save();
-  ctx.translate(px, 0);
-  if (p.dir < 0) ctx.scale(-1, 1);                         // влево — зеркало (вправо рисуем как есть)
-  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -A.anchorX, py, A.cellW, A.cellH);
+  ctx.translate(Math.round(x), 0);
+  if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
+  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -A.anchorX, Math.round(y) - A.floorY, A.cellW, A.cellH);
   ctx.restore();
 }
-// Слои (снизу вверх): 1) фон помещения и объекты позади персонажей, 2) отметки остатка товара,
-// 3) персонажи, 4) передний план, 5) интерфейс (HTML поверх сцены).
+// Слои (снизу вверх): 1) фон помещения, 2) отметки остатка (только при заглушке фона), 3) мать,
+// 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
+// 8) передний план, 9) интерфейс (HTML поверх сцены). Покупатель всегда перед прилавком, Андрей за ним — и никогда не наоборот.
 function drawBackdrop() {                              // слой 1
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
@@ -335,15 +403,20 @@ function drawBackdrop() {                              // слой 1
   rect('#f0b04a', 520, 90, 2, 8); rect('rgba(255,170,60,.12)', 490, 70, 62, 54);    // свеча: тёплый янтарный свет
   rect('#8a2a2a', 150, 159, 330, 8);                                                // ковёр
 }
-function drawStock() {                                 // слой 2: одна штука товара — один квадрат; вызывается один раз за кадр
-  const m = ART.stockMarks; if (!m.show) return;
+function drawStock() {                                 // слой 2: одна штука товара — один квадрат; один раз за кадр
+  const m = ART.stockMarks; if (!(m.show === true || (m.show === 'auto' && !spr.bg.ok))) return;
   Object.keys(GOODS).forEach((k, i) => {
     for (let n = 0; n < state.stock[k]; n++)
       rect(GOODS[k].color, m.x + i * m.groupStep + (n % m.perRow) * m.gap, m.y - Math.floor(n / m.perRow) * m.gap, m.size, m.size);
   });
 }
-function drawFront() {                                 // слой 4
-  if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);                // настоящий передний план
+function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
+  if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
+  else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
+  else rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);
+}
+function drawFront() {                                 // слой 8
+  if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
   else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }
 function draw() {
@@ -354,14 +427,16 @@ function draw() {
   drawBackdrop();
   drawStock();
   person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
-  if (C()) person(SCENE.customerX, LANE, C().color, 0, -1);   // ушедший покупатель (visit уже вырос) не рисуется
-  drawAndrey();
+  if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
+  drawCounterFront();
+  if (C()) person(SCENE.customerX, LANE, C().color, 0, 1);    // ушедший покупатель (visit уже вырос) не рисуется
+  if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
   ctx.restore();
   $('hud').textContent = 'Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = nearCust() || nearMom() ? 'E — Поговорить' : nearCounter() ? 'E — осмотреть товары' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
+  const msg = serving ? '' : nearMom() ? 'E — Поговорить' : nearWork() ? 'E — Встать за прилавок' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
 }
 
