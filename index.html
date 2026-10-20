@@ -14,7 +14,7 @@
   #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
   #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
              font-family: inherit; opacity: .6; cursor: pointer; }
-  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 13px); color: #f08a8a; }
+  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 13px); color: #c9b98a; opacity: .75; }
   #dlg { position: absolute; left: 0; right: 0; bottom: 0; display: none; }
   #choices { display: flex; flex-direction: column; gap: calc(var(--s) * 2px); margin: 0 20% calc(var(--s) * 3px); }
   #choices button { font: inherit; font-size: calc(var(--s) * 6px); padding: calc(var(--s) * 2px); cursor: pointer;
@@ -64,7 +64,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 6) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 7) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -186,21 +186,27 @@ function fit() {
 }
 addEventListener('resize', fit); fit();
 
-// ================= ЗАГРУЗКА СПРАЙТОВ =================
-// Если файла нет или у него не тот размер, спрайт не используется, рисуется заглушка,
-// а причина выводится красным текстом в углу экрана.
+// ================= ЗАГРУЗКА ГРАФИКИ =================
+// Любой файл может отсутствовать: тогда рисуется временная заглушка и игра продолжается.
+// Подробности (какой файл, какой размер) — только в консоли браузера (F12); на экране при необходимости
+// одна короткая надпись «Временная графика». Необязательный слой (передний план) надписи не вызывает, если его просто нет.
 const spr = {}, problems = [];
-function loadSprite(key, src, w, h) {
+function loadImage(key, src, w, h, optional) {
   const im = new Image(); im.ok = false; spr[key] = im;
   im.onload = () => {
     if (im.width === w && im.height === h) im.ok = true;
-    else problems.push(src + ': размер ' + im.width + '×' + im.height + ', нужен ' + w + '×' + h);
+    else { problems.push(src); console.warn('[графика] ' + src + ': размер ' + im.width + '×' + im.height + ', нужен ' + w + '×' + h + '. Показана заглушка.'); }
   };
-  im.onerror = () => problems.push(src + ' не найден, показана заглушка');
+  im.onerror = () => {
+    if (optional) console.info('[графика] ' + src + ' не найден (необязательный слой).');
+    else { problems.push(src); console.warn('[графика] ' + src + ' не найден. Показана заглушка.'); }
+  };
   im.src = src;
 }
-loadSprite('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH);
-loadSprite('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
+loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH);
+loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
+loadImage('bg', ART.background.src, SCENE.worldW, H);
+loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 47 };
@@ -307,7 +313,7 @@ function person(x, y, color, swing, dir) {
 function drawAndrey() {
   const A = ANDREY, p = player, img = p.moving ? spr.walk : spr.idle;
   const cycle = (p.dist / A.cycleDistance) % 1;            // 0..1 внутри цикла ходьбы
-  if (!img.ok) {                                           // картинки нет — заглушка
+  if (!(spr.walk.ok && spr.idle.ok)) {                     // нет одного из двух файлов — заглушка целиком
     person(p.x, p.y, '#6b8a3a', p.moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, p.dir);
     return;
   }
@@ -319,29 +325,41 @@ function drawAndrey() {
   ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -A.anchorX, py, A.cellW, A.cellH);
   ctx.restore();
 }
-function drawGoods() {                                 // каждая единица товара — квадрат на прилавке
+// Слои (снизу вверх): 1) фон помещения и объекты позади персонажей, 2) отметки остатка товара,
+// 3) персонажи, 4) передний план, 5) интерфейс (HTML поверх сцены).
+function drawBackdrop() {                              // слой 1
+  if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
+  rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
+  shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
+  rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);     // прилавок
+  rect('#f0b04a', 520, 90, 2, 8); rect('rgba(255,170,60,.12)', 490, 70, 62, 54);    // свеча: тёплый янтарный свет
+  rect('#8a2a2a', 150, 159, 330, 8);                                                // ковёр
+}
+function drawStock() {                                 // слой 2: одна штука товара — один квадрат; вызывается один раз за кадр
+  const m = ART.stockMarks; if (!m.show) return;
   Object.keys(GOODS).forEach((k, i) => {
     for (let n = 0; n < state.stock[k]; n++)
-      rect(GOODS[k].color, 330 + i * 60 + (n % 5) * 4, 95 - Math.floor(n / 5) * 4, 3, 3);
+      rect(GOODS[k].color, m.x + i * m.groupStep + (n % m.perRow) * m.gap, m.y - Math.floor(n / m.perRow) * m.gap, m.size, m.size);
   });
+}
+function drawFront() {                                 // слой 4
+  if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);                // настоящий передний план
+  else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }
 function draw() {
   const cam = cameraX();
-  rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120);
-  ctx.save(); ctx.translate(-cam, 0);
-  rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
-  shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
-  rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);                  // прилавок
-  drawGoods();
-  rect('#f0b04a', 520, 90, 2, 8); rect('rgba(255,170,60,.12)', 490, 70, 62, 54);    // свеча: тёплый янтарный свет
-  rect('#8a2a2a', 150, 159, 330, 8);                   // ковёр
+  ctx.clearRect(0, 0, W, H);
+  if (!spr.bg.ok) { rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120); }   // заглушка: стена и пол
+  ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
+  drawBackdrop();
+  drawStock();
   person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
   if (C()) person(SCENE.customerX, LANE, C().color, 0, -1);   // ушедший покупатель (visit уже вырос) не рисуется
   drawAndrey();
-  rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25);      // передний план
+  drawFront();
   ctx.restore();
   $('hud').textContent = 'Монет: ' + state.money;
-  $('dbg').textContent = problems.join(' | ');
+  $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
   const msg = nearCust() || nearMom() ? 'E — Поговорить' : nearCounter() ? 'E — осмотреть товары' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
