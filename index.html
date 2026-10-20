@@ -371,13 +371,13 @@ function shelf(x, y, n) {
 }
 // Заглушка-человечек (ростом ~66 px, как будущие спрайты). Нужна для покупателей и пока нет картинок Андрея.
 function person(x, y, color, swing, dir) {
-  x = Math.round(x); y = Math.round(y);
-  rect('#1d1510', x - 8 + swing, y - 22, 6, 22);
-  rect('#1d1510', x + 2 - swing, y - 22, 6, 22);
-  rect(color, x - 11, y - 50, 22, 28);
-  rect('#e0b890', x - 7, y - 66, 14, 16);
-  rect('#2a1a0e', x + (dir > 0 ? 2 : -7), y - 60, 5, 3);
-  rect('#d8d0b0', x - 2 - swing, y - 48, 5, 20);
+  const k = SCENE.charScale, R = (c, dx, dy, w, h) => rect(c, Math.round(x + dx * k), Math.round(y + dy * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  R('#1d1510', -8 + swing, -22, 6, 22);
+  R('#1d1510', 2 - swing, -22, 6, 22);
+  R(color, -11, -50, 22, 28);
+  R('#e0b890', -7, -66, 14, 16);
+  R('#2a1a0e', dir > 0 ? 2 : -7, -60, 5, 3);
+  R('#d8d0b0', -2 - swing, -48, 5, 20);
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Файла ходьбы пока нет — при движении показывается тот же статичный
 // кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
@@ -389,7 +389,8 @@ function drawAndrey(x, y, dir, moving) {
   ctx.save();
   ctx.translate(Math.round(x), 0);
   if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
-  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -A.anchorX, Math.round(y) - A.floorY, A.cellW, A.cellH);
+  const k = SCENE.charScale;                               // опора (48, 76) остаётся на месте, увеличивается всё вокруг неё
+  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
   ctx.restore();
 }
 // Слои (снизу вверх): 1) фон помещения, 2) отметки остатка (только при заглушке фона), 3) мать,
@@ -399,7 +400,7 @@ function drawBackdrop() {                              // слой 1
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
   shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
-  rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);     // прилавок
+  rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 36);     // прилавок
   rect('#f0b04a', 520, 90, 2, 8); rect('rgba(255,170,60,.12)', 490, 70, 62, 54);    // свеча: тёплый янтарный свет
   rect('#8a2a2a', 150, 159, 330, 8);                                                // ковёр
 }
@@ -413,7 +414,7 @@ function drawStock() {                                 // слой 2: одна �
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
-  else rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 24);
+  else rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 36);
 }
 function drawFront() {                                 // слой 8
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
