@@ -63,6 +63,20 @@
 </div>
 <script src="data.js"></script>
 <script>
+// ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 6) {
+  const why = typeof DATA_VERSION === 'undefined'
+    ? 'Рядом с index.html не найден data.js или он старой версии.'
+    : 'Файл data.js от другой версии игры.';
+  document.getElementById('stage').style.display = 'none';
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;color:#f0e2c0;font:20px/1.5 Georgia,serif;text-align:center;';
+  box.innerHTML = '<div style="max-width:640px"><b>Игра не может запуститься.</b><br>' + why +
+    '<br><br>Что сделать: скачайте актуальные <b>index.html</b> и <b>data.js</b> вместе (лучше всего через Code → Download ZIP на GitHub), положите в одну папку и удалите копии вроде «data (1).js». Затем обновите страницу (F5).</div>';
+  document.body.appendChild(box);
+  throw new Error('data.js не найден или не той версии');
+}
+
 // ================= НАСТРОЙКИ ЭКРАНА =================
 const W = 320, H = 180;                                // утверждённая сетка пикселей (экран)
 const WORLD_W = SCENE.worldW, LANE = SCENE.lane;       // ширина лавки и линия пола берутся из data.js (ходьба только влево-вправо)
