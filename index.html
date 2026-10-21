@@ -91,7 +91,7 @@ if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 8) {
 // ================= НАСТРОЙКИ ЭКРАНА =================
 const W = 320, H = 180;                                // утверждённая сетка пикселей (экран)
 const WORLD_W = SCENE.worldW, LANE = SCENE.lane;       // ширина лавки и линия пола берутся из data.js (ходьба только влево-вправо)
-const FLOOR = { l: SCENE.walkMin, r: SCENE.worldW - SCENE.walkMin };
+const FLOOR = { l: SCENE.walkMin, r: SCENE.walkMax !== undefined ? SCENE.walkMax : SCENE.worldW - SCENE.walkMin };   // без walkMax — симметрично
 
 // ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
 const C = () => CUSTOMERS[state.visit];                // текущий покупатель (undefined, когда очередь кончилась)
