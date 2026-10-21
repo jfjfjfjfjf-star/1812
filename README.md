@@ -41,8 +41,8 @@
 - PROJECT_STATE.md — что утверждено, что сделано, что проверено, что открыто.
 - assets/characters/ — фигуры в сцене: Андрей (`andrey_idle.png`, ходьба `andrey_walk.png`), мать (`mother_idle.png`); покупатели и Сорокин позже.
 - assets/backgrounds/ — фон `shop.png`, слой прилавка `shop_counter.png`, передние ящики `shop_front.png`; фон лабаза `labaz.png` позже.
-- assets/portraits/ — портреты для диалога (`pavel.png`, `darya.png`, `fedor.png`, `mother.png`, `sorokin.png`, 120×136), пока не переданы.
-- assets/goods/ — необязательные значки товаров 24×24.
+- assets/portraits/ — портреты для диалога (`pavel.png`, `darya.png`, `fedor.png`, `mother.png`, `sorokin.png`, 180×204), пока не переданы.
+- assets/goods/ — необязательные значки товаров 36×36.
 - assets/source/ — оригиналы присланных исходников (игра их не загружает).
 - tools/ — вспомогательные скрипты для команды (`make_shop_front.py` — слой передних ящиков из фона, `make_sprites.py` — спрайты из крупных генераций); игре не нужны.
 - docs/ — решения и требования (`ANIMATION_SPEC.md`, `ART_REQUIREMENTS.md`), планы (`REPUTATION_PLAN.md` — репутация, черновик), промты для ChatGPT (`GPT_PROMPTS.md` — персонажи в стиле Андрея, ходьба в 4 кадра).

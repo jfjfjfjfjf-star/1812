@@ -3,33 +3,33 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 17;
+const DATA_VERSION = 18;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
-// background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (396×180), без прозрачности.
+// background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
 //   Когда фон подключён, старые окна, полки, прилавок и ковёр из прямоугольников не рисуются.
 // counterFront — передняя часть прилавка отдельным слоем: рисуется ПОВЕРХ Андрея, когда он стоит за прилавком, и ПОД покупателем.
-//   Файл 396×180 с прозрачностью (непрозрачна только область прилавка, пиксели те же, что в фоне, поэтому дыр и двойных контуров нет).
+//   Файл 594×270 с прозрачностью (непрозрачна только область прилавка, пиксели те же, что в фоне, поэтому дыр и двойных контуров нет).
 //   Если файла нет, а фон есть, слой вырезается из фона по прямоугольнику rect (координаты мира).
-// foreground — передний план: ящики справа перед дверью, 396×180 с прозрачностью; рисуется поверх всех персонажей, поэтому
+// foreground — передний план: ящики справа перед дверью, 594×270 с прозрачностью; рисуется поверх всех персонажей, поэтому
 //   Андрей и покупатели проходят позади ящиков. Это точная копия пикселей фона внутри силуэта ящиков (собирается tools/make_shop_front.py).
 // portrait — размер крупного портрета в режиме обслуживания (пути портретов лежат у персонажей); goodsIcon — размер значка товара в панели.
 // stockMarks — временные квадратики остатка товара: show 'auto' = рисовать только пока фон ещё заглушка; true/false — принудительно.
 //   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
 const ART = {
   background:   { src: 'assets/backgrounds/shop.png' },
-  counterFront: { src: 'assets/backgrounds/shop_counter.png', rect: { x: 135, y: 95, w: 219, h: 41 } },
+  counterFront: { src: 'assets/backgrounds/shop_counter.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
   foreground:   { src: 'assets/backgrounds/shop_front.png' },
-  portrait:  { w: 120, h: 136 },
-  goodsIcon: { w: 24, h: 24 },
-  stockMarks: { show: 'auto', x: 160, y: 98, groupStep: 60, perRow: 5, gap: 4, size: 3 }
+  portrait:  { w: 180, h: 204 },
+  goodsIcon: { w: 36, h: 36 },
+  stockMarks: { show: 'auto', x: 240, y: 147, groupStep: 90, perRow: 5, gap: 6, size: 4 }
 };
 
 const ANDREY = {                      // утверждённые параметры первого теста
-  cellW: 96, cellH: 80, anchorX: 48, floorY: 76,
-  walk: { src: 'assets/characters/andrey_walk.png', frames: 4 },   // промежуточно 4 кадра (лист 384×80), цель — 8 (768×80); пока нет файла: статичный кадр покоя (НЕ анимация)
+  cellW: 144, cellH: 120, anchorX: 72, floorY: 114,  // сетка 480×270: Андрей 104 пикселя, подошвы в строке 113 ячейки
+  walk: { src: 'assets/characters/andrey_walk.png', frames: 4 },   // промежуточно 4 кадра (лист 576×120), цель — 8 (1152×120); пока нет файла: статичный кадр покоя (НЕ анимация)
   idle: { src: 'assets/characters/andrey_idle.png' },
-  cycleDistance: 52                   // пикселей пути на цикл из 4 кадров (два шага); по кадрам: опорная стопа смещается 7 + 19 px за шаг
+  cycleDistance: 78                   // пикселей пути на цикл из 4 кадров (два шага); по кадрам: опорная стопа смещается 11 + 27 px за шаг
 };
 
 // Товары: unit — единица, stock — остаток на старте, cost — закупка за единицу, price — начальная цена продажи
@@ -108,35 +108,35 @@ const DAYS = [
   { date: [2, 9], chapter: 'Финал', visits: [] }
 ];
 
-// Сцена: координаты МИРА в пикселях (экран 320x180 показывает часть лавки, камера следует за Андреем).
+// Сцена: координаты МИРА в пикселях (экран 480×270 показывает часть лавки, камера следует за Андреем).
 // worldW — ширина лавки (= ширина фона), lane — линия пола перед прилавком (по ней Андрей ходит свободно),
-// walkMin / walkMax — границы ходьбы по x: слева табурет и мешки; справа дверь (за 372 — стена). У двери Андрей проходит ПОЗАДИ ящиков (слой foreground),
+// walkMin / walkMax — границы ходьбы по x: слева табурет и мешки; справа дверь (за 558 — стена). У двери Андрей проходит ПОЗАДИ ящиков (слой foreground),
 // workX — рабочее место: здесь подсказка «E — Встать за прилавок» и здесь Андрей стоит за прилавком (ноги на линии serviceY):
-//   x = 300 — голова и торс на гладкой стенной панели (x 263–312), у правого края книги; фигура целиком левее панели цены; лицом влево, к покупателю;
+//   x = 448 — голова и торс на гладкой стенной панели (x ≈ 395–468), у правого края книги; фигура целиком левее панели цены; лицом влево, к покупателю;
 // customerX — где стоит покупатель (перед прилавком), motherX — мать, talkRange — на каком расстоянии можно заговорить,
 // counter — границы прилавка (нужны только для заглушки).
 // doorX — дверь (справа на фоне): отсюда покупатели входят и сюда уходят; customerSpeed — их скорость (пикселей в секунду);
 // arrivalDelay — через сколько секунд после ухода одного покупателя в двери появляется следующий.
-// charScale — во сколько раз игра увеличивает всех персонажей при рисовании. 1 = как нарисовано (Андрей 69 пикселей; принято 21.10.2026
-//   по сравнению на скриншотах: при 1.2 он почти с дверь ростом, при 1 дверь выше, прилавок по пояс).
-// Размер самих файлов (ячейка 96×80) не меняется: увеличение делает игра. Из-за дробного множителя пиксели могут быть неровными.
-const SCENE = { charScale: 1, worldW: 396, lane: 150, startX: 150, walkMin: 108, walkMax: 372, talkRange: 23,
-                workX: 300, serviceY: 133, customerX: 258, motherX: 118, counter: { l: 135, r: 353 },
-                doorX: 372, customerSpeed: 40, arrivalDelay: 1.5 };
+// charScale — во сколько раз игра увеличивает всех персонажей при рисовании. 1 = как нарисовано (Андрей 104 пикселя в ячейке 144×120).
+// placeholderScale — во сколько раз крупнее рисуются человечки-заглушки (они задуманы ростом 66 для старой сетки 320×180).
+// Сетка 480×270 с 21.10.2026 (раньше 320×180, все координаты умножены на 1,5).
+const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, startX: 225, walkMin: 162, walkMax: 558, talkRange: 35,
+                workX: 448, serviceY: 200, customerX: 387, motherX: 177, counter: { l: 202, r: 530 },
+                doorX: 558, customerSpeed: 60, arrivalDelay: 1.5 };
 
 // Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
-// portrait — крупный портрет для диалога (120×136); sprite — фигура в сцене (отдельный файл, один кадр покоя):
-//   src — путь; cellW×cellH — размер ячейки (как у Андрея, 96×80); anchorX, floorY — точка опоры стоп в ячейке;
+// portrait — крупный портрет для диалога (180×204); sprite — фигура в сцене (отдельный файл, один кадр покоя):
+//   src — путь; cellW×cellH — размер ячейки (как у Андрея, 144×120); anchorX, floorY — точка опоры стоп в ячейке;
 //   facing — куда смотрит фигура в файле ('right' или 'left'), в другую сторону игра её отражает.
 //   Пока файла нет (или размер не тот) — человечек-заглушка. Кадров ходьбы нет: идущий показан тем же кадром (не анимация).
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 const CUSTOMERS = [
   { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/portraits/pavel.png', color: '#4a5a3a',
-    sprite: { src: 'assets/characters/pavel_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } },
+    sprite: { src: 'assets/characters/pavel_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b',
-    sprite: { src: 'assets/characters/darya_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } },
+    sprite: { src: 'assets/characters/darya_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/portraits/fedor.png', color: '#5a4a3a',
-    sprite: { src: 'assets/characters/fedor_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } }
+    sprite: { src: 'assets/characters/fedor_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -186,14 +186,14 @@ const VISITS = {
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 // Другие места (сцены), куда Андрей приходит через карту. Лавка описана выше (SCENE, ART), здесь — остальные.
 // name — название (показывается при переходе); worldW, lane, startX, walkMin, walkMax, talkRange — как у лавки (координаты мира);
-// background — фон ровно worldW×180 без прозрачности (пока файла нет — заглушка цветами wall и floor);
-// npcs — персонажи сцены: x — где стоит, color — цвет заглушки, portrait — портрет 120×136, sprite — фигура (как у покупателей), node — первая реплика (NODES).
+// background — фон ровно worldW×270 без прозрачности (пока файла нет — заглушка цветами wall и floor);
+// npcs — персонажи сцены: x — где стоит, color — цвет заглушки, portrait — портрет 180×204, sprite — фигура (как у покупателей), node — первая реплика (NODES).
 // Чтобы сцена была доступна, у места на карте (MAP) указывается scene с её id.
 const SCENES = {
-  labaz: { name: 'Лабаз Сорокина', worldW: 320, lane: 150, startX: 50, walkMin: 24, walkMax: 296, talkRange: 23,
+  labaz: { name: 'Лабаз Сорокина', worldW: 480, lane: 225, startX: 75, walkMin: 36, walkMax: 444, talkRange: 35,
     background: 'assets/backgrounds/labaz.png', wall: '#3a2c1e', floor: '#6b5236',
-    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 230, color: '#3b4a6b', portrait: 'assets/portraits/sorokin.png', node: 'sorokin_hub',
-             sprite: { src: 'assets/characters/sorokin_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } }] }
+    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 345, color: '#3b4a6b', portrait: 'assets/portraits/sorokin.png', node: 'sorokin_hub',
+             sprite: { src: 'assets/characters/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
 // и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
@@ -210,7 +210,7 @@ const SUPPLY = {
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
 };
 const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/portraits/mother.png', color: '#8a5a5a', node: 'mother_hub',
-  sprite: { src: 'assets/characters/mother_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } };
+  sprite: { src: 'assets/characters/mother_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {

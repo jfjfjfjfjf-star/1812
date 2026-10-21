@@ -9,7 +9,7 @@ from collections import deque
 import numpy as np
 from PIL import Image
 
-CELL_W, CELL_H, FLOOR, ANCHOR = 96, 80, 76, 48
+CELL_W, CELL_H, FLOOR, ANCHOR = 144, 120, 114, 72   # сетка 480×270: ячейка 144×120, подошвы в строке 113, опора x = 72 (можно задать в cfg)
 
 def figure_mask(rgb):
     """Фон = почти белые пиксели, связанные с краем картинки (заливка от краёв)."""
@@ -74,6 +74,7 @@ def quantize(cells, colors):
 
 if __name__ == '__main__':
     cfg = json.loads(sys.argv[1])
+    CELL_W, CELL_H = cfg.get('cell', [CELL_W, CELL_H]); FLOOR = cfg.get('floor', FLOOR); ANCHOR = cfg.get('anchor', ANCHOR)
     srcs = [np.asarray(Image.open(p).convert('RGB')).astype(np.float32) for p in cfg['src']]
     masks = [figure_mask(s) for s in srcs]
     hs = [np.where(m.any(axis=1))[0] for m in masks]
