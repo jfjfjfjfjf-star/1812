@@ -71,7 +71,9 @@
   /* Карта: экран поверх сцены. Сама карта — SVG в рамке 1000×560 (растягивается на всю сцену), карточка места — HTML */
   #mapbtn { position: absolute; left: calc(var(--u) * 89px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
             color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
-  body.serving #mapbtn, body.serving #screenbtn { display: none; }
+  body.serving #mapbtn, body.serving #screenbtn, body.serving #soundbtn { display: none; }
+  #soundbtn { position: absolute; left: calc(var(--u) * 166px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
+              color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
   #screenbtn { position: absolute; left: calc(var(--u) * 122px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
                color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
   #map { position: absolute; inset: 0; display: none; z-index: 6; background: #0b0805; overflow: hidden; }
@@ -97,7 +99,7 @@
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
-  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="mapbtn">Карта (M)</button><button id="screenbtn"></button><button id="back">← Отойти от прилавка</button>
+  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="mapbtn">Карта (M)</button><button id="screenbtn"></button><button id="soundbtn"></button><button id="back">← Отойти от прилавка</button>
   <div id="hud"></div>
   <div id="hint"></div>
   <div id="dbg"></div>
@@ -108,7 +110,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 19) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 20) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -176,7 +178,7 @@ function sell() {                                      // деньги и тов
   if (d.stage === 'after' || d.stage === 'done') return;
   if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
   d.stage = 'after'; d.afterNode = c.soldNode; d.sold = true;
-  state.money += total(d); state.stock[c.want] -= c.qty;
+  state.money += total(d); state.stock[c.want] -= c.qty; sfx.coins();
   const t = state.today; t.revenue += total(d); t.profit += profit(d); t.sold[c.want] = (t.sold[c.want] || 0) + c.qty;
   save(); showNode(c.soldNode);
 }
@@ -226,7 +228,7 @@ function placeOrder() {                                // деньги спис�
   if (!sum || sum > state.money || lastDay()) return;
   const o = state.orders[s] = state.orders[s] || {};
   Object.keys(dlg.qty).forEach(k => { if (dlg.qty[k]) o[k] = (o[k] || 0) + dlg.qty[k]; });
-  state.money -= sum; save();
+  state.money -= sum; save(); sfx.coins();
   toast('Заказано: ' + orderText(o) + '. Привезут завтра утром');
   showNode(SUPPLY[s].doneNode);
 }
@@ -379,6 +381,7 @@ loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
+if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
@@ -401,7 +404,9 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;                                // удержание клавиши не повторяет действие
+  sfx.unlock();                                        // звук можно включить только после действия игрока (правило браузеров)
   if (e.code === 'KeyF') { toggleScreen(); return; }   // режим экрана — в любой момент
+  if (e.code === 'KeyS') { sfx.toggle(); return; }     // звук — в любой момент
   if (sleeping) return;                                // ночью остальной ввод не действует
   if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; if (mapOpen) mapId = MAP.start; renderMap(); return; }
   if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
@@ -419,6 +424,8 @@ $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
 $('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.target.blur(); };
 $('screenbtn').onclick = e => { toggleScreen(); e.target.blur(); };
+$('soundbtn').onclick = e => { sfx.unlock(); sfx.toggle(); e.target.blur(); };
+addEventListener('pointerdown', () => sfx.unlock());
 $('mapclose').onclick = e => { mapOpen = false; renderMap(); e.target.blur(); };
 $('mapswitch').onclick = e => { mapId = nextMap(); renderMap(); e.target.blur(); };
 $('map').querySelector('svg').onclick = e => { const g = e.target.closest('.loc'); if (g) { mapSel[mapId] = g.dataset.id; renderMap(); } };
@@ -762,9 +769,9 @@ function updateVisitors(dt) {
     if (visitor.cust && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, cust: visitor.cust });
     Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
   }
-  leaving.forEach(l => { l.x += v; }); leaving = leaving.filter(l => l.x < SCENE.doorX);
+  leaving.forEach(l => { l.x += v; if (l.x >= SCENE.doorX && inShop()) sfx.bell(0.6); }); leaving = leaving.filter(l => l.x < SCENE.doorX);   // ушёл — колокольчик
   if (visitor.phase !== 'in') return;
-  if (visitor.wait > 0) { visitor.wait -= dt; return; }
+  if (visitor.wait > 0) { visitor.wait -= dt; if (visitor.wait <= 0 && inShop()) sfx.bell(1); return; }   // вошёл — колокольчик
   visitor.x -= v;
   if (visitor.x <= SCENE.customerX) {
     visitor.x = SCENE.customerX; visitor.phase = 'here';
@@ -786,7 +793,12 @@ function update(dt) {
   const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
   const d = Math.abs(nx - player.x);
   player.x = nx;
-  if (d > 0) { player.moving = true; player.dist += d; }
+  if (d > 0) {
+    player.moving = true; player.dist += d;
+    const f = Math.floor((player.dist / ANDREY.cycleDistance) % 1 * ANDREY.walk.frames);   // шаг слышен на кадрах касания (0 и 2)
+    if (f !== player.frame && f % 2 === 0) sfx.step();
+    player.frame = f;
+  }
   if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)
 }
 
@@ -835,6 +847,96 @@ function drawAndrey(x, y, dir, moving) {
   ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
   ctx.restore();
 }
+// ================= ЗВУК =================
+// Все звуки синтезируются в браузере (файлов нет): колокольчик над дверью, монеты, шаги, тихий фон комнаты.
+// Браузер разрешает звук только после действия игрока — первое нажатие клавиши или щелчок включает его.
+// S или кнопка «Звук» — выключить и включить (запоминается).
+const SOUND_KEY = 'letopisi1812_sound';
+const sfx = (() => {
+  let ac = null, master = null, amb = null, on = (() => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch (e) { return true; } })();
+  const label = () => { $('soundbtn').textContent = on ? 'Звук: вкл (S)' : 'Звук: выкл (S)'; };
+  const noiseBuf = (sec, brown) => {
+    const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate), d = b.getChannelData(0); let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; d[i] = brown ? (last = (last + 0.02 * w) / 1.02) * 3.5 : w; }
+    return b;
+  };
+  function ambience() {                                 // фон: тихий низкий шум комнаты и улицы за стеной
+    if (amb) return;
+    const src = ac.createBufferSource(); src.buffer = noiseBuf(4, true); src.loop = true;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+    const g = ac.createGain(); g.gain.value = 0.05;
+    src.connect(lp).connect(g).connect(master); src.start(); amb = g;
+  }
+  function tone(freq, start, dur, vol, type) {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(vol, start + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g).connect(master); o.start(start); o.stop(start + dur + 0.05);
+  }
+  const ready = () => on && ac && ac.state === 'running';
+  return {
+    unlock() {
+      if (!on || ac) { if (ac && ac.state === 'suspended') ac.resume(); return; }
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.6; master.connect(ac.destination); ambience(); } catch (e) { ac = null; }
+    },
+    toggle() {
+      on = !on; try { localStorage.setItem(SOUND_KEY, on ? 'on' : 'off'); } catch (e) {}
+      if (ac) { if (on) ac.resume(); else ac.suspend(); } else if (on) this.unlock();
+      label();
+    },
+    label,
+    bell(v) {                                           // колокольчик над дверью: два удара
+      if (!ready()) return; const t = ac.currentTime, k = (v || 1) * 0.16;
+      [0, 0.13].forEach((d, i) => [1760, 2637, 3951].forEach((f, j) => tone(f * (1 + (Math.random() - 0.5) * 0.01), t + d, 1.4 - j * 0.3, k / (j + 1) * (i ? 0.7 : 1))));
+    },
+    coins() {                                           // монеты: несколько коротких звонких щелчков
+      if (!ready()) return; const t = ac.currentTime;
+      for (let i = 0; i < 3; i++) [4200, 5600, 7100].forEach(f => tone(f * (0.95 + Math.random() * 0.1), t + i * 0.07 + Math.random() * 0.02, 0.09, 0.05));
+    },
+    step() {                                            // шаг по доскам: короткий глухой удар
+      if (!ready()) return; const t = ac.currentTime;
+      const src = ac.createBufferSource(); src.buffer = noiseBuf(0.08, false);
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 180 + Math.random() * 60; bp.Q.value = 1.2;
+      const g = ac.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      src.connect(bp).connect(g).connect(master); src.start(t);
+    }
+  };
+})();
+sfx.label();
+
+// ================= ПРОХОЖИЕ ЗА ОКНОМ =================
+// Тёмные силуэты в длинной одежде (кафтан, платье) проходят за стеклом. Рисуются только на стекле (слой shop_glass.png),
+// поэтому идут позади рамы и кувшинов на подоконнике. Ног не видно — шагов не изображаем.
+const walkers = { list: [], next: 2, last: 0 };
+const glassCv = document.createElement('canvas'), gctx = glassCv.getContext('2d');
+const rnd = (a, b) => a + Math.random() * (b - a);
+function drawPassersby() {                             // слой 1а: в координатах мира, сразу после фона
+  const P = SCENE.passersby, gl = spr.glass;
+  if (!P || !gl || !gl.ok) return;
+  const t = performance.now() / 1000, dt = Math.min(0.1, t - (walkers.last || t)); walkers.last = t;
+  if (P.phases.includes(state.phase)) {
+    walkers.next -= dt;
+    if (walkers.next <= 0) {
+      const dir = Math.random() < 0.5 ? 1 : -1, h = rnd(P.height[0], P.height[1]);
+      walkers.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress' });
+      walkers.next = rnd(P.every[0], P.every[1]);
+    }
+  }
+  walkers.list.forEach(w => { w.x += w.dir * w.v * dt; });
+  walkers.list = walkers.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
+  if (!walkers.list.length) return;
+  if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
+  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.drawImage(gl, 0, 0);
+  gctx.globalCompositeOperation = 'source-atop'; gctx.fillStyle = P.color;
+  walkers.list.forEach(w => {                          // силуэт: голова, плечи, длинная одежда до земли
+    const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
+    gctx.beginPath();
+    gctx.moveTo(x - sh, f - h * 0.8); gctx.lineTo(x + sh, f - h * 0.8); gctx.lineTo(x + hw, f); gctx.lineTo(x - hw, f); gctx.closePath(); gctx.fill();
+    gctx.beginPath(); gctx.arc(x, f - h * 0.89, h * (w.kind === 'dress' ? 0.1 : 0.085), 0, Math.PI * 2); gctx.fill();
+    if (w.kind === 'coat') gctx.fillRect(x - h * 0.1, f - h * 0.99, h * 0.2, h * 0.05);   // шапка
+  });
+  ctx.drawImage(glassCv, 0, 0);
+}
+
 // ================= СВЕТ (настройки — TIME.light и lights у сцены в data.js) =================
 // Поверх сцены: сумрак с просветами вокруг источников, затем свечение (сложение цветов): мерцающее пламя, ровное тёплое
 // свечение, луч из окна с пылинками. Плюс тени под ногами. Интерфейс (HTML) не затемняется.
@@ -953,6 +1055,7 @@ function draw() {
   if (!spr.bg.ok) { rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120); }   // заглушка: стена и пол
   ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
   drawBackdrop();
+  drawPassersby();
   drawStock();
   drawPerson(MOTHER, SCENE.motherX, LANE, 1);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
