@@ -12,7 +12,7 @@
 | `assets/backgrounds/shop_counter.png` | **подготовлен** (передняя часть прилавка, точная копия участка фона) |
 | `assets/characters/andrey_idle.png` | **подготовлен из присланной фигуры Андрея**, нужен глазами Кирилла |
 | `assets/characters/andrey_walk.png` | **нет**. Пока при ходьбе показывается статичный кадр покоя: это НЕ готовая анимация |
-| `assets/portraits/pavel.png`, `darya.png`, `mother.png` | **нет**. Пока вместо них цветная заглушка с буквой |
+| `assets/portraits/pavel.png`, `darya.png`, `fedor.png`, `mother.png` | **нет**. Пока вместо них цветная заглушка с буквой |
 | `assets/backgrounds/shop_front.png` | необязателен, нет |
 | `assets/goods/grain.png`, `bread.png`, `apples.png` | необязательны, нет (пока цветной квадрат) |
 
@@ -99,7 +99,7 @@
 
 | | |
 |---|---|
-| Файлы | `assets/portraits/pavel.png`, `assets/portraits/darya.png`, `assets/portraits/mother.png` |
+| Файлы | `assets/portraits/pavel.png`, `assets/portraits/darya.png`, `assets/portraits/fedor.png`, `assets/portraits/mother.png` |
 | Размер | ровно 120×136, прозрачный фон |
 | Положение | показывается в левом нижнем углу экрана, прижат к низу и левому краю (в макете: крупный портрет по пояс, взгляд к центру) |
 
