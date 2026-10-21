@@ -14,6 +14,10 @@
   #night { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: #05070d; color: #f0e2c0;
            font-size: calc(var(--s) * 9px); opacity: 0; pointer-events: none; transition: opacity .6s; }
   #night.on { opacity: 1; pointer-events: auto; }
+  #night div { max-width: 70%; text-align: center; line-height: 1.4; }
+  #night b { display: block; color: #e8c36a; font-size: calc(var(--s) * 11px); margin-bottom: calc(var(--s) * 4px); }
+  #night p { font-size: calc(var(--s) * 7px); margin: 0 0 calc(var(--s) * 4px); }
+  #night i { opacity: .8; } #night small { display: block; opacity: .5; font-size: calc(var(--s) * 5px); margin-top: calc(var(--s) * 6px); }
   #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
   #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
              font-family: inherit; opacity: .6; cursor: pointer; }
@@ -101,7 +105,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 12) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 13) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -126,15 +130,7 @@ const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c
 // ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
 // ----- Дни и части дня (настройки и расписание — TIME и DAYS в data.js) -----
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-function dateOf(n) {                                   // дата n-го дня игры по старому стилю (високосный — каждый четвёртый год)
-  let { day, month, year } = TIME.start; day += n;
-  for (;;) {
-    const len = [31, year % 4 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
-    if (day <= len) break;
-    day -= len; if (++month > 12) { month = 1; year++; }
-  }
-  return day + ' ' + MONTHS[month - 1] + ' ' + year;
-}
+const dateOf = n => { const [d, m] = DAYS[n].date; return d + ' ' + MONTHS[m - 1] + ' ' + TIME.year; };   // дата n-го играбельного дня (старый стиль)
 const todayQueue = () => (DAYS[state.day] || { customers: [] }).customers;
 const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
@@ -238,7 +234,8 @@ const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, cou
 const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
   deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, newDeal(c)])) });
-let state = load() || newState();
+const loaded = load();
+let state = loaded || newState();
 let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
 
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
@@ -248,7 +245,7 @@ function load() {                                      // старое сохр�
     const num = v => typeof v === 'number' && isFinite(v);
     if (s && s.deals) CUSTOMERS.forEach(c => { if (!s.deals[c.id]) s.deals[c.id] = newDeal(c); });   // миграция: новый покупатель в очереди
     if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
-        Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { customers: [] }).customers.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
+        s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { customers: [] }).customers.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
         CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
       CUSTOMERS.forEach(c => {                         // миграция: у сделки появился признак «продано»
@@ -329,7 +326,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { if (sleeping) return; state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { if (sleeping) return; state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); intro(); };
 $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
 $('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.target.blur(); };
@@ -617,16 +614,31 @@ function closeShop() {                                 // покупатели, 
   state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.moving = false;
   dlg = { summary: true }; save(); renderDlg();
 }
-function endDay() {                                    // ночь: экран перехода, затем утро следующего дня в лавке
+// Экран поверх сцены (ночь, глава, перемотка). ms > 0 — исчезает сам; ms = 0 — ждёт E, пробел, Enter или щелчок.
+function card(html, ms) {
+  const n = $('night'); n.innerHTML = '<div>' + html + '</div>'; n.classList.add('on');
+  return new Promise(done => {
+    if (ms) return setTimeout(done, ms);
+    const go = e => { if (e.type === 'keydown' && !['KeyE', 'Space', 'Enter'].includes(e.code)) return;
+      removeEventListener('keydown', go); n.removeEventListener('click', go); done(); };
+    setTimeout(() => { addEventListener('keydown', go); n.addEventListener('click', go); }, 400);   // случайное двойное нажатие не пропускает текст
+  });
+}
+const chapterCard = n => { const d = DAYS[n];           // глава и перемотка перед днём n (если есть) — ждёт игрока
+  return card((d.chapter ? '<b>' + d.chapter + '</b>' : '') + (d.skip ? '<p>' + d.skip + '</p>' : '') + '<i>' + dateOf(n) + ' года, утро</i><small>E — продолжить</small>', 0); };
+async function endDay() {                              // ночь, затем следующий день из DAYS (с главой и перемоткой, если они есть)
   if (state.phase !== 'evening' || sleeping) return;
+  if (state.day + 1 >= DAYS.length) { toast('Это последний день в текущей версии игры. «Новая игра» — заново.'); return; }
   sleeping = true; dlg = null; renderDlg();
-  const n = $('night'); n.textContent = 'Ночь'; n.classList.add('on');
-  setTimeout(() => {
-    Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
-    resetPlayer(); placeVisitor(); save();
-    n.textContent = 'Утро, ' + dateOf(state.day) + ' года';
-    setTimeout(() => { n.classList.remove('on'); sleeping = false; }, 1600);
-  }, 1300);
+  await card('Ночь', 1300);
+  Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
+  resetPlayer(); placeVisitor(); save();
+  const d = DAYS[state.day];
+  await (d.chapter || d.skip ? chapterCard(state.day) : card('Утро, ' + dateOf(state.day) + ' года', 1600));
+  $('night').classList.remove('on'); sleeping = false;
+}
+async function intro() {                               // начало игры: заголовок первой главы
+  sleeping = true; await chapterCard(0); $('night').classList.remove('on'); sleeping = false;
 }
 
 // ================= ПОКУПАТЕЛИ ПРИХОДЯТ И УХОДЯТ =================
@@ -781,6 +793,7 @@ function loop(now) {
   update(dt); draw(); requestAnimationFrame(loop);
 }
 placeVisitor(); renderDlg(); renderNotes(); requestAnimationFrame(loop);
+if (!loaded) intro();                                  // новая игра (сохранения нет): заголовок первой главы
 </script>
 </body>
 </html>
