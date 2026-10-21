@@ -3,7 +3,7 @@
 // Историческую дату, валюту, меры и обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 10;
+const DATA_VERSION = 11;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (396×180), без прозрачности.
@@ -45,10 +45,13 @@ const START = { money: 30 };
 // workX — рабочее место: здесь подсказка «E — Встать за прилавок» и здесь Андрей стоит за прилавком (ноги на линии serviceY);
 // customerX — где стоит покупатель (перед прилавком), motherX — мать, talkRange — на каком расстоянии можно заговорить,
 // counter — границы прилавка (нужны только для заглушки).
+// doorX — дверь (справа на фоне): отсюда покупатели входят и сюда уходят; customerSpeed — их скорость (пикселей в секунду);
+// arrivalDelay — через сколько секунд после ухода одного покупателя в двери появляется следующий.
 // charScale — во сколько раз игра увеличивает всех персонажей при рисовании (1.2 = на 20% больше; 1 = как нарисовано).
 // Размер самих файлов (ячейка 96×80) не меняется: увеличение делает игра. Из-за дробного множителя пиксели могут быть неровными.
 const SCENE = { charScale: 1.2, worldW: 396, lane: 150, startX: 150, walkMin: 108, walkMax: 308, talkRange: 23,
-                workX: 285, serviceY: 133, customerX: 235, motherX: 118, counter: { l: 135, r: 353 } };
+                workX: 285, serviceY: 133, customerX: 235, motherX: 118, counter: { l: 135, r: 353 },
+                doorX: 372, customerSpeed: 40, arrivalDelay: 1.5 };
 
 // Покупатели (приходят по очереди). Правило торга одно для всех, без случайности:
 // согласен, если цена за единицу <= maxUnit И сумма <= budget; иначе предлагает wantUnit за единицу.
@@ -60,7 +63,10 @@ const CUSTOMERS = [
     tradeTalk: [{ text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true }] },
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
     openNode: 'darya_open', soldNode: 'darya_sold', refusedNode: 'darya_refused', leaveNode: 'darya_leave',
-    priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] }
+    priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] },
+  { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/portraits/fedor.png', color: '#5a4a3a', want: 'apples', qty: 2, budget: 13, wantUnit: 6, maxUnit: 6,
+    openNode: 'fedor_open', soldNode: 'fedor_sold', refusedNode: 'fedor_refused', leaveNode: 'fedor_leave',
+    priceMsg: 'Почём свёрток?', counterMsg: 'Дам {counter} за оба, больше не могу.', tradeTalk: [] }
 ];
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 // Другие места (сцены), куда Андрей приходит через карту. Лавка описана выше (SCENE, ART), здесь — остальные.
@@ -114,6 +120,12 @@ const NODES = {
     choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_refused: { who: 'Дарья', text: 'Жаль. Зайду позже.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_leave: { who: 'Дарья', text: 'Нет, так не пойдёт. Я заканчиваю разговор.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor_open: { who: 'Фёдор', text: 'Сушёных яблок бы, два свёртка. В дорогу.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  fedor_sold: { who: 'Фёдор', text: 'Благодарствую.',
+    choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor_refused: { who: 'Фёдор', text: 'Ну, в другой лавке спрошу.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor_leave: { who: 'Фёдор', text: 'Дорого. Пойду в ряды, там сговорчивее.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   mother_hub: { who: 'Мать', text: 'Что-то хотел, Андрей?', choices: [
     { text: 'Как сегодня дела?', goto: 'mother_shop' },
     { text: 'Павел говорит, трудно найти подводу. Ты слышала?', need: { heard: 'pavel_neighbor_cart' }, id: 'c_m_cart', once: true, goto: 'mother_cart' },

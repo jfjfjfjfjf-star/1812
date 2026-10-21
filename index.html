@@ -98,7 +98,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 10) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 11) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -180,7 +180,7 @@ function tradeChoices() {
 let serving = false;                                   // не сохраняется: после загрузки Андрей стоит перед прилавком, сделка продолжается
 function openCustomer() {                              // показывает текущего покупателя с того места, где сделка остановилась
   const c = C();
-  if (!c) { dlg = { idle: true }; return renderDlg(); }
+  if (!c || !visitorReady()) { dlg = { idle: true }; return renderDlg(); }   // никого нет или покупатель ещё идёт
   const d = deal();
   if (d.stage === 'price') return showTrade();
   showNode(d.stage === 'open' ? c.openNode : d.afterNode);
@@ -201,7 +201,7 @@ function act(c) {
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
   const op = c.do || '', cu = C(), d = cu && deal();
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
-  if (op === 'next') return openCustomer();
+  if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
@@ -215,9 +215,10 @@ function act(c) {
 
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
 const SAVE_KEY = 'letopisi1812_save_v6';
+const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
 const newState = () => ({ scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
-  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false }])) });
+  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, newDeal(c)])) });
 let state = load() || newState();
 let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
 
@@ -226,6 +227,7 @@ function load() {                                      // старое сохр�
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     const num = v => typeof v === 'number' && isFinite(v);
+    if (s && s.deals) CUSTOMERS.forEach(c => { if (!s.deals[c.id]) s.deals[c.id] = newDeal(c); });   // миграция: новый покупатель в очереди
     if (s && num(s.money) && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= CUSTOMERS.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
         CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
@@ -307,7 +309,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
 $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
 $('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.target.blur(); };
@@ -339,8 +341,9 @@ function renderDlg() {
   if (!dlg) { box.style.display = 'none'; return; }
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
-    who = ''; text = c ? 'Следующий покупатель ждёт у прилавка.' : 'Пока покупателей нет.';
-    list = (c ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Отойти от прилавка', do: 'leave' }]);
+    const ready = c && visitorReady();
+    who = ''; text = ready ? 'Следующий покупатель ждёт у прилавка.' : c ? 'Покупатель заходит в лавку.' : 'Пока покупателей нет.';
+    list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Отойти от прилавка', do: 'leave' }]);
     pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
@@ -579,8 +582,38 @@ function travel(scene, name) {
   mapOpen = false; renderMap(); renderDlg(); toast(name);
 }
 
+// ================= ПОКУПАТЕЛИ ПРИХОДЯТ И УХОДЯТ =================
+// Текущий покупатель (C) входит в дверь и идёт к прилавку; после прощания (visit вырос) уходит к двери, следующий появляется
+// через arrivalDelay секунд. Движение не сохраняется: после загрузки текущий покупатель уже стоит у прилавка.
+const visitor = { idx: -1, x: 0, phase: 'none', wait: 0 }; // phase: in — идёт к прилавку, here — стоит, none — никого
+let leaving = [];                                      // ушедшие покупатели, которые ещё идут к двери: { x, color }
+function placeVisitor() { Object.assign(visitor, { idx: state.visit, x: SCENE.customerX, phase: C() ? 'here' : 'none', wait: 0 }); leaving = []; }
+const visitorReady = () => visitor.idx === state.visit && visitor.phase === 'here';
+function updateVisitors(dt) {
+  const v = SCENE.customerSpeed * dt;
+  if (visitor.idx !== state.visit) {                   // очередь сдвинулась: прежний уходит, следующий скоро войдёт
+    if (CUSTOMERS[visitor.idx] && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, color: CUSTOMERS[visitor.idx].color });
+    Object.assign(visitor, { idx: state.visit, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
+  }
+  leaving.forEach(l => { l.x += v; }); leaving = leaving.filter(l => l.x < SCENE.doorX);
+  if (visitor.phase !== 'in') return;
+  if (visitor.wait > 0) { visitor.wait -= dt; return; }
+  visitor.x -= v;
+  if (visitor.x <= SCENE.customerX) {
+    visitor.x = SCENE.customerX; visitor.phase = 'here';
+    if (dlg && dlg.idle) renderDlg();                  // Андрей за прилавком ждёт: появляется «Обслужить следующего»
+  }
+}
+function drawVisitors() {                              // слой 6: покупатели перед прилавком
+  const sw = x => Math.round(Math.sin(x / 4) * 4);
+  leaving.forEach(l => person(l.x, LANE, l.color, sw(l.x), 1));
+  if (C() && visitor.idx === state.visit && visitor.wait <= 0 && visitor.phase !== 'none')
+    person(visitor.x, LANE, C().color, visitor.phase === 'in' ? sw(visitor.x) : 0, visitor.phase === 'in' ? -1 : 1);
+}
+
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt) {
+  updateVisitors(dt);
   player.moving = false;
   if (dlg || notesOpen || serving || mapOpen) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
@@ -675,7 +708,7 @@ function draw() {
   person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
   drawCounterFront();
-  if (C()) person(SCENE.customerX, LANE, C().color, 0, 1);    // ушедший покупатель (visit уже вырос) не рисуется
+  drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
   ctx.restore();
@@ -696,7 +729,7 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05); last = now;
   update(dt); draw(); requestAnimationFrame(loop);
 }
-renderDlg(); renderNotes(); requestAnimationFrame(loop);
+placeVisitor(); renderDlg(); renderNotes(); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
