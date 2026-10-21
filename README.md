@@ -42,7 +42,7 @@
 - assets/portraits/ — портреты (`pavel.png`, `darya.png`, `mother.png`, 120×136), пока не переданы.
 - assets/goods/ — необязательные значки товаров 24×24.
 - assets/source/ — оригиналы присланных исходников (игра их не загружает).
-- docs/ — решения и требования (`ANIMATION_SPEC.md`, `ART_REQUIREMENTS.md`).
+- docs/ — решения и требования (`ANIMATION_SPEC.md`, `ART_REQUIREMENTS.md`), планы (`REPUTATION_PLAN.md` — репутация, черновик).
 
 Названия файлов — латиницей, без пробелов. Пример: andrey_walk.png. Не загружаем пароли, ключи API, node_modules и временные файлы.
 
