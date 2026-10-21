@@ -27,7 +27,7 @@ const ART = {
 
 const ANDREY = {                      // утверждённые параметры первого теста
   cellW: 96, cellH: 80, anchorX: 48, floorY: 76,
-  walk: { src: 'assets/characters/andrey_walk.png', frames: 8 },   // пока нет файла: при ходьбе показывается статичный кадр покоя (НЕ готовая анимация)
+  walk: { src: 'assets/characters/andrey_walk.png', frames: 4 },   // промежуточно 4 кадра (лист 384×80), цель — 8 (768×80); пока нет файла: статичный кадр покоя (НЕ анимация)
   idle: { src: 'assets/characters/andrey_idle.png' },
   cycleDistance: 40                   // ПРОВИЗОРНО: подобрать по готовой анимации
 };
