@@ -797,7 +797,7 @@ function update(dt) {
   player.x = nx;
   if (d > 0) {
     player.moving = true; player.dist += d;
-    const f = Math.floor((player.dist / ANDREY.cycleDistance) % 1 * ANDREY.walk.frames);   // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
+    const f = walkFrame(player.dist);                  // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
     if (f !== player.frame && f % (ANDREY.walk.frames / 2) === 0) sfx.step();
     player.frame = f;
   }
@@ -847,12 +847,20 @@ function counterFrame() {
   while (r >= ts[f]) r -= ts[f++];
   return [spr.atCounter, f];
 }
+// Кадр ходьбы по пройденному пути: каждый кадр держится walk.weights[i] пикселей (без weights — поровну).
+function walkFrame(dist) {
+  const w = ANDREY.walk.weights, n = ANDREY.walk.frames;
+  if (!w) return Math.floor((dist / ANDREY.cycleDistance) % 1 * n);
+  let r = dist % w.reduce((a, b) => a + b, 0), f = 0;
+  while (f < n - 1 && r >= w[f]) r -= w[f++];
+  return f;
+}
 function drawAndrey(x, y, dir, moving, atCounter) {
-  const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
+  const A = ANDREY;
   shadow(x, y);
   if (!spr.idle.ok) { person(x, y, '#6b8a3a', dir); return; }
   const useWalk = moving && spr.walk.ok;
-  let img = useWalk ? spr.walk : spr.idle, f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
+  let img = useWalk ? spr.walk : spr.idle, f = useWalk ? walkFrame(player.dist) : 0;
   if (atCounter) [img, f] = counterFrame();
   ctx.save();
   ctx.translate(Math.round(x), 0);
