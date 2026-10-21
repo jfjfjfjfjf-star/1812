@@ -60,22 +60,40 @@
   #panel .step b { font-size: calc(var(--s) * 8px); }
   #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--s) * 1.5px); padding-top: calc(var(--s) * 2px); }
   #pact button { padding: calc(var(--s) * 1.5px) calc(var(--s) * 3px); }
+  /* Карта: экран поверх сцены. Сама карта — SVG в рамке 1000×560 (растягивается на всю сцену), карточка места — HTML */
+  #mapbtn { position: absolute; left: calc(var(--s) * 89px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
+            color: #f0e2c0; font-family: inherit; font-size: calc(var(--s) * 5px); opacity: .6; cursor: pointer; }
+  body.serving #mapbtn { display: none; }
+  #map { position: absolute; inset: 0; display: none; z-index: 6; background: #0b0805; overflow: hidden; }
+  #map svg { width: 100%; height: 100%; display: block; font-family: Georgia, serif; }
+  #map .loc { cursor: pointer; }
+  #map .loc:hover .dot { stroke: #fff; }
+  #mapclose { position: absolute; left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); font-family: inherit; cursor: pointer; color: #f0e2c0;
+              font-size: calc(var(--s) * 5px); background: rgba(20,12,6,.92); border: calc(var(--s) * 1px) solid #8c7647; padding: calc(var(--s) * 1.5px) calc(var(--s) * 5px); }
+  #mapclose:hover { border-color: #e8c36a; }
+  #mapcard { position: absolute; left: calc(var(--s) * 4px); bottom: calc(var(--s) * 4px); width: calc(var(--s) * 92px); box-sizing: border-box;
+             background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0; padding: calc(var(--s) * 3px) calc(var(--s) * 4px);
+             font-size: calc(var(--s) * 5.5px); line-height: 1.3; }
+  #mapcard b { color: #e8c36a; font-size: calc(var(--s) * 6.5px); display: block; }
+  #mapcard i { opacity: .7; font-size: calc(var(--s) * 4.5px); display: block; margin-bottom: calc(var(--s) * 1.5px); }
+  #mapcard p { margin: calc(var(--s) * 1.5px) 0 0; }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
-  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="back">← Отойти от прилавка</button>
+  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="mapbtn">Карта (M)</button><button id="back">← Отойти от прилавка</button>
   <div id="hud"></div>
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
   <div id="toast"></div><div id="notes"></div>
+  <div id="map"><svg viewBox="0 0 1000 560" preserveAspectRatio="none"><g id="mapbase"></g><g id="mapmarks"></g></svg><button id="mapclose">← Вернуться (M)</button><div id="mapcard"></div></div>
 </div>
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 8) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 9) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -249,6 +267,7 @@ loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
 [...CUSTOMERS, MOTHER].forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
+loadImage('map', ART.map.src, ART.map.w, ART.map.h, true);
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 47 };
@@ -265,6 +284,8 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;                                // удержание клавиши не повторяет действие (заметки не мигают)
+  if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; renderMap(); return; }
+  if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
@@ -273,9 +294,12 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
 $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
+$('mapbtn').onclick = e => { mapOpen = true; renderMap(); e.target.blur(); };
+$('mapclose').onclick = e => { mapOpen = false; renderMap(); e.target.blur(); };
+$('map').querySelector('svg').onclick = e => { const g = e.target.closest('.loc'); if (g) { mapSel = g.dataset.id; renderMap(); } };
 
 // ================= ДИАЛОГ, ПАНЕЛЬ ЦЕНЫ, ЗАМЕТКИ (интерфейс — слой поверх сцены 320×180) =================
 function toast(t) {
@@ -348,10 +372,184 @@ function renderNotes() {
   el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';
 }
 
+// ================= КАРТА (экран поверх сцены; места и география — в data.js, блок MAP) =================
+// Схема рисуется один раз при первом открытии: местность, вода, дороги, валы, застройка, рощи. Случайность с постоянным зерном,
+// поэтому карта всегда одинаковая. Точки мест, подписи и карточка перерисовываются при выборе места.
+let mapOpen = false, mapSel = MAP.here, mapBuilt = false;
+const MV = MAP.view;
+const mp = ([x, y]) => [MV.cx + x * MV.kmPx, MV.cy - y * MV.kmPx];           // километры → точки карты
+const r1 = n => Math.round(n * 10) / 10;
+function curve(pts, closed) {                         // плавная линия через точки
+  const q = pts.map(mp), n = q.length, at = i => q[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
+  let d = 'M' + q[0].map(r1);
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const a = at(i - 1), b = at(i), c = at(i + 1), e = at(i + 2);
+    d += 'C' + [b[0] + (c[0] - a[0]) / 6, b[1] + (c[1] - a[1]) / 6, c[0] - (e[0] - b[0]) / 6, c[1] - (e[1] - b[1]) / 6, c[0], c[1]].map(r1);
+  }
+  return d + (closed ? 'Z' : '');
+}
+function rng(seed) {                                  // повторяемый генератор случайных чисел
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function inPoly(x, y, poly) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+function lineDist(x, y, line) {                       // расстояние от точки до ломаной, км
+  let m = Infinity;
+  for (let i = 0; i < line.length - 1; i++) {
+    const [ax, ay] = line[i], [bx, by] = line[i + 1], dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+    m = Math.min(m, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+  }
+  return m;
+}
+const tree = (x, y, s) => '<circle cx="' + r1(x) + '" cy="' + r1(y) + '" r="' + r1(s) + '" fill="#2c4422"/><circle cx="' + r1(x - s * .3) + '" cy="' + r1(y - s * .35) + '" r="' + r1(s * .55) + '" fill="#4d6b31"/>';
+function buildMap() {
+  const rnd = rng(1812), o = [], M = MAP;
+  o.push('<defs><filter id="mTerrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="4" seed="12"/>' +
+    '<feColorMatrix values="0 0 0 0 .13  0 0 0 0 .17  0 0 0 0 .07  0 0 0 1.6 -.6"/></filter>' +
+    '<filter id="mGrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3"/>' +
+    '<feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .28 0"/></filter>' +
+    '<filter id="mShade"><feDropShadow dx="1" dy="1.4" stdDeviation=".5" flood-color="#000" flood-opacity=".55"/></filter>' +
+    '<radialGradient id="mVig" cx="50%" cy="50%" r="72%"><stop offset="60%" stop-color="#0b0805" stop-opacity="0"/><stop offset="100%" stop-color="#0b0805" stop-opacity=".8"/></radialGradient></defs>');
+  if (spr.map.ok) o.push('<image href="' + ART.map.src + '" width="' + MV.w + '" height="' + MV.h + '" preserveAspectRatio="none"/>');
+  else {
+    // местность: земля, тёмные пятна, поля за городом
+    o.push('<rect width="' + MV.w + '" height="' + MV.h + '" fill="#5f6d3c"/><rect width="' + MV.w + '" height="' + MV.h + '" filter="url(#mTerrain)"/>');
+    for (let i = 0; i < 140; i++) {
+      const x = -12 + rnd() * 24, y = -7 + rnd() * 14.5;
+      if (inPoly(x, y, M.cityLine) || lineDist(x, y, M.river) < .4) continue;
+      const [px, py] = mp([x, y]), w = 14 + rnd() * 30, h = 8 + rnd() * 18;
+      o.push('<rect x="' + r1(px) + '" y="' + r1(py) + '" width="' + r1(w) + '" height="' + r1(h) + '" transform="rotate(' + r1(rnd() * 50 - 25) + ' ' + r1(px) + ' ' + r1(py) + ')" fill="' +
+        ['#8a8a4c', '#7a8446', '#9a8a52', '#6f7c40'][i % 4] + '" opacity=".55"/>');
+    }
+    // город: утоптанная земля внутри Камер-Коллежского вала, плотнее внутри Земляного вала
+    o.push('<path d="' + curve(M.cityLine, true) + '" fill="#6f6442" opacity=".55"/><path d="' + curve(M.earthWall, true) + '" fill="#7d6b48" opacity=".55"/>');
+    // холмы: штрихи склонов
+    const hills = [[[-5.3, -4.55], [-4.3, -4.65], [-3.2, -4.6], [-2.3, -4.1]], [[-7.7, -.1], [-7.2, -.25], [-6.7, -.1]]];
+    hills.forEach(h => { for (let i = 0; i < h.length - 1; i++) for (let t = 0; t < 1; t += .08) {
+      const x = h[i][0] + (h[i + 1][0] - h[i][0]) * t, y = h[i][1] + (h[i + 1][1] - h[i][1]) * t, [px, py] = mp([x, y]);
+      o.push('<path d="M' + r1(px) + ',' + r1(py) + 'l' + r1(rnd() * 2 - 1) + ',' + r1(7 + rnd() * 5) + '" stroke="#2e3a1c" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>');
+    } });
+    // вода
+    const water = (line, w) => '<path d="' + curve(line) + '" fill="none" stroke="#2a4b66" stroke-width="' + (w + 4) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + curve(line) + '" fill="none" stroke="#4f86ad" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + curve(line) + '" fill="none" stroke="#9cc8e0" stroke-width="' + r1(w / 4) + '" stroke-linecap="round" opacity=".45" stroke-dasharray="14 10"/>';
+    o.push(water(M.river, 9), water(M.yauza, 4), water(M.canal, 3));
+    M.ponds.forEach(([x, y, rx, ry]) => { const [px, py] = mp([x, y]);
+      o.push('<ellipse cx="' + r1(px) + '" cy="' + r1(py) + '" rx="' + r1(rx * MV.kmPx) + '" ry="' + r1(ry * MV.kmPx + 1) + '" fill="#4f86ad" stroke="#2a4b66" stroke-width="1.5"/>'); });
+    // дороги
+    M.roads.forEach(l => o.push('<path d="' + curve(l) + '" fill="none" stroke="#4e3d22" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>'));
+    M.roads.forEach(l => o.push('<path d="' + curve(l) + '" fill="none" stroke="#cdb07a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'));
+    // валы: Камер-Коллежский (граница города, пунктир) и Земляной
+    o.push('<path d="' + curve(M.earthWall, true) + '" fill="none" stroke="#9c845a" stroke-width="3" opacity=".85"/>');
+    o.push('<path d="' + curve(M.cityLine, true) + '" fill="none" stroke="#e0c890" stroke-width="1.6" stroke-dasharray="7 5" opacity=".75"/>');
+    // застройка: сетка ячеек, вероятность дома зависит от части города
+    const dens = (x, y) => {
+      if (inPoly(x, y, M.kremlin) || lineDist(x, y, M.river) < .2 || lineDist(x, y, M.yauza) < .1 || lineDist(x, y, M.canal) < .07) return 0;
+      if (M.woods.some(w => Math.hypot(x - w[0], y - w[1]) < w[2] * .9)) return 0;
+      const road = Math.min(...M.roads.map(l => lineDist(x, y, l)));
+      if (road < .06) return 0;
+      if (inPoly(x, y, M.earthWall)) return Math.hypot(x - .3, y - .3) < 1.4 ? .85 : .6;
+      if (inPoly(x, y, M.cityLine)) return road < .5 ? .35 : .16;
+      return road < .3 ? .1 : 0;
+    };
+    const roofs = ['#8c3b2a', '#6f4a32', '#a39272', '#5b6a6e', '#a0522d', '#7c6f5a', '#b5a27e'], houses = [], churches = [];
+    for (let gx = -10; gx < 11; gx += .13) for (let gy = -6.8; gy < 7.2; gy += .13) {
+      if (rnd() >= dens(gx, gy)) continue;
+      const [px, py] = mp([gx + rnd() * .05, gy + rnd() * .05]), w = 2.4 + rnd() * 2.6, h = 2.2 + rnd() * 2.2;
+      if (rnd() < .025) churches.push([px, py]);
+      else houses.push('<rect x="' + r1(px) + '" y="' + r1(py) + '" width="' + r1(w) + '" height="' + r1(h) + '" fill="' + roofs[Math.floor(rnd() * roofs.length)] + '"/>');
+    }
+    o.push('<g filter="url(#mShade)">' + houses.join('') + '</g>');
+    o.push('<g filter="url(#mShade)">' + churches.map(([x, y]) => '<rect x="' + r1(x - 2) + '" y="' + r1(y - 1) + '" width="5" height="6" fill="#ece5d2"/><circle cx="' + r1(x + .5) +
+      '" cy="' + r1(y - 1.6) + '" r="2" fill="#e2b33c"/>').join('') + '</g>');
+    // деревья: рощи и сады, бульвары Белого города, одиночные деревья за городом
+    const trees = [];
+    M.woods.forEach(([x, y, r, n]) => { for (let i = 0; i < n; i++) {
+      const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r, tx = x + Math.cos(a) * d, ty = y + Math.sin(a) * d;
+      if (lineDist(tx, ty, M.river) > .2) { const [px, py] = mp([tx, ty]); trees.push([px, py, 2.6 + rnd() * 2]); }
+    } });
+    for (let i = 0; i < 260; i++) {
+      const x = -12 + rnd() * 24, y = -7 + rnd() * 14.5;
+      if (!inPoly(x, y, M.cityLine) && lineDist(x, y, M.river) > .3) { const [px, py] = mp([x, y]); trees.push([px, py, 2.2 + rnd() * 1.8]); }
+    }
+    for (let i = 0; i < M.boulevards.length - 1; i++) for (let t = 0; t < 1; t += .2) {
+      const a = M.boulevards[i], b = M.boulevards[i + 1], [px, py] = mp([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      trees.push([px, py, 1.8]);
+    }
+    trees.sort((a, b) => a[1] - b[1]);
+    o.push('<g filter="url(#mShade)">' + trees.map(t => tree(...t)).join('') + '</g>');
+    // Китай-город и Кремль: кирпичные стены с башнями, внутри соборы
+    const towers = (pts, closed, step) => { const q = pts.map(mp), out = [];
+      for (let i = 0; i < (closed ? q.length : q.length - 1); i++) { const a = q[i], b = q[(i + 1) % q.length], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+        for (let k = 0; k < n; k++) { const x = a[0] + (b[0] - a[0]) * k / n, y = a[1] + (b[1] - a[1]) * k / n; out.push('<rect x="' + r1(x - 2.5) + '" y="' + r1(y - 2.5) + '" width="5" height="5" fill="#7d2219"/>'); } }
+      if (!closed) { const e = q[q.length - 1]; out.push('<rect x="' + r1(e[0] - 2.5) + '" y="' + r1(e[1] - 2.5) + '" width="5" height="5" fill="#7d2219"/>'); }
+      return out.join(''); };
+    const kq = M.kremlin.map(mp).map(p => p.map(r1).join(',')).join(' ');
+    o.push('<polyline points="' + M.kitayWall.map(mp).map(p => p.map(r1).join(',')).join(' ') + '" fill="none" stroke="#a8322a" stroke-width="2.5"/>' + towers(M.kitayWall, false, 12));
+    o.push('<g filter="url(#mShade)"><polygon points="' + kq + '" fill="#8a7650" stroke="#b5352b" stroke-width="3.5" stroke-linejoin="round"/>' + towers(M.kremlin, true, 9));
+    const [kx, ky] = mp([-.1, .05]);
+    [[-6, -4], [3, -6], [-2, 4], [5, 2]].forEach(([dx, dy]) => o.push('<rect x="' + r1(kx + dx - 2.5) + '" y="' + r1(ky + dy - 2) + '" width="5.5" height="5" fill="#ece5d2"/><circle cx="' +
+      r1(kx + dx + .3) + '" cy="' + r1(ky + dy - 2.5) + '" r="2.3" fill="#e9bb3f"/>'));
+    o.push('<rect x="' + r1(kx - 1.5) + '" y="' + r1(ky - 6) + '" width="3" height="9" fill="#f4efe0"/><circle cx="' + r1(kx) + '" cy="' + r1(ky - 6.5) + '" r="2" fill="#f2c24a"/></g>');
+    o.push('<rect width="' + MV.w + '" height="' + MV.h + '" filter="url(#mGrain)"/>');
+  }
+  o.push('<rect width="' + MV.w + '" height="' + MV.h + '" fill="url(#mVig)"/>');
+  // обозначения (слева под кнопкой), заголовок (справа вверху), роза ветров и масштаб (справа внизу)
+  const kinds = Object.keys(M.kinds), lh = 17;
+  o.push('<rect x="14" y="48" width="196" height="' + (32 + kinds.length * lh) + '" fill="rgba(20,12,6,.88)" stroke="#8c7647" stroke-width="1.5"/>' +
+    '<text x="26" y="68" fill="#e8c36a" font-size="13" font-weight="bold">Обозначения</text>');
+  kinds.forEach((k, i) => o.push('<circle cx="32" cy="' + (84 + i * lh) + '" r="4.5" fill="' + M.kinds[k].color + '" stroke="#1a1008" stroke-width="1.4"/>' +
+    '<text x="44" y="' + (88 + i * lh) + '" fill="#f0e2c0" font-size="12">' + M.kinds[k].name + '</text>'));
+  o.push('<g transform="translate(800 14)"><rect width="186" height="66" fill="rgba(20,12,6,.88)" stroke="#8c7647" stroke-width="1.5"/>' +
+    '<rect x="4" y="4" width="178" height="58" fill="none" stroke="#8c764788"/>' +
+    '<text x="93" y="38" text-anchor="middle" fill="#e8c36a" font-size="28" letter-spacing="3">' + M.title.toUpperCase() + '</text>' +
+    '<text x="93" y="55" text-anchor="middle" fill="#f0e2c0" font-size="12" font-style="italic">' + M.subtitle + '</text></g>');
+  o.push('<g transform="translate(958 462)" opacity=".9"><circle r="22" fill="rgba(20,12,6,.7)" stroke="#8c7647"/>' +
+    '<polygon points="0,-19 4,0 0,19 -4,0" fill="#f0e2c0"/><polygon points="0,-19 4,0 -4,0" fill="#e8c36a"/><polygon points="-19,0 0,4 19,0 0,-4" fill="#8c7647"/>' +
+    '<text y="-25" text-anchor="middle" fill="#f0e2c0" font-size="11" font-weight="bold">С</text></g>');
+  const vw = 2 * 1.0668 * MV.kmPx;                     // 2 версты
+  o.push('<g transform="translate(' + r1(986 - vw) + ' 528)"><rect x="-6" y="-16" width="' + r1(vw + 12) + '" height="26" fill="rgba(20,12,6,.7)"/>' +
+    '<rect width="' + r1(vw / 2) + '" height="4" fill="#f0e2c0"/><rect x="' + r1(vw / 2) + '" width="' + r1(vw / 2) + '" height="4" fill="#1a1008" stroke="#f0e2c0" stroke-width=".8"/>' +
+    '<text x="' + r1(vw / 2) + '" y="-4" text-anchor="middle" fill="#f0e2c0" font-size="11">2 версты</text></g>');
+  $('mapbase').innerHTML = o.join('');
+  mapBuilt = true;
+}
+function renderMap() {
+  $('map').style.display = mapOpen ? 'block' : 'none';
+  if (!mapOpen) return;
+  if (notesOpen) { notesOpen = false; renderNotes(); }
+  if (!mapBuilt) buildMap();
+  const marks = [], labels = [];
+  MAP.places.forEach(p => {
+    const [x, y] = mp([p.x, p.y]).map(r1), k = MAP.kinds[p.kind], home = p.id === MAP.here, sel = p.id === mapSel, r = home ? 6.5 : 5;
+    const g = ['<g class="loc" data-id="' + p.id + '" transform="translate(' + x + ' ' + y + ')"><circle r="11" fill="transparent"/>'];
+    if (home) g.push('<circle r="7" fill="none" stroke="' + k.color + '" stroke-width="2"><animate attributeName="r" values="7;17" dur="1.6s" repeatCount="indefinite"/>' +
+      '<animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="indefinite"/></circle>');
+    if (sel) g.push('<circle r="' + (r + 4) + '" fill="none" stroke="#fff" stroke-width="2"/>');
+    g.push('<circle class="dot" r="' + r + '" fill="' + k.color + '" stroke="#1a1008" stroke-width="1.6"/><circle cx="-1.4" cy="-1.4" r="' + r1(r / 3) + '" fill="#fff" opacity=".55"/></g>');
+    marks.push(g.join(''));
+    const off = { r: [r + 6, 4, 'start'], l: [-r - 6, 4, 'end'], t: [0, -r - 6, 'middle'], b: [0, r + 15, 'middle'] }[p.at || 'r'];
+    labels.push('<text class="loc" data-id="' + p.id + '" x="' + r1(x + off[0]) + '" y="' + r1(y + off[1]) + '" text-anchor="' + off[2] + '" font-size="' + (home ? 14 : 12.5) +
+      '" font-weight="' + (home || sel ? 'bold' : 'normal') + '" fill="' + (home ? '#ffe9a8' : '#fdf6e3') + '" stroke="#1a1008" stroke-width="3.4" paint-order="stroke" stroke-linejoin="round">' + p.name + '</text>');
+  });
+  $('mapmarks').innerHTML = marks.join('') + labels.join('');
+  const p = MAP.places.find(q => q.id === mapSel) || MAP.places[0];
+  const status = p.id === MAP.here ? 'Вы здесь.' : p.scene ? 'Сюда можно будет отправиться.' : 'Сюда пока нельзя: сцена ещё не готова.';
+  $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + '<p><i>' + status + '</i></p>';
+}
+
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt) {
   player.moving = false;
-  if (dlg || notesOpen || serving) return;             // во время диалога, заметок и обслуживания движение заблокировано
+  if (dlg || notesOpen || serving || mapOpen) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   const nx = Math.min(Math.max(player.x + dx * player.speed * dt, FLOOR.l), FLOOR.r);
   const d = Math.abs(nx - player.x);
