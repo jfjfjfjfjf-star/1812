@@ -795,8 +795,8 @@ function update(dt) {
   player.x = nx;
   if (d > 0) {
     player.moving = true; player.dist += d;
-    const f = Math.floor((player.dist / ANDREY.cycleDistance) % 1 * ANDREY.walk.frames);   // шаг слышен на кадрах касания (0 и 2)
-    if (f !== player.frame && f % 2 === 0) sfx.step();
+    const f = Math.floor((player.dist / ANDREY.cycleDistance) % 1 * ANDREY.walk.frames);   // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
+    if (f !== player.frame && f % (ANDREY.walk.frames / 2) === 0) sfx.step();
     player.frame = f;
   }
   if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)

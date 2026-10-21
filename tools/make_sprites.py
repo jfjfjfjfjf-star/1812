@@ -7,6 +7,8 @@
 #   python tools/make_sprites.py '{"src":["assets/source/andrey_idle_original.png"],"height":104,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_idle.png"}'
 #   ходьба Андрея (4 кадра, выровнены по голове кадра покоя; жилет перекрашен под цвет кадра покоя):
 #   python tools/make_sprites.py '{"src":["assets/source/andrey_walk_gpt_1.webp","assets/source/andrey_walk_gpt_2.webp","assets/source/andrey_walk_gpt_3.webp","assets/source/andrey_walk_gpt_4.webp"],"height":104,"scaleRef":0,"align":"head","headOffset":1.37,"colors":24,"recolor":[{"rows":[0.2,0.52],"hue":[16,32],"sat":[0.38,0.8],"val":[0.15,0.5],"shift":10,"satMul":0.85}],"palette":"assets/palette.png","out":"assets/characters/andrey_walk.png"}'
+#   ходьба Андрея, 8 кадров (шаг, проход, проход, подъём — и то же с другой ноги); рост по кадрам: шаг 103, остальные 104:
+#   python tools/make_sprites.py '{"src":["assets/source/andrey_walk8_1.webp","assets/source/andrey_walk8_2.webp","assets/source/andrey_walk8_3.webp","assets/source/andrey_walk8_4.webp","assets/source/andrey_walk8_5.webp","assets/source/andrey_walk8_6.webp","assets/source/andrey_walk8_7.webp","assets/source/andrey_walk8_8.webp"],"height":104,"heights":[103,104,104,104,103,104,104,104],"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_walk.png"}'
 #   мать (рост 96):
 #   python tools/make_sprites.py '{"src":["assets/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother_idle.png"}'
 import sys, os, json, colorsys
@@ -101,7 +103,10 @@ if __name__ == '__main__':
     masks = [figure_mask(s) for s in srcs]
     hs = [np.where(m.any(axis=1))[0] for m in masks]
     ref = hs[cfg.get('scaleRef', 0)]; scale = cfg['height'] / (ref[-1] - ref[0] + 1)
-    smalls = [shrink(s, m, scale)[0] for s, m in zip(srcs, masks)]
+    if cfg.get('heights'):   # свой рост для каждого кадра (масштаб всего кадра целиком): ровняет кадры разных генераций и задаёт подъём тела
+        scales = [hh / (h[-1] - h[0] + 1) for hh, h in zip(cfg['heights'], hs)]
+    else: scales = [scale] * len(srcs)
+    smalls = [shrink(s, m, sc)[0] for s, m, sc in zip(srcs, masks, scales)]
     if cfg.get('align') == 'head':
         cells = [to_cell(sm, head_center_x(sm) - cfg.get('headOffset', 0)) for sm in smalls]
     else:
@@ -113,4 +118,4 @@ if __name__ == '__main__':
     img.save(cfg['out'])
     for i, sm in enumerate(smalls):
         a = sm[..., 3] > 0; print('кадр', i + 1, 'размер фигуры', a.any(axis=0).sum(), '×', a.any(axis=1).sum())
-    print('масштаб', round(scale, 4), '->', cfg['out'], sheet.shape[1], '×', sheet.shape[0])
+    print('масштаб', [round(float(x), 4) for x in scales], '->', cfg['out'], sheet.shape[1], '×', sheet.shape[0])
