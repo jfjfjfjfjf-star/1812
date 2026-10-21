@@ -11,6 +11,8 @@
 #   python tools/make_sprites.py '{"src":["assets/source/andrey_walk8_1.webp","assets/source/andrey_walk8_2.webp","assets/source/andrey_walk8_3.webp","assets/source/andrey_walk8_4.webp","assets/source/andrey_walk8_5.webp","assets/source/andrey_walk8_6.webp","assets/source/andrey_walk8_7.webp","assets/source/andrey_walk8_8.webp"],"height":104,"heights":[103,104,104,104,103,104,104,104],"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_walk.png"}'
 #   Андрей за прилавком (2 кадра; потом кадр 2 = кадр 1 + область кистей [50:60, 76:100] из кадра 2, см. docs/ART_REQUIREMENTS.md):
 #   python tools/make_sprites.py '{"src":["assets/source/andrey_counter_1.webp","assets/source/andrey_counter_2.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_counter.png"}'
+#   Андрей передаёт товар (3 кадра; потом строки 0–26 каждого кадра = голова из кадра ожидания andrey_counter.png):
+#   python tools/make_sprites.py '{"src":["assets/source/andrey_give_1.webp","assets/source/andrey_give_2.webp","assets/source/andrey_give_3.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_give.png"}'
 #   мать (рост 96):
 #   python tools/make_sprites.py '{"src":["assets/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother_idle.png"}'
 import sys, os, json, colorsys
