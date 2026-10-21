@@ -105,7 +105,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 14) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 15) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -303,8 +303,9 @@ loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cel
 loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
-loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
+loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
+speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
@@ -657,13 +658,13 @@ async function intro() {                               // начало игры:
 // Покупатель привязан к ключу «день / номер в очереди / открыта ли лавка»: ключ сменился — прежний уходит (в том числе при закрытии лавки).
 const vkey = () => state.day + '/' + state.visit + '/' + state.phase;
 const visitor = { key: '', cust: null, x: 0, phase: 'none', wait: 0 }; // phase: in — идёт к прилавку, here — стоит, none — никого
-let leaving = [];                                      // ушедшие покупатели, которые ещё идут к двери: { x, color }
+let leaving = [];                                      // ушедшие покупатели, которые ещё идут к двери: { x, cust }
 function placeVisitor() { Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.customerX, phase: C() ? 'here' : 'none', wait: 0 }); leaving = []; }
 const visitorReady = () => visitor.key === vkey() && visitor.phase === 'here';
 function updateVisitors(dt) {
   const v = SCENE.customerSpeed * dt;
   if (visitor.key !== vkey()) {                        // очередь сдвинулась или лавка закрылась: прежний уходит, следующий скоро войдёт
-    if (visitor.cust && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, color: visitor.cust.color });
+    if (visitor.cust && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, cust: visitor.cust });
     Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
   }
   leaving.forEach(l => { l.x += v; }); leaving = leaving.filter(l => l.x < SCENE.doorX);
@@ -675,11 +676,10 @@ function updateVisitors(dt) {
     if (dlg && dlg.idle) renderDlg();                  // Андрей за прилавком ждёт: появляется «Обслужить следующего»
   }
 }
-function drawVisitors() {                              // слой 6: покупатели перед прилавком
-  const sw = x => Math.round(Math.sin(x / 4) * 4);
-  leaving.forEach(l => person(l.x, LANE, l.color, sw(l.x), 1));
+function drawVisitors() {                              // слой 6: покупатели перед прилавком (идут без кадров ходьбы — это не анимация)
+  leaving.forEach(l => drawPerson(l.cust, l.x, LANE, 1));
   if (visitor.cust && visitor.key === vkey() && visitor.wait <= 0 && visitor.phase !== 'none')
-    person(visitor.x, LANE, visitor.cust.color, visitor.phase === 'in' ? sw(visitor.x) : 0, visitor.phase === 'in' ? -1 : 1);
+    drawPerson(visitor.cust, visitor.x, LANE, visitor.phase === 'in' ? -1 : 1);
 }
 
 // ================= ОБНОВЛЕНИЕ =================
@@ -704,21 +704,31 @@ function shelf(x, y, n) {
     for (let i = 0; i < n; i++) rect(cols[(i + r) % 4], x + 4 + i * 13, y + r * 20, 5, 9);
   }
 }
-// Заглушка-человечек (ростом ~66 px, как будущие спрайты). Нужна для покупателей и пока нет картинок Андрея.
-function person(x, y, color, swing, dir) {
+// Заглушка-человечек (ростом ~66 px, как будущие спрайты): пока нет файла спрайта. Неподвижный: ходьбу не изображает.
+function person(x, y, color, dir) {
   const k = SCENE.charScale, R = (c, dx, dy, w, h) => rect(c, Math.round(x + dx * k), Math.round(y + dy * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
-  R('#1d1510', -8 + swing, -22, 6, 22);
-  R('#1d1510', 2 - swing, -22, 6, 22);
+  R('#1d1510', -8, -22, 6, 22);
+  R('#1d1510', 2, -22, 6, 22);
   R(color, -11, -50, 22, 28);
   R('#e0b890', -7, -66, 14, 16);
   R('#2a1a0e', dir > 0 ? 2 : -7, -60, 5, 3);
-  R('#d8d0b0', -2 - swing, -48, 5, 20);
+  R('#d8d0b0', -2, -48, 5, 20);
+}
+// Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
+function drawPerson(who, x, y, dir) {
+  const sp = who.sprite, im = sp && spr['s_' + who.id];
+  if (!im || !im.ok) { person(x, y, who.color, dir); return; }
+  const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
+  ctx.save(); ctx.translate(Math.round(x), 0);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  ctx.restore();
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Файла ходьбы пока нет — при движении показывается тот же статичный
 // кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
 function drawAndrey(x, y, dir, moving) {
   const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
-  if (!spr.idle.ok) { person(x, y, '#6b8a3a', moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, dir); return; }
+  if (!spr.idle.ok) { person(x, y, '#6b8a3a', dir); return; }
   const useWalk = moving && spr.walk.ok, img = useWalk ? spr.walk : spr.idle;
   const f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
   ctx.save();
@@ -764,7 +774,7 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 28); rect(c.floor, 0, c.lane - 28, c.worldW, H - c.lane + 28);
     for (let x = 12; x < c.worldW - 20; x += 26) { rect('#2a1f14', x - 1, c.lane - 50, 22, 23); rect('#cbb88e', x, c.lane - 49, 20, 21); rect('#b3a077', x + 3, c.lane - 49, 14, 4); }
   }
-  (c.npcs || []).forEach(n => person(n.x, c.lane, n.color, 0, -1));
+  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
   drawAndrey(player.x, player.y, player.dir, player.moving);
   ctx.restore();
 }
@@ -776,7 +786,7 @@ function draw() {
   ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
   drawBackdrop();
   drawStock();
-  person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
+  drawPerson(MOTHER, SCENE.motherX, LANE, 1);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
   drawCounterFront();
   drawVisitors();
