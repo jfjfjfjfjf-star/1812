@@ -12,6 +12,7 @@
 | `assets/backgrounds/shop_counter.png` | **подготовлен** (передняя часть прилавка, точная копия участка фона) |
 | `assets/characters/andrey_idle.png` | **подготовлен из присланной фигуры Андрея**, нужен глазами Кирилла |
 | `assets/characters/andrey_walk.png` | **подготовлен 21.10.2026** из 8 генераций ChatGPT (1152×120, 8 кадров), нужен глазами Кирилла |
+| `assets/characters/andrey_counter.png`, `andrey_give.png` | **нет** (движок готов: за прилавком ждёт — 2 кадра, 288×120; передаёт товар при продаже — 3 кадра, 432×120). Пока вместо них кадр покоя. Промты B1, B2 в `docs/GPT_PROMPTS.md` |
 | `assets/portraits/pavel.png`, `darya.png`, `fedor.png`, `mother.png` | **нет**. Пока вместо них цветная заглушка с буквой |
 | `assets/characters/mother_idle.png` | **подготовлен 21.10.2026** из генерации ChatGPT (144×120, рост 96), нужен глазами Кирилла |
 | `assets/characters/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png`, `sorokin_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |

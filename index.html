@@ -178,7 +178,7 @@ function sell() {                                      // деньги и тов
   if (d.stage === 'after' || d.stage === 'done') return;
   if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
   d.stage = 'after'; d.afterNode = c.soldNode; d.sold = true;
-  state.money += total(d); state.stock[c.want] -= c.qty; sfx.coins();
+  state.money += total(d); state.stock[c.want] -= c.qty; sfx.coins(); giveStart = performance.now() / 1000;
   const t = state.today; t.revenue += total(d); t.profit += profit(d); t.sold[c.want] = (t.sold[c.want] || 0) + c.qty;
   save(); showNode(c.soldNode);
 }
@@ -378,6 +378,8 @@ function loadImage(key, src, w, h, optional, note) {
 loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH, false,
   'Покадровой ходьбы пока нет: при ходьбе показывается статичный кадр покоя (это НЕ готовая анимация).');
 loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
+if (ANDREY.counter) loadImage('atCounter', ANDREY.counter.src, ANDREY.cellW * ANDREY.counter.frames, ANDREY.cellH, true);
+if (ANDREY.give) loadImage('give', ANDREY.give.src, ANDREY.cellW * ANDREY.give.frames, ANDREY.cellH, true);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
@@ -832,14 +834,26 @@ function drawPerson(who, x, y, dir) {
   ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
   ctx.restore();
 }
-// Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Файла ходьбы пока нет — при движении показывается тот же статичный
-// кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
-function drawAndrey(x, y, dir, moving) {
+// Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
+// при движении показывается статичный кадр покоя — это НЕ анимация.
+// За прилавком (atCounter = true): передача товара после продажи, иначе ожидание; без этих файлов — кадр покоя.
+let giveStart = -1e9;                                    // время последней продажи (секунды), не сохраняется
+function counterFrame() {
+  const t = performance.now() / 1000, g = ANDREY.give;
+  if (spr.give.ok && t - giveStart < g.frames * g.time) return [spr.give, Math.floor((t - giveStart) / g.time)];
+  if (!spr.atCounter.ok) return [spr.idle, 0];
+  const ts = ANDREY.counter.times, sum = ts.reduce((a, b) => a + b, 0);
+  let r = t % sum, f = 0;
+  while (r >= ts[f]) r -= ts[f++];
+  return [spr.atCounter, f];
+}
+function drawAndrey(x, y, dir, moving, atCounter) {
   const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
   shadow(x, y);
   if (!spr.idle.ok) { person(x, y, '#6b8a3a', dir); return; }
-  const useWalk = moving && spr.walk.ok, img = useWalk ? spr.walk : spr.idle;
-  const f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
+  const useWalk = moving && spr.walk.ok;
+  let img = useWalk ? spr.walk : spr.idle, f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
+  if (atCounter) [img, f] = counterFrame();
   ctx.save();
   ctx.translate(Math.round(x), 0);
   if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
@@ -1058,7 +1072,7 @@ function draw() {
   drawPassersby();
   drawStock();
   drawPerson(MOTHER, SCENE.motherX, LANE, 1);
-  if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
+  if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
   drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
