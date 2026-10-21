@@ -108,7 +108,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 18) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 19) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -811,6 +811,7 @@ function person(x, y, color, dir) {
 }
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
 function drawPerson(who, x, y, dir) {
+  shadow(x, y);
   const sp = who.sprite, im = sp && spr['s_' + who.id];
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
@@ -823,6 +824,7 @@ function drawPerson(who, x, y, dir) {
 // кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
 function drawAndrey(x, y, dir, moving) {
   const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
+  shadow(x, y);
   if (!spr.idle.ok) { person(x, y, '#6b8a3a', dir); return; }
   const useWalk = moving && spr.walk.ok, img = useWalk ? spr.walk : spr.idle;
   const f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
@@ -832,6 +834,75 @@ function drawAndrey(x, y, dir, moving) {
   const k = SCENE.charScale;                               // опора (48, 76) остаётся на месте, увеличивается всё вокруг неё
   ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
   ctx.restore();
+}
+// ================= СВЕТ (настройки — TIME.light и lights у сцены в data.js) =================
+// Поверх сцены: сумрак с просветами вокруг источников, затем свечение (сложение цветов): мерцающее пламя, ровное тёплое
+// свечение, луч из окна с пылинками. Плюс тени под ногами. Интерфейс (HTML) не затемняется.
+// ?light=0 в адресе — без света, теней и цветокоррекции (для попиксельных проверок).
+const LIGHT_ON = !/[?&]light=0\b/.test(location.search);
+const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + Math.max(0, Math.min(1, a)) + ')'; };
+const flick = (t, seed, amp) => 1 + amp * (0.6 * Math.sin(t * 7.1 + seed) + 0.3 * Math.sin(t * 13.7 + seed * 2.3) + 0.1 * Math.sin(t * 31 + seed * 5.1));
+let dust = { scene: '', list: [], last: 0 };
+function shadow(x, y) {                                // тень под ногами (в координатах мира)
+  const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
+  ctx.fillStyle = 'rgba(0,0,0,' + sh.alpha + ')';
+  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w / 2, sh.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+}
+function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
+  if (!LIGHT_ON) return;
+  const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
+  const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
+  // 1) сумрак: заливка цветом, в местах света — просветы
+  if (L.dark > 0) {
+    const w = canvas.width, h = canvas.height;
+    if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
+    lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, w, h);
+    lctx.fillStyle = rgba(L.darkColor, L.dark); lctx.fillRect(0, 0, w, h);
+    lctx.setTransform(px, 0, 0, px, -cam * px, 0); lctx.globalCompositeOperation = 'destination-out';
+    lights.forEach((l, i) => {
+      const cx = l.kind === 'window' ? (l.x0 + l.x1) / 2 : l.x, cy = l.kind === 'window' ? (l.y0 + l.y1) / 2 : l.y, r = (l.r || 70) * 1.5;
+      const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(0,0,0,' + Math.min(1, 0.95 * power(l, i)) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      lctx.fillStyle = g; lctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(lightCv, 0, 0); ctx.restore();
+  }
+  // 2) свечение — складывается с цветами сцены
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  lights.forEach((l, i) => {
+    const k = power(l, i);
+    if (l.kind === 'window') {
+      const b = l.beam, top = b[0][1], bottom = b[2][1];
+      const g = ctx.createLinearGradient(0, top, 0, bottom);
+      g.addColorStop(0, rgba(l.color, 0.16 * k)); g.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); b.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+      const cx = (l.x0 + l.x1) / 2, cy = (l.y0 + l.y1) / 2, gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 45);
+      gr.addColorStop(0, rgba(l.color, 0.18 * k)); gr.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = gr; ctx.fillRect(cx - 45, cy - 45, 90, 90);
+      drawDust(l, k, t);
+    } else {
+      const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      g.addColorStop(0, rgba(l.color, (l.kind === 'flame' ? 0.30 : 0.16) * k)); g.addColorStop(0.35, rgba(l.color, (l.kind === 'flame' ? 0.10 : 0.07) * k));
+      g.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = g; ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+    }
+  });
+  ctx.restore();
+}
+function drawDust(l, k, t) {                           // пылинки в луче окна: медленно плывут и мерцают
+  const b = l.beam, xs = b.map(p => p[0]), ys = b.map(p => p[1]);
+  const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  const spawn = () => { for (;;) { const x = box[0] + Math.random() * (box[2] - box[0]), y = box[1] + Math.random() * (box[3] - box[1]);
+    if (inPoly(x, y, b)) return { x, y, vx: 1 + Math.random() * 2.5, vy: -0.6 + Math.random() * 1.6, ph: Math.random() * 6.28 }; } };
+  if (dust.scene !== state.scene) dust = { scene: state.scene, list: Array.from({ length: 36 }, spawn), last: t };
+  const dt = Math.min(0.1, t - dust.last); dust.last = t;
+  dust.list.forEach((d, i) => {
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    if (!inPoly(d.x, d.y, b)) dust.list[i] = d = spawn();
+    const a = (0.25 + 0.25 * Math.sin(t * 1.3 + d.ph)) * k;
+    ctx.fillStyle = rgba(l.color, a); ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+  });
 }
 // Слои (снизу вверх): 1) фон помещения, 2) отметки остатка (только при заглушке фона), 3) мать,
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
@@ -871,6 +942,7 @@ function drawPlace() {
   }
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
   drawAndrey(player.x, player.y, player.dir, player.moving);
+  drawLight();
   ctx.restore();
 }
 function draw() {
@@ -888,11 +960,13 @@ function draw() {
   drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
+  drawLight();
   ctx.restore();
   drawHud();
 }
 function drawHud() {
-  const t = TIME.tint[state.phase]; if (t) rect(t, 0, 0, W, H);   // свет части дня поверх сцены
+  const grade = LIGHT_ON ? (TIME.light[state.phase] || {}).grade || '' : '';   // цветокоррекция части дня
+  if (canvas.style.filter !== grade) canvas.style.filter = grade;
   $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
