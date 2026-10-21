@@ -79,6 +79,9 @@
   #mapcard b { color: #e8c36a; font-size: calc(var(--s) * 6.5px); display: block; }
   #mapcard i { opacity: .7; font-size: calc(var(--s) * 4.5px); display: block; margin-bottom: calc(var(--s) * 1.5px); }
   #mapcard p { margin: calc(var(--s) * 1.5px) 0 0; }
+  #mapgo { font: inherit; cursor: pointer; background: #c9a96a; color: #1a1008; font-weight: bold; border: calc(var(--s) * 1px) solid #8c7647;
+           padding: calc(var(--s) * 1.5px) calc(var(--s) * 5px); width: 100%; }
+  #mapgo:hover { border-color: #e8c36a; }
 </style>
 </head>
 <body>
@@ -95,7 +98,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 9) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 10) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -110,8 +113,12 @@ if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 9) {
 
 // ================= НАСТРОЙКИ ЭКРАНА =================
 const W = 320, H = 180;                                // утверждённая сетка пикселей (экран)
-const WORLD_W = SCENE.worldW, LANE = SCENE.lane;       // ширина лавки и линия пола берутся из data.js (ходьба только влево-вправо)
-const FLOOR = { l: SCENE.walkMin, r: SCENE.walkMax !== undefined ? SCENE.walkMax : SCENE.worldW - SCENE.walkMin };   // без walkMax — симметрично
+// Текущая сцена: лавка (SCENE в data.js) или другое место из SCENES. Ширина мира, линия пола и границы ходьбы берутся из неё.
+const scn = () => state.scene === 'shop' ? SCENE : SCENES[state.scene];
+const inShop = () => state.scene === 'shop';
+const LANE = SCENE.lane;                               // линия пола лавки
+const floorX = () => { const c = scn(); return { l: c.walkMin, r: c.walkMax !== undefined ? c.walkMax : c.worldW - c.walkMin }; };   // без walkMax — симметрично
+const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c => c.npcs || [])];
 
 // ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
 const C = () => CUSTOMERS[state.visit];                // текущий покупатель (undefined, когда очередь кончилась)
@@ -208,7 +215,7 @@ function act(c) {
 
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
 const SAVE_KEY = 'letopisi1812_save_v6';
-const newState = () => ({ money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
+const newState = () => ({ scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
   deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false }])) });
 let state = load() || newState();
@@ -228,6 +235,7 @@ function load() {                                      // старое сохр�
         if (!num(d.fails)) d.fails = 0;
         if (typeof d.msg !== 'string') d.msg = '';
       });
+      if (s.scene !== 'shop' && !SCENES[s.scene]) s.scene = 'shop';   // миграция: раньше сцена была одна
       return s;
     }
   } catch (e) {}
@@ -267,18 +275,20 @@ loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
-[...CUSTOMERS, MOTHER].forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
+Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
+speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 47 };
-function resetPlayer() { Object.assign(player, { x: SCENE.startX, dist: 0, dir: 1, moving: false }); }   // «Новая игра» вызывает то же самое
+function resetPlayer() { Object.assign(player, { x: scn().startX, y: scn().lane, dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
-const cameraX = () => Math.max(0, Math.min(WORLD_W - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
-const near = x => Math.abs(player.x - x) < SCENE.talkRange;
-const nearMom = () => !dlg && !serving && near(SCENE.motherX);
-const nearWork = () => !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
+const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
+const near = x => Math.abs(player.x - x) < scn().talkRange;
+const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX);
+const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
+const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
@@ -293,6 +303,7 @@ addEventListener('keydown', e => {
   if (e.code !== 'KeyE' || notesOpen) return;
   if (nearMom()) showNode(MOTHER.node);
   else if (nearWork()) enterService();
+  else if (nearNpc()) showNode(nearNpc().node);
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -344,7 +355,7 @@ function renderDlg() {
     $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
   } else {
     who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
-    sp = [...CUSTOMERS, MOTHER].find(x => x.name === who) || null;
+    sp = speakers().find(x => x.name === who) || null;
     if (c && who === c.name && d.stage === 'after' && d.sold) {          // итог продажи — в интерфейсе, а не в речи покупателя
       pn.style.display = 'flex';
       pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>Продано</b><br>' + G().name + ' × ' + c.qty + '</div></div>' +
@@ -540,10 +551,11 @@ function renderMap() {
   MV = map.view;
   if (mapShown !== mapId) { $('mapbase').innerHTML = mapCache[mapId] || (mapCache[mapId] = buildMap()); mapShown = mapId; }
   $('mapswitch').textContent = '→ ' + MAP.maps[nextMap()].name;
-  if (!places.some(q => q.id === mapSel[mapId])) mapSel[mapId] = places.some(q => q.id === MAP.here) ? MAP.here : places[0].id;
+  const here = places.find(q => q.scene === state.scene);   // где сейчас Андрей (если это место есть на этой карте)
+  if (!places.some(q => q.id === mapSel[mapId])) mapSel[mapId] = here ? here.id : places[0].id;
   const marks = [], labels = [];
   places.forEach(p => {
-    const [x, y] = mp([p.x, p.y]).map(r1), k = MAP.kinds[p.kind], home = p.id === MAP.here, sel = p.id === mapSel[mapId], r = home ? 6.5 : 5;
+    const [x, y] = mp([p.x, p.y]).map(r1), k = MAP.kinds[p.kind], home = p === here, sel = p.id === mapSel[mapId], r = home ? 6.5 : 5;
     const g = ['<g class="loc" data-id="' + p.id + '" transform="translate(' + x + ' ' + y + ')"><circle r="11" fill="transparent"/>'];
     if (home) g.push('<circle r="7" fill="none" stroke="' + k.color + '" stroke-width="2"><animate attributeName="r" values="7;17" dur="1.6s" repeatCount="indefinite"/>' +
       '<animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="indefinite"/></circle>');
@@ -556,8 +568,15 @@ function renderMap() {
   });
   $('mapmarks').innerHTML = marks.join('') + labels.join('');
   const p = places.find(q => q.id === mapSel[mapId]);
-  const status = p.id === MAP.here ? 'Вы здесь.' : p.scene ? 'Сюда можно будет отправиться.' : 'Сюда пока нельзя: сцена ещё не готова.';
-  $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + '<p><i>' + status + '</i></p>';
+  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
+  $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
+  if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
+}
+// Переход через карту: Андрей оказывается в начальной точке выбранного места, открытый разговор закрывается.
+function travel(scene, name) {
+  if (serving || (scene !== 'shop' && !SCENES[scene])) return;
+  state.scene = scene; dlg = null; resetPlayer(); save();
+  mapOpen = false; renderMap(); renderDlg(); toast(name);
 }
 
 // ================= ОБНОВЛЕНИЕ =================
@@ -565,7 +584,7 @@ function update(dt) {
   player.moving = false;
   if (dlg || notesOpen || serving || mapOpen) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  const nx = Math.min(Math.max(player.x + dx * player.speed * dt, FLOOR.l), FLOOR.r);
+  const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
   const d = Math.abs(nx - player.x);
   player.x = nx;
   if (d > 0) { player.moving = true; player.dist += d; }
@@ -630,11 +649,25 @@ function drawCounterFront() {                          // слой 5: закры
 }
 function drawFront() {                                 // слой 8
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
-  else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
+  else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
+}
+// Другое место (не лавка): фон или заглушка, персонажи, Андрей.
+function drawPlace() {
+  const c = scn(), bg = spr['bg_' + state.scene];
+  ctx.save(); ctx.translate(-cameraX(), 0);
+  if (bg && bg.ok) ctx.drawImage(bg, 0, 0);
+  else {                                               // заглушка: стена, пол, мешки у стены
+    rect(c.wall, 0, 0, c.worldW, c.lane - 28); rect(c.floor, 0, c.lane - 28, c.worldW, H - c.lane + 28);
+    for (let x = 12; x < c.worldW - 20; x += 26) { rect('#2a1f14', x - 1, c.lane - 50, 22, 23); rect('#cbb88e', x, c.lane - 49, 20, 21); rect('#b3a077', x + 3, c.lane - 49, 14, 4); }
+  }
+  (c.npcs || []).forEach(n => person(n.x, c.lane, n.color, 0, -1));
+  drawAndrey(player.x, player.y, player.dir, player.moving);
+  ctx.restore();
 }
 function draw() {
   const cam = cameraX();
   ctx.clearRect(0, 0, W, H);
+  if (!inShop()) { drawPlace(); drawHud(); return; }
   if (!spr.bg.ok) { rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120); }   // заглушка: стена и пол
   ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
   drawBackdrop();
@@ -646,10 +679,14 @@ function draw() {
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
   ctx.restore();
+  drawHud();
+}
+function drawHud() {
   $('hud').textContent = 'Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = serving ? '' : nearMom() ? 'E — Поговорить' : nearWork() ? 'E — Встать за прилавок' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
+  const msg = serving ? '' : nearMom() || nearNpc() ? 'E — Поговорить' : nearWork() ? 'E — Встать за прилавок' :
+    (inShop() && !C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
 }
 
