@@ -105,7 +105,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 16) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 17) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -148,8 +148,9 @@ const profit = d => C().qty * (d.price - G().cost);
 const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
 const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
 const heard = id => !!state.heard[id];
-// Условие need: heard — слух известен; sold — в указанном приходе была продажа; notSold — продажи не было (или приход ещё не был).
-const okNeed = n => !n || ((!n.heard || heard(n.heard)) && (!n.sold || !!(state.deals[n.sold] || {}).sold) && (!n.notSold || !(state.deals[n.notSold] || {}).sold));
+// Условие need: heard — слух известен; ctx — запись уже дополнена (CONTEXT); sold — в указанном приходе была продажа;
+// notSold — продажи не было (или приход ещё не был).
+const okNeed = n => !n || ((!n.heard || heard(n.heard)) && (!n.ctx || !!state.ctx[n.ctx]) && (!n.sold || !!(state.deals[n.sold] || {}).sold) && (!n.notSold || !(state.deals[n.notSold] || {}).sold));
 const okChoice = c => okNeed(c.need) && !(c.once && c.id && state.asked[c.id]);
 const pickNode = x => typeof x === 'string' ? x : x.find(o => okNeed(o.need)).node;   // первая реплика: строка или список вариантов
 
@@ -256,6 +257,7 @@ const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
 function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
+  if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) { state.promises[c.keep].done = true; toast('Обещание выполнено'); }
   const op = c.do || '', cu = C(), d = cu && deal();
   if (op === 'order') return showOrder(c.seller);
   if (op === 'buy') return placeOrder();
@@ -303,6 +305,17 @@ function load() {                                      // старое сохр�
         if (typeof d.msg !== 'string') d.msg = '';
       });
       if (s.scene !== 'shop' && !SCENES[s.scene]) s.scene = 'shop';   // миграция: раньше сцена была одна
+      // миграция (DATA_VERSION 17): июньский слух и обещание переписаны — прежние записи переносятся на новые id;
+      // записи с неизвестными id отбрасываются, чтобы заметки не ломались
+      const RENAME = { pavel_neighbor_cart: 'pavel_neighbor_price', tell_pavel_carrier: 'tell_pavel_price' };
+      [['heard', RUMORS], ['promises', PROMISES]].forEach(([f, known]) => Object.keys(s[f]).forEach(k => {
+        if (RENAME[k] && !s[f][RENAME[k]]) s[f][RENAME[k]] = s[f][k];
+        if (!known[k]) delete s[f][k];
+      }));
+      Object.keys(s.heard).forEach(k => { if (!Array.isArray(s.heard[k].ctx)) s.heard[k].ctx = []; });
+      Object.keys(s.ctx).forEach(k => { if (!CONTEXT[k]) delete s.ctx[k]; });
+      if (s.ctx.mother_same_source && s.heard.pavel_neighbor_price)        // текст дополнения матери тоже переписан
+        s.heard.pavel_neighbor_price.ctx = s.heard.pavel_neighbor_price.ctx.map(t => t.startsWith('Мать:') ? CONTEXT.mother_same_source.text : t);
       if (!s.orders || typeof s.orders !== 'object') s.orders = {};     // миграция: заказов у оптовика раньше не было
       Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
         if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
@@ -474,7 +487,7 @@ function renderNotes() {
     return '<p><b>' + r.title + '</b><br>' + r.note + '<br><i>Сообщил: ' + r.who + '. Источник: ' + r.source + ' (' + r.kind + ')</i>' +
       h.ctx.map(t => '<br>' + t).join('') + '</p>';
   });
-  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — не выполнено</p>')
+  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + (state.promises[k].done ? ' — выполнено' : ' — не выполнено') + '</p>')
     .concat(Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
       .map(s => '<p><b>' + SUPPLY[s].title + ':</b> ' + orderText(state.orders[s]) + ' — оплачено, привезут завтра утром</p>'));
   el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';

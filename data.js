@@ -1,9 +1,9 @@
 // data.js — данные игры и настройки графики. Логику (index.html) править не нужно.
 // ВСЁ содержимое, кроме размеров спрайта Андрея, ТЕСТОВОЕ: цены, единицы, персонажи, слухи.
-// Историческую дату, валюту, меры и обстоятельства проверяем отдельно.
+// Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 16;
+const DATA_VERSION = 17;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (396×180), без прозрачности.
@@ -56,15 +56,15 @@ const TIME = {
 // visits — какие приходы покупателей (id из VISITS) будут в этот день, по порядку. Один человек может прийти в разные дни.
 // После последнего дня игра сообщает, что это конец текущей версии.
 // ЧЕРНОВИК: главы, даты и тексты перемоток предложены для обсуждения, исторические подробности проверяем отдельно.
-// Покупатели пока есть только в первую неделю (1, 2, 3, 5, 6 июня).
+// Покупатели пока есть только в первую неделю (1–7 июня).
 const DAYS = [
   { date: [1, 6], chapter: 'Глава 1. Мирная Москва', visits: ['pavel_1', 'darya_1'] },
   { date: [2, 6], visits: ['fedor_1'] },
   { date: [3, 6], visits: ['darya_2'] },
-  { date: [4, 6], visits: [] },
+  { date: [4, 6], visits: ['fedor_2'] },
   { date: [5, 6], visits: ['pavel_2'] },
-  { date: [6, 6], visits: ['fedor_2'] },
-  { date: [7, 6], visits: [] },
+  { date: [6, 6], visits: ['fedor_3'] },
+  { date: [7, 6], visits: ['darya_3', 'pavel_3'] },
   { date: [24, 6], chapter: 'Глава 2. Первые вести', visits: [],
     skip: 'Прошло больше двух недель. По городу ползут слухи: французы перешли Неман, началась война.' },
   { date: [25, 6], visits: [] },
@@ -147,8 +147,8 @@ const CUSTOMERS = [
 const VISITS = {
   pavel_1: { who: 'pavel', want: 'grain', qty: 2, budget: 18, wantUnit: 8, maxUnit: 9,
     openNode: 'pavel_open', soldNode: 'pavel_sold', refusedNode: 'pavel_refused', leaveNode: 'pavel_leave',
-    priceMsg: 'Два мешочка крупы. Почём?', counterMsg: 'За {counter} отдашь? Ещё дорогу оплачивать.',
-    tradeTalk: [{ text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true }] },
+    priceMsg: 'Два мешочка крупы. Почём?', counterMsg: 'За {counter} отдашь? Тёща у нас за двоих ест.',
+    tradeTalk: [{ text: 'Гости надолго?', goto: 'pavel_why', id: 'c_why', once: true }] },
   darya_1: { who: 'darya', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
     openNode: 'darya_open', soldNode: 'darya_sold', refusedNode: 'darya_refused', leaveNode: 'darya_leave',
     priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] },
@@ -162,10 +162,26 @@ const VISITS = {
   pavel_2: { who: 'pavel', want: 'grain', qty: 3, budget: 27, wantUnit: 8, maxUnit: 9,
     openNode: [{ need: { sold: 'pavel_1' }, node: 'pavel2_glad' }, { node: 'pavel2_open' }],
     soldNode: 'pavel2_sold', refusedNode: 'pavel2_refused', leaveNode: 'pavel2_leave',
-    priceMsg: 'Три мешочка. Почём отдашь?', counterMsg: 'По старой памяти — {counter} за все?', tradeTalk: [] },
+    priceMsg: 'Три мешочка. Почём отдашь?', counterMsg: 'По старой памяти — {counter} за все?',
+    tradeTalk: [{ text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true,
+                  goto: 'pavel2_told', keep: 'tell_pavel_price' }] },
   fedor_2: { who: 'fedor', want: 'apples', qty: 1, budget: 7, wantUnit: 6, maxUnit: 7,
     openNode: 'fedor2_open', soldNode: 'fedor2_sold', refusedNode: 'fedor2_refused', leaveNode: 'fedor2_leave',
-    priceMsg: 'Почём нынче свёрток?', counterMsg: 'Шесть дам, не больше.', tradeTalk: [] }
+    priceMsg: 'Почём нынче свёрток?', counterMsg: 'Шесть дам, не больше.', tradeTalk: [] },
+  fedor_3: { who: 'fedor', want: 'grain', qty: 3, budget: 26, wantUnit: 8, maxUnit: 8,
+    openNode: [{ need: { sold: 'fedor_2' }, node: 'fedor3_glad' }, { node: 'fedor3_open' }],
+    soldNode: 'fedor3_sold', refusedNode: 'fedor3_refused', leaveNode: 'fedor3_leave',
+    priceMsg: 'Почём мешочек?', counterMsg: 'Дам {counter} за все, больше артель не даст.', tradeTalk: [] },
+  darya_3: { who: 'darya', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
+    openNode: [{ need: { sold: 'darya_2' }, node: 'darya3_glad' }, { node: 'darya3_open' }],
+    soldNode: 'darya3_sold', refusedNode: 'darya3_refused', leaveNode: 'darya3_leave',
+    priceMsg: 'Сколько?', counterMsg: 'Давайте {counter}, и я побежала.', tradeTalk: [] },
+  pavel_3: { who: 'pavel', want: 'grain', qty: 4, budget: 34, wantUnit: 8, maxUnit: 9,
+    openNode: [{ need: { sold: 'pavel_2' }, node: 'pavel3_glad' }, { node: 'pavel3_open' }],
+    soldNode: 'pavel3_sold', refusedNode: 'pavel3_refused', leaveNode: 'pavel3_leave',
+    priceMsg: 'Четыре мешочка. Почём?', counterMsg: 'По-соседски — {counter} за все?',
+    tradeTalk: [{ text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true,
+                  goto: 'pavel3_told', keep: 'tell_pavel_price' }] }
 };
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 // Другие места (сцены), куда Андрей приходит через карту. Лавка описана выше (SCENE, ART), здесь — остальные.
@@ -198,44 +214,49 @@ const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'asse
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {
-  pavel_neighbor_cart: { topic: 'cart_shortage', title: 'Трудно найти подводу', who: 'Павел', source: 'его сосед', kind: 'пересказ',
-    note: 'Павел передал рассказ соседа, которому было трудно найти подводу. Причина неизвестна.',
-    toast: 'Новый слух: «Трудно найти подводу»' }
+  pavel_neighbor_price: { topic: 'grain_price', title: 'Крупа подорожает?', who: 'Павел', source: 'его сосед', kind: 'пересказ',
+    note: 'Павел передал слова соседа: Сорокин будто бы собирается поднять цену на крупу. Сам Павел у Сорокина не спрашивал.',
+    toast: 'Новый слух: «Крупа подорожает?»' }
 };
 // Дополнение к уже известной записи (новой записи не создаёт)
-const CONTEXT = { mother_same_source: { to: 'pavel_neighbor_cart',
-  text: 'Мать: сосед жаловался и ей утром. Источник тот же, это не второе подтверждение.' } };
-const PROMISES = { tell_pavel_carrier: { title: 'Сообщить Павлу, если найдём перевозчика' } };
+const CONTEXT = {
+  mother_same_source: { to: 'pavel_neighbor_price',
+    text: 'Мать: тот же сосед говорил и ей. Источник тот же — это не второе подтверждение.' },
+  sorokin_says_price: { to: 'pavel_neighbor_price',
+    text: 'Сорокин сам: цена пока прежняя, по шести за мешочек; что будет к осени, не обещает. Прямой источник, независимый от соседа.' } };
+// Обещания. В реплике promise — дать обещание; keep — выполнить (в заметках «выполнено»).
+const PROMISES = { tell_pavel_price: { title: 'Сказать Павлу, правда ли Сорокин поднимет цену на крупу' } };
 
 // Реплики. choices: goto — другая реплика; do — действие (trade, refuse, back, finish, end; order + seller — заказ у оптовика, см. SUPPLY);
-// need — условие {heard}; once+id — вопрос задаётся один раз; learn — запись; context — дополнение к записи.
+// need — условие {heard, ctx, sold, notSold}; once+id — вопрос задаётся один раз; learn — запись; context — дополнение к записи;
+// promise — дать обещание; keep — выполнить обещание.
 // Реплики не проводят оплату: деньги и товар меняются только в торговле.
 const NODES = {
-  pavel_open: { who: 'Павел', text: 'Два мешочка крупы. Семью, может, отправлю за город — надо припасы собрать.', choices: [
-    { text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true },
+  pavel_open: { who: 'Павел', text: 'Два мешочка крупы. Тёща из Коломны на лето приехала — едоков прибавилось.', choices: [
+    { text: 'Гости надолго?', goto: 'pavel_why', id: 'c_why', once: true },
     { text: 'Перейти к цене', do: 'trade' },
     { text: 'Пока не могу продать', do: 'refuse' }] },
-  pavel_why: { who: 'Павел', learn: 'pavel_neighbor_cart',
-    text: 'Сосед говорит, подводу едва нашёл. Вот и думаю, не пора ли заранее договориться.', choices: [
-    { text: 'Ты сам с перевозчиками говорил?', goto: 'pavel_src', id: 'c_src', once: true },
+  pavel_why: { who: 'Павел', learn: 'pavel_neighbor_price',
+    text: 'До осени, не меньше. Да ещё сосед говорит, Сорокин крупу скоро дороже отдавать будет. Вот и беру впрок.', choices: [
+    { text: 'Ты сам у Сорокина спрашивал?', goto: 'pavel_src', id: 'c_src', once: true },
     { text: 'Понятно. Вернёмся к покупке.', do: 'back' }] },
-  pavel_src: { who: 'Павел', text: 'Нет, сам не говорил. Всё от соседа.', choices: [
+  pavel_src: { who: 'Павел', text: 'Нет, сам не спрашивал. Всё от соседа.', choices: [
     { text: 'Понятно. Вернёмся к покупке.', do: 'back' }] },
-  pavel_sold: { who: 'Павел', text: 'Спасибо. Если узнаешь, кто за перевозку берётся, скажи.', choices: [
-    { text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true },
-    { text: 'Если узнаю — передам.', do: 'finish', promise: 'tell_pavel_carrier' },
+  pavel_sold: { who: 'Павел', text: 'Спасибо. Будешь у Сорокина — узнай, правда ли подорожает. Скажешь?', choices: [
+    { text: 'Гости надолго?', goto: 'pavel_why', id: 'c_why', once: true },
+    { text: 'Узнаю — скажу.', do: 'finish', promise: 'tell_pavel_price' },
     { text: 'Обещать не стану.', do: 'finish' }] },
   pavel_refused: { who: 'Павел', text: 'Понятно. Пойду искать в другом месте.', choices: [
-    { text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true },
+    { text: 'Гости надолго?', goto: 'pavel_why', id: 'c_why', once: true },
     { text: 'До свидания.', do: 'finish' }] },
   pavel_leave: { who: 'Павел', text: 'Так не пойдёт. Я заканчиваю разговор, пойду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
-  darya_open: { who: 'Дарья', text: 'Две буханки, пожалуйста.', choices: [
+  darya_open: { who: 'Дарья', text: 'Две буханки, пожалуйста. Барыня гостей ждёт, а я с утра не успела испечь.', choices: [
     { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
   darya_sold: { who: 'Дарья', text: 'Спасибо.',
     choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_refused: { who: 'Дарья', text: 'Жаль. Зайду позже.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya_leave: { who: 'Дарья', text: 'Нет, так не пойдёт. Я заканчиваю разговор.', choices: [{ text: 'До свидания.', do: 'finish' }] },
-  fedor_open: { who: 'Фёдор', text: 'Сушёных яблок бы, два свёртка. В дорогу.', choices: [
+  fedor_open: { who: 'Фёдор', text: 'Сушёных яблок бы, два свёртка. Ребятишкам на взвар.', choices: [
     { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
   fedor_sold: { who: 'Фёдор', text: 'Благодарствую.',
     choices: [{ text: 'До свидания.', do: 'finish' }] },
@@ -250,8 +271,10 @@ const NODES = {
   darya2_refused: { who: 'Дарья', text: 'Что ж, в другой раз.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   darya2_leave: { who: 'Дарья', text: 'Нет, так не пойдёт. Пойду в ряды.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   pavel2_glad: { who: 'Павел', text: 'Снова к тебе, Андрей. Крупа твоя хороша, возьму ещё три мешочка.', choices: [
+    { text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true, goto: 'pavel2_told', keep: 'tell_pavel_price' },
     { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
   pavel2_open: { who: 'Павел', text: 'Здравствуй. Попробую ещё раз у тебя: три мешочка крупы.', choices: [
+    { text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true, goto: 'pavel2_told', keep: 'tell_pavel_price' },
     { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
   pavel2_sold: { who: 'Павел', text: 'Спасибо. Хорошо, что лавка рядом.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   pavel2_refused: { who: 'Павел', text: 'Жаль. Поищу в другом месте.', choices: [{ text: 'До свидания.', do: 'finish' }] },
@@ -261,25 +284,57 @@ const NODES = {
   fedor2_sold: { who: 'Фёдор', text: 'Благодарствую.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   fedor2_refused: { who: 'Фёдор', text: 'Ну, нет так нет.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   fedor2_leave: { who: 'Фёдор', text: 'Дорого. Пойду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel2_told: { who: 'Павел', text: 'Вот как. Значит, сосед зря пугал. Спасибо, что узнал.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  // 6 июня: Фёдор за крупой
+  fedor3_glad: { who: 'Фёдор', text: 'Опять к тебе. Теперь крупы, три мешочка: артель кашу варит.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  fedor3_open: { who: 'Фёдор', text: 'Крупы три мешочка. С яблоками в тот раз не вышло — может, с крупой сговоримся.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  fedor3_sold: { who: 'Фёдор', text: 'Ладно. Артель сыта будет.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor3_refused: { who: 'Фёдор', text: 'Нет так нет.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor3_leave: { who: 'Фёдор', text: 'Дорого. Артель не даст.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  // 7 июня: Дарья и Павел в третий раз
+  darya3_glad: { who: 'Дарья', text: 'Хозяйка велела хлеб только у вас брать. Две буханки, я тороплюсь!', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  darya3_open: { who: 'Дарья', text: 'Опять я. Хозяйка ворчит, а хлеб нужен. Две буханки.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  darya3_sold: { who: 'Дарья', text: 'Вот и славно. Побежала!', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  darya3_refused: { who: 'Дарья', text: 'Ну что ж. Хозяйка расстроится.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  darya3_leave: { who: 'Дарья', text: 'Нет, пойду в ряды.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel3_glad: { who: 'Павел', text: 'Андрей, выручай: к нам ещё родня из деревни нагрянула. Четыре мешочка крупы.', choices: [
+    { text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true, goto: 'pavel3_told', keep: 'tell_pavel_price' },
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  pavel3_open: { who: 'Павел', text: 'Здравствуй. В прошлый раз не сговорились, а крупа нужна. Четыре мешочка.', choices: [
+    { text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true, goto: 'pavel3_told', keep: 'tell_pavel_price' },
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  pavel3_told: { who: 'Павел', text: 'Вот и хорошо. А я уж хотел впрок мешок взять. Спасибо, сосед.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  pavel3_sold: { who: 'Павел', text: 'Спасибо, сосед. Выручил.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel3_refused: { who: 'Павел', text: 'Жаль. Пойду в ряды.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel3_leave: { who: 'Павел', text: 'Нет, это дорого даже для родни.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   mother_hub: { who: 'Мать', text: 'Что-то хотел, Андрей?', choices: [
     { text: 'Как сегодня дела?', goto: 'mother_shop' },
-    { text: 'Павел говорит, трудно найти подводу. Ты слышала?', need: { heard: 'pavel_neighbor_cart' }, id: 'c_m_cart', once: true, goto: 'mother_cart' },
+    { text: 'Павел говорит, крупа подорожает. Ты слышала?', need: { heard: 'pavel_neighbor_price' }, id: 'c_m_price', once: true, goto: 'mother_price' },
     { text: 'Ничего, потом.', do: 'end' }] },
-  mother_shop: { who: 'Мать', text: 'Припасы проверь. И мешки из прохода убери — покупатели задевают.', choices: [
+  mother_shop: { who: 'Мать', text: 'Торговля идёт. Крупу проверь: кончится — сходи утром к Сорокину, к следующему утру привезут. И мешки из прохода убери.', choices: [
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Хорошо.', do: 'end' }] },
-  mother_cart: { who: 'Мать', context: 'mother_same_source', text: 'Его сосед и здесь утром жаловался. Это всё один рассказ.', choices: [
+  mother_price: { who: 'Мать', context: 'mother_same_source', text: 'Сосед и мне то же говорил. Это всё один рассказ. У Сорокина сам спроси.', choices: [
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Понятно.', do: 'end' }] },
   // Купец Сорокин (лабаз в Зарядье). Тестовые реплики; заказ товара — SUPPLY.sorokin.
   sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, гречневая и овсяная, мешками.', choices: [
     { text: 'Хочу заказать крупы', do: 'order', seller: 'sorokin' },
     { text: 'Почём нынче крупа?', goto: 'sorokin_price' },
+    { text: 'Говорят, крупа у тебя подорожает?', need: { heard: 'pavel_neighbor_price' }, id: 'c_s_price', once: true, goto: 'sorokin_rumor' },
     { text: 'Что слышно на реке?', goto: 'sorokin_news', id: 'c_sorokin_news', once: true },
     { text: 'Пока ничего, зайду позже.', do: 'end' }] },
   sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: шесть за мешочек. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
   sorokin_ordered: { who: 'Сорокин', text: 'Сговорились. Завтра поутру будет у тебя в лавке.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Спасибо.', do: 'end' }] },
-  sorokin_news: { who: 'Сорокин', text: 'Барки с хлебом приходят, как прежде. А подвод в городе всё меньше: развозить скоро будет не на чем.', choices: [
+  sorokin_rumor: { who: 'Сорокин', context: 'sorokin_says_price', text: 'Кто говорит? Сосед Павлов? Пока отдаю по шести, как весной. Что к осени будет — не загадываю.', choices: [
+    { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
+  sorokin_news: { who: 'Сорокин', text: 'На реке как обычно: барки разгружают, грузчики ругаются. Скучно, Андрей.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] }
 };
 
