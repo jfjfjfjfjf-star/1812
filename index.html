@@ -10,7 +10,10 @@
            width: calc(var(--s) * 320px); height: calc(var(--s) * 180px); }
   canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
   #hud, #hint, #newgame, #dbg, #back { position: absolute; color: #f0e2c0; font-size: calc(var(--s) * 5px); text-shadow: 1px 1px #000; }
-  #hud { right: calc(var(--s) * 4px); top: calc(var(--s) * 3px); }
+  #hud { right: calc(var(--s) * 4px); top: calc(var(--s) * 3px); text-align: right; }
+  #night { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: #05070d; color: #f0e2c0;
+           font-size: calc(var(--s) * 9px); opacity: 0; pointer-events: none; transition: opacity .6s; }
+  #night.on { opacity: 1; pointer-events: auto; }
   #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
   #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
              font-family: inherit; opacity: .6; cursor: pointer; }
@@ -46,7 +49,7 @@
   #choices button:hover, #pact button:hover, #back:hover { border-color: #e8c36a; }
   #choices button:disabled { opacity: .4; cursor: not-allowed; }
   #pact button:first-child.main { background: #c9a96a; color: #1a1008; font-weight: bold; }
-  #panel { position: absolute; right: calc(var(--s) * 4px); top: calc(var(--s) * 11px); width: calc(var(--s) * 84px); box-sizing: border-box; display: none;
+  #panel { position: absolute; right: calc(var(--s) * 4px); top: calc(var(--s) * 17px); width: calc(var(--s) * 84px); box-sizing: border-box; display: none;
            flex-direction: column; background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0;
            padding: calc(var(--s) * 2.5px); font-size: calc(var(--s) * 5.5px); line-height: 1.25; }
   #panel.full { bottom: calc(var(--s) * 3px); overflow-y: auto; }
@@ -92,13 +95,13 @@
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
-  <div id="toast"></div><div id="notes"></div>
+  <div id="toast"></div><div id="notes"></div><div id="night"></div>
   <div id="map"><svg viewBox="0 0 1000 560" preserveAspectRatio="none"><g id="mapbase"></g><g id="mapmarks"></g></svg><button id="mapclose">← Вернуться (M)</button><button id="mapswitch"></button><div id="mapcard"></div></div>
 </div>
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 11) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 12) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -121,7 +124,21 @@ const floorX = () => { const c = scn(); return { l: c.walkMin, r: c.walkMax !== 
 const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c => c.npcs || [])];
 
 // ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
-const C = () => CUSTOMERS[state.visit];                // текущий покупатель (undefined, когда очередь кончилась)
+// ----- Дни и части дня (настройки и расписание — TIME и DAYS в data.js) -----
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+function dateOf(n) {                                   // дата n-го дня игры по старому стилю (високосный — каждый четвёртый год)
+  let { day, month, year } = TIME.start; day += n;
+  for (;;) {
+    const len = [31, year % 4 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+    if (day <= len) break;
+    day -= len; if (++month > 12) { month = 1; year++; }
+  }
+  return day + ' ' + MONTHS[month - 1] + ' ' + year;
+}
+const todayQueue = () => (DAYS[state.day] || { customers: [] }).customers;
+const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
+// Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
+const C = () => state.phase === 'day' ? CUSTOMERS.find(c => c.id === todayQueue()[state.visit]) : undefined;
 const deal = () => state.deals[C().id];
 const G = () => GOODS[C().want];
 const total = d => C().qty * d.price;
@@ -133,7 +150,7 @@ const okChoice = c => (!c.need || !c.need.heard || heard(c.need.heard)) && !(c.o
 
 function learn(id) {                                   // запись о сведении появляется один раз
   if (!id || heard(id)) return;
-  state.heard[id] = { n: Object.keys(state.heard).length + 1, visit: state.visit, ctx: [] };
+  state.heard[id] = { n: Object.keys(state.heard).length + 1, day: state.day, visit: state.visit, ctx: [] };
   if (RUMORS[id].toast) toast(RUMORS[id].toast);
   save();
 }
@@ -151,6 +168,7 @@ function sell() {                                      // деньги и тов
   if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
   d.stage = 'after'; d.afterNode = c.soldNode; d.sold = true;
   state.money += total(d); state.stock[c.want] -= c.qty;
+  const t = state.today; t.revenue += total(d); t.profit += profit(d); t.sold[c.want] = (t.sold[c.want] || 0) + c.qty;
   save(); showNode(c.soldNode);
 }
 // Согласие возможно, только если одновременно: цена за единицу <= предела, сумма <= бюджета, товар есть в лавке.
@@ -186,7 +204,7 @@ function openCustomer() {                              // показывает �
   showNode(d.stage === 'open' ? c.openNode : d.afterNode);
 }
 function enterService() {
-  if (dlg || notesOpen || serving) return;
+  if (dlg || notesOpen || serving || state.phase !== 'day') return;
   serving = true; player.x = SCENE.workX; player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
   openCustomer();
 }
@@ -203,6 +221,7 @@ function act(c) {
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
   if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
+  if (op === 'close') return closeShop();
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
@@ -214,9 +233,9 @@ function act(c) {
 }
 
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
-const SAVE_KEY = 'letopisi1812_save_v6';
+const SAVE_KEY = 'letopisi1812_save_v7';               // v7: дни и части дня (сохранения v6 не загружаются — новая игра)
 const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
-const newState = () => ({ scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
+const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
   deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, newDeal(c)])) });
 let state = load() || newState();
@@ -228,7 +247,8 @@ function load() {                                      // старое сохр�
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     const num = v => typeof v === 'number' && isFinite(v);
     if (s && s.deals) CUSTOMERS.forEach(c => { if (!s.deals[c.id]) s.deals[c.id] = newDeal(c); });   // миграция: новый покупатель в очереди
-    if (s && num(s.money) && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= CUSTOMERS.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
+    if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
+        Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { customers: [] }).customers.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
         CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
       CUSTOMERS.forEach(c => {                         // миграция: у сделки появился признак «продано»
@@ -297,19 +317,19 @@ const keys = {};
 addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
-  if (e.repeat) return;                                // удержание клавиши не повторяет действие (заметки не мигают)
+  if (e.repeat || sleeping) return;                    // удержание клавиши не повторяет действие; ночью ввод не действует
   if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; if (mapOpen) mapId = MAP.start; renderMap(); return; }
   if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
   if (nearMom()) showNode(MOTHER.node);
-  else if (nearWork()) enterService();
+  else if (nearWork()) ({ morning: openShop, day: enterService, evening: endDay })[state.phase]();
   else if (nearNpc()) showNode(nearNpc().node);
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { if (sleeping) return; state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
 $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
 $('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.target.blur(); };
@@ -342,9 +362,15 @@ function renderDlg() {
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
     const ready = c && visitorReady();
-    who = ''; text = ready ? 'Следующий покупатель ждёт у прилавка.' : c ? 'Покупатель заходит в лавку.' : 'Пока покупателей нет.';
-    list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Отойти от прилавка', do: 'leave' }]);
+    who = ''; text = ready ? 'Следующий покупатель ждёт у прилавка.' : c ? 'Покупатель заходит в лавку.' : 'Покупателей сегодня больше нет.';
+    list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Закрыть лавку', do: 'close' }, { text: 'Отойти от прилавка', do: 'leave' }]);
     pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
+  } else if (dlg.summary) {                           // вечер: итоги дня
+    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего';
+    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.'; list = [{ text: 'Хорошо', do: 'end' }];
+    pn.style.display = 'flex'; pn.className = 'full';
+    pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
+      '<i>выручка минус закупка проданного</i><div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
     const pf = profit(d);
@@ -571,29 +597,52 @@ function renderMap() {
   });
   $('mapmarks').innerHTML = marks.join('') + labels.join('');
   const p = places.find(q => q.id === mapSel[mapId]);
-  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
+  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
   $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
   if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
 }
 // Переход через карту: Андрей оказывается в начальной точке выбранного места, открытый разговор закрывается.
+const shopOpenBlocks = () => !TIME.travelWhenOpen && state.phase === 'day';   // пока лавка открыта, уходить нельзя
 function travel(scene, name) {
-  if (serving || (scene !== 'shop' && !SCENES[scene])) return;
+  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene])) return;
   state.scene = scene; dlg = null; resetPlayer(); save();
   mapOpen = false; renderMap(); renderDlg(); toast(name);
+}
+
+// ================= ОТКРЫТИЕ И ЗАКРЫТИЕ ЛАВКИ, СМЕНА ДНЕЙ =================
+let sleeping = false;                                  // идёт экран ночи: ввод и движение отключены
+function openShop() { if (state.phase !== 'morning') return; state.phase = 'day'; state.visit = 0; save(); toast('Лавка открыта'); }
+function closeShop() {                                 // покупатели, которые не успели, сегодня уже не придут
+  if (state.phase !== 'day') return;
+  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.moving = false;
+  dlg = { summary: true }; save(); renderDlg();
+}
+function endDay() {                                    // ночь: экран перехода, затем утро следующего дня в лавке
+  if (state.phase !== 'evening' || sleeping) return;
+  sleeping = true; dlg = null; renderDlg();
+  const n = $('night'); n.textContent = 'Ночь'; n.classList.add('on');
+  setTimeout(() => {
+    Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
+    resetPlayer(); placeVisitor(); save();
+    n.textContent = 'Утро, ' + dateOf(state.day) + ' года';
+    setTimeout(() => { n.classList.remove('on'); sleeping = false; }, 1600);
+  }, 1300);
 }
 
 // ================= ПОКУПАТЕЛИ ПРИХОДЯТ И УХОДЯТ =================
 // Текущий покупатель (C) входит в дверь и идёт к прилавку; после прощания (visit вырос) уходит к двери, следующий появляется
 // через arrivalDelay секунд. Движение не сохраняется: после загрузки текущий покупатель уже стоит у прилавка.
-const visitor = { idx: -1, x: 0, phase: 'none', wait: 0 }; // phase: in — идёт к прилавку, here — стоит, none — никого
+// Покупатель привязан к ключу «день / номер в очереди / открыта ли лавка»: ключ сменился — прежний уходит (в том числе при закрытии лавки).
+const vkey = () => state.day + '/' + state.visit + '/' + state.phase;
+const visitor = { key: '', cust: null, x: 0, phase: 'none', wait: 0 }; // phase: in — идёт к прилавку, here — стоит, none — никого
 let leaving = [];                                      // ушедшие покупатели, которые ещё идут к двери: { x, color }
-function placeVisitor() { Object.assign(visitor, { idx: state.visit, x: SCENE.customerX, phase: C() ? 'here' : 'none', wait: 0 }); leaving = []; }
-const visitorReady = () => visitor.idx === state.visit && visitor.phase === 'here';
+function placeVisitor() { Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.customerX, phase: C() ? 'here' : 'none', wait: 0 }); leaving = []; }
+const visitorReady = () => visitor.key === vkey() && visitor.phase === 'here';
 function updateVisitors(dt) {
   const v = SCENE.customerSpeed * dt;
-  if (visitor.idx !== state.visit) {                   // очередь сдвинулась: прежний уходит, следующий скоро войдёт
-    if (CUSTOMERS[visitor.idx] && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, color: CUSTOMERS[visitor.idx].color });
-    Object.assign(visitor, { idx: state.visit, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
+  if (visitor.key !== vkey()) {                        // очередь сдвинулась или лавка закрылась: прежний уходит, следующий скоро войдёт
+    if (visitor.cust && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, color: visitor.cust.color });
+    Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
   }
   leaving.forEach(l => { l.x += v; }); leaving = leaving.filter(l => l.x < SCENE.doorX);
   if (visitor.phase !== 'in') return;
@@ -607,15 +656,15 @@ function updateVisitors(dt) {
 function drawVisitors() {                              // слой 6: покупатели перед прилавком
   const sw = x => Math.round(Math.sin(x / 4) * 4);
   leaving.forEach(l => person(l.x, LANE, l.color, sw(l.x), 1));
-  if (C() && visitor.idx === state.visit && visitor.wait <= 0 && visitor.phase !== 'none')
-    person(visitor.x, LANE, C().color, visitor.phase === 'in' ? sw(visitor.x) : 0, visitor.phase === 'in' ? -1 : 1);
+  if (visitor.cust && visitor.key === vkey() && visitor.wait <= 0 && visitor.phase !== 'none')
+    person(visitor.x, LANE, visitor.cust.color, visitor.phase === 'in' ? sw(visitor.x) : 0, visitor.phase === 'in' ? -1 : 1);
 }
 
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt) {
   updateVisitors(dt);
   player.moving = false;
-  if (dlg || notesOpen || serving || mapOpen) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
+  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
   const d = Math.abs(nx - player.x);
@@ -715,11 +764,13 @@ function draw() {
   drawHud();
 }
 function drawHud() {
-  $('hud').textContent = 'Монет: ' + state.money;
+  const t = TIME.tint[state.phase]; if (t) rect(t, 0, 0, W, H);   // свет части дня поверх сцены
+  $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = serving ? '' : nearMom() || nearNpc() ? 'E — Поговорить' : nearWork() ? 'E — Встать за прилавок' :
-    (inShop() && !C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
+  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' :
+    nearWork() ? { morning: 'E — Открыть лавку', day: 'E — Встать за прилавок', evening: 'E — Закончить день' }[state.phase] :
+    (inShop() && state.phase === 'day' && !C() && !dlg) ? 'Покупателей сегодня больше нет. Закрыть лавку можно за прилавком.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
 }
 
