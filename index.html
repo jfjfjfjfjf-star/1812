@@ -51,7 +51,7 @@
   #choices button, #pact button { font: inherit; font-size: calc(var(--s) * 5.5px); padding: calc(var(--s) * 2px) calc(var(--s) * 3px); cursor: pointer;
                   background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--s) * 1px) solid #8c7647; flex: 1 1 auto; }
   #choices button:hover, #pact button:hover, #back:hover { border-color: #e8c36a; }
-  #choices button:disabled { opacity: .4; cursor: not-allowed; }
+  #choices button:disabled, #pact button:disabled { opacity: .4; cursor: not-allowed; }
   #pact button:first-child.main { background: #c9a96a; color: #1a1008; font-weight: bold; }
   #panel { position: absolute; right: calc(var(--s) * 4px); top: calc(var(--s) * 17px); width: calc(var(--s) * 84px); box-sizing: border-box; display: none;
            flex-direction: column; background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0;
@@ -105,7 +105,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 15) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 16) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -136,6 +136,8 @@ const todayQueue = () => (DAYS[state.day] || { visits: [] }).visits;
 const VIS = Object.fromEntries(Object.keys(VISITS).map(v => [v, Object.assign({}, CUSTOMERS.find(p => p.id === VISITS[v].who), VISITS[v], { id: VISITS[v].who, visit: v })]));
 Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)) console.error('[данные] приход ' + v + ': нет покупателя ' + VISITS[v].who); });
 DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
+Object.keys(SUPPLY).forEach(s => { if (!speakers().some(p => p.id === s)) console.error('[данные] SUPPLY: нет персонажа ' + s);
+  Object.keys(SUPPLY[s].goods).forEach(k => { if (!GOODS[k]) console.error('[данные] SUPPLY.' + s + ': нет товара ' + k); }); });
 const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
 const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefined;
@@ -197,6 +199,40 @@ function tradeChoices() {
   if (d.counter) l.push({ text: 'Принять ' + d.counter, do: 'accept' });
   return l.concat(c.kind === 'story' ? c.tradeTalk.filter(okChoice) : [], [{ text: 'Отказаться', do: 'refuse' }]);
 }
+// ----- Закупка у оптовика (SUPPLY в data.js): платится сразу, товар привозят в лавку на следующее утро -----
+// state.orders — оплаченные заказы, которые привезут утром: { seller: { товар: количество } }. Черновик заказа живёт только в dlg.
+const lastDay = () => state.day + 1 >= DAYS.length;    // в последний день текущей версии утра не будет — заказ не принимается
+const npcName = id => speakers().find(p => p.id === id).name;
+const ordered = (s, k) => (state.orders[s] || {})[k] || 0;
+const orderSum = () => Object.keys(dlg.qty).reduce((n, k) => n + dlg.qty[k] * SUPPLY[dlg.order].goods[k].cost, 0);
+const orderText = o => Object.keys(o).map(k => GOODS[k].name + ' × ' + o[k]).join(', ');
+function showOrder(seller, msg) {
+  const s = SUPPLY[seller];
+  dlg = { order: seller, qty: dlg && dlg.order === seller ? dlg.qty : {}, msg: msg || (lastDay() ? s.lastDayMsg : s.askMsg) }; renderDlg();
+}
+function orderStep(k, n) {
+  const s = SUPPLY[dlg.order], was = dlg.qty[k] || 0;
+  if (lastDay()) return;
+  dlg.qty[k] = Math.max(0, Math.min(s.goods[k].max - ordered(dlg.order, k), was + n));
+  if (orderSum() > state.money) { dlg.qty[k] = was; return showOrder(dlg.order, s.noMoneyMsg); }
+  showOrder(dlg.order, n < 0 ? s.askMsg : dlg.msg === s.noMoneyMsg ? s.askMsg : dlg.msg);
+}
+function placeOrder() {                                // деньги списываются здесь и один раз; товар приходит в deliver()
+  const s = dlg.order, sum = orderSum();
+  if (!sum || sum > state.money || lastDay()) return;
+  const o = state.orders[s] = state.orders[s] || {};
+  Object.keys(dlg.qty).forEach(k => { if (dlg.qty[k]) o[k] = (o[k] || 0) + dlg.qty[k]; });
+  state.money -= sum; save();
+  toast('Заказано: ' + orderText(o) + '. Привезут завтра утром');
+  showNode(SUPPLY[s].doneNode);
+}
+function deliver() {                                   // утро: всё заказанное накануне уже в лавке; возвращает строку для сообщения
+  const got = Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
+    .map(s => { Object.keys(state.orders[s]).forEach(k => { state.stock[k] += state.orders[s][k]; }); return npcName(s) + ' привёз: ' + orderText(state.orders[s]); });
+  state.orders = {};
+  return got.join('; ');
+}
+
 // ----- Режим обслуживания: Андрей занимает место за прилавком (переход между двумя заранее заданными позициями) -----
 let serving = false;                                   // не сохраняется: после загрузки Андрей стоит перед прилавком, сделка продолжается
 function openCustomer() {                              // показывает текущего покупателя с того места, где сделка остановилась
@@ -221,6 +257,8 @@ function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
   const op = c.do || '', cu = C(), d = cu && deal();
+  if (op === 'order') return showOrder(c.seller);
+  if (op === 'buy') return placeOrder();
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
   if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
@@ -238,7 +276,7 @@ function act(c) {
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
 const SAVE_KEY = 'letopisi1812_save_v7';               // v7: дни и части дня (сохранения v6 не загружаются — новая игра)
 const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
-const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
+const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {}, orders: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
   deals: Object.fromEntries(Object.keys(VIS).map(v => [v, newDeal(VIS[v])])) });   // сделка у каждого прихода своя
 const loaded = load();
@@ -265,6 +303,10 @@ function load() {                                      // старое сохр�
         if (typeof d.msg !== 'string') d.msg = '';
       });
       if (s.scene !== 'shop' && !SCENES[s.scene]) s.scene = 'shop';   // миграция: раньше сцена была одна
+      if (!s.orders || typeof s.orders !== 'object') s.orders = {};     // миграция: заказов у оптовика раньше не было
+      Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
+        if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
+        Object.keys(o).forEach(k => { if (!GOODS[k] || !Number.isInteger(o[k]) || o[k] <= 0) delete o[k]; }); });
       return s;
     }
   } catch (e) {}
@@ -379,6 +421,19 @@ function renderDlg() {
     pn.style.display = 'flex'; pn.className = 'full';
     pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
       '<i>выручка минус закупка проданного</i><div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
+  } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, монеты
+    const s = SUPPLY[dlg.order], sum = orderSum();
+    sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
+    list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + sum : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
+    pn.style.display = 'flex'; pn.className = 'full';
+    pn.innerHTML = Object.keys(s.goods).map(k => { const g = s.goods[k], u = GOODS[k];
+      return '<div class="head"><div class="gi">' + goodsIcon(k) + '</div><div><b>' + u.name + '</b><br>по ' + g.cost + ' за ' + u.unit + '</div></div>' +
+        '<div class="step"><button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>' +
+        '<i>в лавке: ' + state.stock[k] + (ordered(dlg.order, k) ? ', уже заказано: ' + ordered(dlg.order, k) : '') + '</i>'; }).join('') +
+      '<div class="row" style="margin-top:2px">Всего: <b>' + sum + '</b></div><div class="row">Монет: <b>' + state.money + '</b></div>' +
+      '<i>платим сразу, товар привезут в лавку завтра утром</i><div id="pact"></div>';
+    pn.querySelectorAll('.step button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
+    target = $('pact');
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
     const pf = profit(d);
@@ -409,7 +464,7 @@ function renderDlg() {
   document.body.classList.toggle('paneled', pn.style.display === 'flex');
   box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
-  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
+  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; b.disabled = !!x.off; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
 }
 function renderNotes() {
   const el = $('notes'); el.style.display = notesOpen ? 'block' : 'none';
@@ -419,7 +474,9 @@ function renderNotes() {
     return '<p><b>' + r.title + '</b><br>' + r.note + '<br><i>Сообщил: ' + r.who + '. Источник: ' + r.source + ' (' + r.kind + ')</i>' +
       h.ctx.map(t => '<br>' + t).join('') + '</p>';
   });
-  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — не выполнено</p>');
+  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — не выполнено</p>')
+    .concat(Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
+      .map(s => '<p><b>' + SUPPLY[s].title + ':</b> ' + orderText(state.orders[s]) + ' — оплачено, привезут завтра утром</p>'));
   el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';
 }
 
@@ -643,10 +700,12 @@ async function endDay() {                              // ночь, затем �
   sleeping = true; dlg = null; renderDlg();
   await card('Ночь', 1300);
   Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
+  const got = deliver();                               // заказ у оптовика привезли ночью
   resetPlayer(); placeVisitor(); save();
   const d = DAYS[state.day];
   await (d.chapter || d.skip ? chapterCard(state.day) : card('Утро, ' + dateOf(state.day) + ' года', 1600));
   $('night').classList.remove('on'); sleeping = false;
+  if (got) toast(got);
 }
 async function intro() {                               // начало игры: заголовок первой главы
   sleeping = true; await chapterCard(0); $('night').classList.remove('on'); sleeping = false;

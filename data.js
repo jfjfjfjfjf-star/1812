@@ -3,7 +3,7 @@
 // Историческую дату, валюту, меры и обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 15;
+const DATA_VERSION = 16;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (396×180), без прозрачности.
@@ -179,6 +179,20 @@ const SCENES = {
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 230, color: '#3b4a6b', portrait: 'assets/portraits/sorokin.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } }] }
 };
+// Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
+// и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
+// goods — что можно заказать: cost — цена за единицу (сейчас равна закупке в GOODS, по ней считается прибыль в лавке),
+//   max — сколько всего можно заказать на одну доставку (заказ можно дополнить в тот же день).
+// title — строка в заметках, пока заказ не привезли; askMsg — реплика при открытии заказа; noMoneyMsg — когда монет не хватает; lastDayMsg — в последний день текущей версии
+//   (заказывать нельзя: привезти будет некуда); doneNode — реплика после заказа; backNode — куда ведёт «Назад».
+// ТЕСТОВОЕ: цены, количества, реплики.
+const SUPPLY = {
+  sorokin: { title: 'Заказ у Сорокина', goods: { grain: { cost: 6, max: 20 } },
+    askMsg: 'Сколько мешочков возьмёшь? Деньги вперёд, а завтра поутру работник привезёт к лавке.',
+    noMoneyMsg: 'На столько у тебя денег не хватит, Андрей.',
+    lastDayMsg: 'Не сегодня, Андрей. (Это последний день в текущей версии игры: привезти заказ будет некуда.)',
+    doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
+};
 const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/portraits/mother.png', color: '#8a5a5a', node: 'mother_hub',
   sprite: { src: 'assets/characters/mother_idle.png', cellW: 96, cellH: 80, anchorX: 48, floorY: 76, facing: 'right' } };
 
@@ -193,7 +207,7 @@ const CONTEXT = { mother_same_source: { to: 'pavel_neighbor_cart',
   text: 'Мать: сосед жаловался и ей утром. Источник тот же, это не второе подтверждение.' } };
 const PROMISES = { tell_pavel_carrier: { title: 'Сообщить Павлу, если найдём перевозчика' } };
 
-// Реплики. choices: goto — другая реплика; do — действие (trade, refuse, back, finish, end);
+// Реплики. choices: goto — другая реплика; do — действие (trade, refuse, back, finish, end; order + seller — заказ у оптовика, см. SUPPLY);
 // need — условие {heard}; once+id — вопрос задаётся один раз; learn — запись; context — дополнение к записи.
 // Реплики не проводят оплату: деньги и товар меняются только в торговле.
 const NODES = {
@@ -255,13 +269,16 @@ const NODES = {
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Хорошо.', do: 'end' }] },
   mother_cart: { who: 'Мать', context: 'mother_same_source', text: 'Его сосед и здесь утром жаловался. Это всё один рассказ.', choices: [
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Понятно.', do: 'end' }] },
-  // Купец Сорокин (лабаз в Зарядье). Тестовые реплики; закупка товара будет позже.
+  // Купец Сорокин (лабаз в Зарядье). Тестовые реплики; заказ товара — SUPPLY.sorokin.
   sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, гречневая и овсяная, мешками.', choices: [
+    { text: 'Хочу заказать крупы', do: 'order', seller: 'sorokin' },
     { text: 'Почём нынче крупа?', goto: 'sorokin_price' },
     { text: 'Что слышно на реке?', goto: 'sorokin_news', id: 'c_sorokin_news', once: true },
     { text: 'Пока ничего, зайду позже.', do: 'end' }] },
-  sorokin_price: { who: 'Сорокин', text: 'Сговоримся, когда соберёшься брать. Пока отдаю по-старому, а дальше кто знает.', choices: [
+  sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: шесть за мешочек. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
+  sorokin_ordered: { who: 'Сорокин', text: 'Сговорились. Завтра поутру будет у тебя в лавке.', choices: [
+    { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Спасибо.', do: 'end' }] },
   sorokin_news: { who: 'Сорокин', text: 'Барки с хлебом приходят, как прежде. А подвод в городе всё меньше: развозить скоро будет не на чем.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] }
 };
