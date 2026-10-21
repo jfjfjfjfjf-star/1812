@@ -105,7 +105,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 13) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 14) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -131,18 +131,25 @@ const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c
 // ----- Дни и части дня (настройки и расписание — TIME и DAYS в data.js) -----
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const dateOf = n => { const [d, m] = DAYS[n].date; return d + ' ' + MONTHS[m - 1] + ' ' + TIME.year; };   // дата n-го играбельного дня (старый стиль)
-const todayQueue = () => (DAYS[state.day] || { customers: [] }).customers;
+const todayQueue = () => (DAYS[state.day] || { visits: [] }).visits;
+// Приход = человек (CUSTOMERS) + что ему нужно в этот раз (VISITS). id — человек (портрет, имя), visit — приход (сделка).
+const VIS = Object.fromEntries(Object.keys(VISITS).map(v => [v, Object.assign({}, CUSTOMERS.find(p => p.id === VISITS[v].who), VISITS[v], { id: VISITS[v].who, visit: v })]));
+Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)) console.error('[данные] приход ' + v + ': нет покупателя ' + VISITS[v].who); });
+DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
 const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
-const C = () => state.phase === 'day' ? CUSTOMERS.find(c => c.id === todayQueue()[state.visit]) : undefined;
-const deal = () => state.deals[C().id];
+const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefined;
+const deal = () => state.deals[C().visit];
 const G = () => GOODS[C().want];
 const total = d => C().qty * d.price;
 const profit = d => C().qty * (d.price - G().cost);
 const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
 const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
 const heard = id => !!state.heard[id];
-const okChoice = c => (!c.need || !c.need.heard || heard(c.need.heard)) && !(c.once && c.id && state.asked[c.id]);
+// Условие need: heard — слух известен; sold — в указанном приходе была продажа; notSold — продажи не было (или приход ещё не был).
+const okNeed = n => !n || ((!n.heard || heard(n.heard)) && (!n.sold || !!(state.deals[n.sold] || {}).sold) && (!n.notSold || !(state.deals[n.notSold] || {}).sold));
+const okChoice = c => okNeed(c.need) && !(c.once && c.id && state.asked[c.id]);
+const pickNode = x => typeof x === 'string' ? x : x.find(o => okNeed(o.need)).node;   // первая реплика: строка или список вариантов
 
 function learn(id) {                                   // запись о сведении появляется один раз
   if (!id || heard(id)) return;
@@ -197,7 +204,7 @@ function openCustomer() {                              // показывает �
   if (!c || !visitorReady()) { dlg = { idle: true }; return renderDlg(); }   // никого нет или покупатель ещё идёт
   const d = deal();
   if (d.stage === 'price') return showTrade();
-  showNode(d.stage === 'open' ? c.openNode : d.afterNode);
+  showNode(d.stage === 'open' ? pickNode(c.openNode) : d.afterNode);
 }
 function enterService() {
   if (dlg || notesOpen || serving || state.phase !== 'day') return;
@@ -222,7 +229,7 @@ function act(c) {
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
   if (op === 'refuse') return leave(cu.refusedNode);
-  if (op === 'back') return d.stage === 'open' ? showNode(cu.openNode) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
+  if (op === 'back') return d.stage === 'open' ? showNode(pickNode(cu.openNode)) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
   if (op === 'finish' && d && d.stage === 'after') { d.stage = 'done'; state.visit++; }   // следующий покупатель
   if (c.goto) { save(); return showNode(c.goto); }
   save(); endDlg();
@@ -233,7 +240,7 @@ const SAVE_KEY = 'letopisi1812_save_v7';               // v7: дни и част
 const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
 const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
-  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, newDeal(c)])) });
+  deals: Object.fromEntries(Object.keys(VIS).map(v => [v, newDeal(VIS[v])])) });   // сделка у каждого прихода своя
 const loaded = load();
 let state = loaded || newState();
 let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
@@ -243,13 +250,16 @@ function load() {                                      // старое сохр�
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     const num = v => typeof v === 'number' && isFinite(v);
-    if (s && s.deals) CUSTOMERS.forEach(c => { if (!s.deals[c.id]) s.deals[c.id] = newDeal(c); });   // миграция: новый покупатель в очереди
+    if (s && s.deals) Object.keys(VIS).forEach(v => {  // миграция: раньше сделка хранилась по человеку (pavel), теперь по приходу (pavel_1)
+      const who = VISITS[v].who;
+      if (!s.deals[v]) s.deals[v] = v === who + '_1' && s.deals[who] ? s.deals[who] : newDeal(VIS[v]);
+    });
     if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
-        s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { customers: [] }).customers.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
+        s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { visits: [] }).visits.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
-        CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
-      CUSTOMERS.forEach(c => {                         // миграция: у сделки появился признак «продано»
-        const d = s.deals[c.id];
+        Object.keys(VIS).every(v => num(s.deals[v].price) && ['open', 'price', 'after', 'done'].includes(s.deals[v].stage))) {
+      Object.values(VIS).forEach(c => {                // миграция: у сделки появился признак «продано»
+        const d = s.deals[c.visit];
         if (typeof d.sold !== 'boolean') d.sold = d.stage !== 'open' && d.stage !== 'price' && d.afterNode === c.soldNode;
         if (!num(d.fails)) d.fails = 0;
         if (typeof d.msg !== 'string') d.msg = '';

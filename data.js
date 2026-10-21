@@ -3,7 +3,7 @@
 // Историческую дату, валюту, меры и обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 13;
+const DATA_VERSION = 14;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 180 (396×180), без прозрачности.
@@ -52,59 +52,59 @@ const TIME = {
 };
 // Играбельные дни по порядку. date — [число, месяц] по старому стилю. Дни можно пропускать: между главами время перематывается.
 // chapter — название главы (показывается перед первым днём главы); skip — текст перемотки (что случилось за пропущенное время);
-// customers — какие покупатели (id из CUSTOMERS) приходят в этот день, по порядку. Каждый покупатель приходит один раз за игру.
+// visits — какие приходы покупателей (id из VISITS) будут в этот день, по порядку. Один человек может прийти в разные дни.
 // После последнего дня игра сообщает, что это конец текущей версии.
 // ЧЕРНОВИК: главы, даты и тексты перемоток предложены для обсуждения, исторические подробности проверяем отдельно.
-// Покупатели пока есть только в первые два дня.
+// Покупатели пока есть только в первую неделю (1, 2, 3, 5, 6 июня).
 const DAYS = [
-  { date: [1, 6], chapter: 'Глава 1. Мирная Москва', customers: ['pavel', 'darya'] },
-  { date: [2, 6], customers: ['fedor'] },
-  { date: [3, 6], customers: [] },
-  { date: [4, 6], customers: [] },
-  { date: [5, 6], customers: [] },
-  { date: [6, 6], customers: [] },
-  { date: [7, 6], customers: [] },
-  { date: [24, 6], chapter: 'Глава 2. Первые вести', customers: [],
+  { date: [1, 6], chapter: 'Глава 1. Мирная Москва', visits: ['pavel_1', 'darya_1'] },
+  { date: [2, 6], visits: ['fedor_1'] },
+  { date: [3, 6], visits: ['darya_2'] },
+  { date: [4, 6], visits: [] },
+  { date: [5, 6], visits: ['pavel_2'] },
+  { date: [6, 6], visits: ['fedor_2'] },
+  { date: [7, 6], visits: [] },
+  { date: [24, 6], chapter: 'Глава 2. Первые вести', visits: [],
     skip: 'Прошло больше двух недель. По городу ползут слухи: французы перешли Неман, началась война.' },
-  { date: [25, 6], customers: [] },
-  { date: [26, 6], customers: [] },
-  { date: [27, 6], customers: [] },
-  { date: [28, 6], customers: [] },
-  { date: [29, 6], customers: [] },
-  { date: [30, 6], customers: [] },
-  { date: [11, 7], chapter: 'Глава 3. Государь в Москве', customers: [],
+  { date: [25, 6], visits: [] },
+  { date: [26, 6], visits: [] },
+  { date: [27, 6], visits: [] },
+  { date: [28, 6], visits: [] },
+  { date: [29, 6], visits: [] },
+  { date: [30, 6], visits: [] },
+  { date: [11, 7], chapter: 'Глава 3. Государь в Москве', visits: [],
     skip: 'Прошло две недели. Армия отступает. Говорят, в Москву едет сам государь.' },
-  { date: [12, 7], customers: [] },
-  { date: [13, 7], customers: [] },
-  { date: [14, 7], customers: [] },
-  { date: [15, 7], customers: [] },
-  { date: [16, 7], customers: [] },
-  { date: [17, 7], customers: [] },
-  { date: [8, 8], chapter: 'Глава 4. Тревога', customers: [],
+  { date: [12, 7], visits: [] },
+  { date: [13, 7], visits: [] },
+  { date: [14, 7], visits: [] },
+  { date: [15, 7], visits: [] },
+  { date: [16, 7], visits: [] },
+  { date: [17, 7], visits: [] },
+  { date: [8, 8], chapter: 'Глава 4. Тревога', visits: [],
     skip: 'Прошло три недели. Вести с запада всё тревожнее: говорят, оставлен Смоленск.' },
-  { date: [9, 8], customers: [] },
-  { date: [10, 8], customers: [] },
-  { date: [11, 8], customers: [] },
-  { date: [12, 8], customers: [] },
-  { date: [13, 8], customers: [] },
-  { date: [14, 8], customers: [] },
-  { date: [19, 8], chapter: 'Глава 5. Ожидание', customers: [],
+  { date: [9, 8], visits: [] },
+  { date: [10, 8], visits: [] },
+  { date: [11, 8], visits: [] },
+  { date: [12, 8], visits: [] },
+  { date: [13, 8], visits: [] },
+  { date: [14, 8], visits: [] },
+  { date: [19, 8], chapter: 'Глава 5. Ожидание', visits: [],
     skip: 'Прошло несколько дней. Армией теперь командует Кутузов, все ждут большого сражения.' },
-  { date: [20, 8], customers: [] },
-  { date: [21, 8], customers: [] },
-  { date: [22, 8], customers: [] },
-  { date: [23, 8], customers: [] },
-  { date: [24, 8], customers: [] },
-  { date: [25, 8], customers: [] },
-  { date: [26, 8], chapter: 'Глава 6. Последняя неделя', customers: [],
+  { date: [20, 8], visits: [] },
+  { date: [21, 8], visits: [] },
+  { date: [22, 8], visits: [] },
+  { date: [23, 8], visits: [] },
+  { date: [24, 8], visits: [] },
+  { date: [25, 8], visits: [] },
+  { date: [26, 8], chapter: 'Глава 6. Последняя неделя', visits: [],
     skip: 'Где-то под Можайском идёт большое сражение.' },
-  { date: [27, 8], customers: [] },
-  { date: [28, 8], customers: [] },
-  { date: [29, 8], customers: [] },
-  { date: [30, 8], customers: [] },
-  { date: [31, 8], customers: [] },
-  { date: [1, 9], customers: [] },
-  { date: [2, 9], chapter: 'Финал', customers: [] }
+  { date: [27, 8], visits: [] },
+  { date: [28, 8], visits: [] },
+  { date: [29, 8], visits: [] },
+  { date: [30, 8], visits: [] },
+  { date: [31, 8], visits: [] },
+  { date: [1, 9], visits: [] },
+  { date: [2, 9], chapter: 'Финал', visits: [] }
 ];
 
 // Сцена: координаты МИРА в пикселях (экран 320x180 показывает часть лавки, камера следует за Андреем).
@@ -121,21 +121,42 @@ const SCENE = { charScale: 1.2, worldW: 396, lane: 150, startX: 150, walkMin: 10
                 workX: 285, serviceY: 133, customerX: 235, motherX: 118, counter: { l: 135, r: 353 },
                 doorX: 372, customerSpeed: 40, arrivalDelay: 1.5 };
 
-// Покупатели (приходят по очереди). Правило торга одно для всех, без случайности:
-// согласен, если цена за единицу <= maxUnit И сумма <= budget; иначе предлагает wantUnit за единицу.
-// После трёх неудачных предложений уходит (leaveNode).
+// Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
+// kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 const CUSTOMERS = [
-  { id: 'pavel', name: 'Павел', kind: 'story', portrait: 'assets/portraits/pavel.png', color: '#4a5a3a', want: 'grain', qty: 2, budget: 18, wantUnit: 8, maxUnit: 9,
+  { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/portraits/pavel.png', color: '#4a5a3a' },
+  { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b' },
+  { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/portraits/fedor.png', color: '#5a4a3a' }
+];
+// Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
+// Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
+// Правило торга одно для всех, без случайности: согласен, если цена за единицу <= maxUnit И сумма <= budget;
+// иначе предлагает wantUnit за единицу. После трёх неудачных предложений уходит (leaveNode).
+// openNode — первая реплика; может быть списком вариантов [{ need, node }, …, { node }]: берётся первый, чьё условие need выполнено
+// (так человек «помнит» прошлый приход). Условия need: heard — слух известен; sold — в этом приходе была продажа; notSold — не было.
+const VISITS = {
+  pavel_1: { who: 'pavel', want: 'grain', qty: 2, budget: 18, wantUnit: 8, maxUnit: 9,
     openNode: 'pavel_open', soldNode: 'pavel_sold', refusedNode: 'pavel_refused', leaveNode: 'pavel_leave',
     priceMsg: 'Два мешочка крупы. Почём?', counterMsg: 'За {counter} отдашь? Ещё дорогу оплачивать.',
     tradeTalk: [{ text: 'Почему решил отправить семью?', goto: 'pavel_why', id: 'c_why', once: true }] },
-  { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
+  darya_1: { who: 'darya', want: 'bread', qty: 2, budget: 10, wantUnit: 4, maxUnit: 5,
     openNode: 'darya_open', soldNode: 'darya_sold', refusedNode: 'darya_refused', leaveNode: 'darya_leave',
     priceMsg: 'Сколько с меня?', counterMsg: 'Дороговато. Давайте {counter}.', tradeTalk: [] },
-  { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/portraits/fedor.png', color: '#5a4a3a', want: 'apples', qty: 2, budget: 13, wantUnit: 6, maxUnit: 6,
+  fedor_1: { who: 'fedor', want: 'apples', qty: 2, budget: 13, wantUnit: 6, maxUnit: 6,
     openNode: 'fedor_open', soldNode: 'fedor_sold', refusedNode: 'fedor_refused', leaveNode: 'fedor_leave',
-    priceMsg: 'Почём свёрток?', counterMsg: 'Дам {counter} за оба, больше не могу.', tradeTalk: [] }
-];
+    priceMsg: 'Почём свёрток?', counterMsg: 'Дам {counter} за оба, больше не могу.', tradeTalk: [] },
+  darya_2: { who: 'darya', want: 'bread', qty: 3, budget: 15, wantUnit: 4, maxUnit: 5,
+    openNode: [{ need: { sold: 'darya_1' }, node: 'darya2_glad' }, { node: 'darya2_open' }],
+    soldNode: 'darya2_sold', refusedNode: 'darya2_refused', leaveNode: 'darya2_leave',
+    priceMsg: 'Почём сегодня?', counterMsg: 'Давайте {counter} за все три.', tradeTalk: [] },
+  pavel_2: { who: 'pavel', want: 'grain', qty: 3, budget: 27, wantUnit: 8, maxUnit: 9,
+    openNode: [{ need: { sold: 'pavel_1' }, node: 'pavel2_glad' }, { node: 'pavel2_open' }],
+    soldNode: 'pavel2_sold', refusedNode: 'pavel2_refused', leaveNode: 'pavel2_leave',
+    priceMsg: 'Три мешочка. Почём отдашь?', counterMsg: 'По старой памяти — {counter} за все?', tradeTalk: [] },
+  fedor_2: { who: 'fedor', want: 'apples', qty: 1, budget: 7, wantUnit: 6, maxUnit: 7,
+    openNode: 'fedor2_open', soldNode: 'fedor2_sold', refusedNode: 'fedor2_refused', leaveNode: 'fedor2_leave',
+    priceMsg: 'Почём нынче свёрток?', counterMsg: 'Шесть дам, не больше.', tradeTalk: [] }
+};
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 // Другие места (сцены), куда Андрей приходит через карту. Лавка описана выше (SCENE, ART), здесь — остальные.
 // name — название (показывается при переходе); worldW, lane, startX, walkMin, walkMax, talkRange — как у лавки (координаты мира);
@@ -194,6 +215,26 @@ const NODES = {
     choices: [{ text: 'До свидания.', do: 'finish' }] },
   fedor_refused: { who: 'Фёдор', text: 'Ну, в другой лавке спрошу.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   fedor_leave: { who: 'Фёдор', text: 'Дорого. Пойду в ряды, там сговорчивее.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  // Повторные приходы (тестовые реплики). Вариант первой реплики зависит от того, купил ли человек в прошлый раз.
+  darya2_glad: { who: 'Дарья', text: 'Опять к вам. В прошлый раз хлеб был хороший. Три буханки, пожалуйста.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  darya2_open: { who: 'Дарья', text: 'В тот раз не сговорились. Может, сегодня выйдет? Три буханки.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  darya2_sold: { who: 'Дарья', text: 'Спасибо. Ещё зайду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  darya2_refused: { who: 'Дарья', text: 'Что ж, в другой раз.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  darya2_leave: { who: 'Дарья', text: 'Нет, так не пойдёт. Пойду в ряды.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel2_glad: { who: 'Павел', text: 'Снова к тебе, Андрей. Крупа твоя хороша, возьму ещё три мешочка.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  pavel2_open: { who: 'Павел', text: 'Здравствуй. Попробую ещё раз у тебя: три мешочка крупы.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  pavel2_sold: { who: 'Павел', text: 'Спасибо. Хорошо, что лавка рядом.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel2_refused: { who: 'Павел', text: 'Жаль. Поищу в другом месте.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  pavel2_leave: { who: 'Павел', text: 'Нет, Андрей, это слишком. Пойду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor2_open: { who: 'Фёдор', text: 'Опять я. Ещё свёрток яблок.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  fedor2_sold: { who: 'Фёдор', text: 'Благодарствую.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor2_refused: { who: 'Фёдор', text: 'Ну, нет так нет.', choices: [{ text: 'До свидания.', do: 'finish' }] },
+  fedor2_leave: { who: 'Фёдор', text: 'Дорого. Пойду.', choices: [{ text: 'До свидания.', do: 'finish' }] },
   mother_hub: { who: 'Мать', text: 'Что-то хотел, Андрей?', choices: [
     { text: 'Как сегодня дела?', goto: 'mother_shop' },
     { text: 'Павел говорит, трудно найти подводу. Ты слышала?', need: { heard: 'pavel_neighbor_cart' }, id: 'c_m_cart', once: true, goto: 'mother_cart' },
