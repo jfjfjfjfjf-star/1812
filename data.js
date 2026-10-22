@@ -196,12 +196,12 @@ const SCENES = {
     background: 'assets/backgrounds/labaz.png', wall: '#3a2c1e', floor: '#6b5236',
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 345, color: '#3b4a6b', portrait: 'assets/portraits/sorokin.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] },
-  // ТЕСТОВОЕ: название, реплики, цена чарки. Фона и фигуры целовальника пока нет — заглушки.
-  kabak: { name: 'Кабак «Зарядный»', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35,
-    background: 'assets/backgrounds/kabak.png', wall: '#2e2219', floor: '#4f3a26',
-    open: ['evening'], closedMsg: 'Кабак оживает к вечеру, а сейчас там пусто. Приходите, когда закроете лавку.', endsEvening: true,
-    npcs: [{ id: 'tselovalnik', name: 'Целовальник', x: 330, color: '#6b3b2e', portrait: 'assets/portraits/tselovalnik.png', node: 'kabak_hub',
-             sprite: { src: 'assets/characters/tselovalnik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'left' } }] }
+  // ТЕСТОВОЕ: название, реплики, цены. Фона и фигуры трактирщика пока нет — заглушки.
+  traktir: { name: 'Трактир «Зарядный»', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35,
+    background: 'assets/backgrounds/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
+    open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
+    npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/portraits/traktirshchik.png', node: 'traktir_hub',
+             sprite: { src: 'assets/characters/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'left' } }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
 // и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
@@ -344,16 +344,19 @@ const NODES = {
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
   sorokin_news: { who: 'Сорокин', text: 'На реке как обычно: барки разгружают, грузчики ругаются. Скучно, Андрей.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
-  // Кабак. pay — сколько монет стоит выбор (не хватает — выбор не срабатывает); do: 'home' — домой спать (конец дня).
-  kabak_hub: { who: 'Целовальник', text: 'Заходи, лавочник, не стой в дверях. Чарку налить?', choices: [
-    { text: 'Налей чарку (1 монета)', pay: 1, goto: 'kabak_drink' },
-    { text: 'Что нынче говорят?', goto: 'kabak_talk' },
+  // Трактир. pay — сколько монет стоит выбор (не хватает — выбор не срабатывает); do: 'home' — домой спать (конец дня).
+  traktir_hub: { who: 'Трактирщик', text: 'Милости просим, Андрей! Садись, где свободно. Чаю подать или чего покрепче?', choices: [
+    { text: 'Подай чаю (1 монета)', pay: 1, goto: 'traktir_tea' },
+    { text: 'Налей рюмку (1 монета)', pay: 1, goto: 'traktir_vodka' },
+    { text: 'Что нынче говорят?', goto: 'traktir_talk' },
     { text: 'Пойду домой.', do: 'home' },
     { text: 'Пока посижу.', do: 'end' }] },
-  kabak_drink: { who: 'Целовальник', text: 'Пей на здоровье. Посиди, послушай: тут вечером вся набережная собирается.', choices: [
-    { text: 'Ещё вопрос', goto: 'kabak_hub' }, { text: 'Посижу.', do: 'end' }] },
-  kabak_talk: { who: 'Целовальник', text: 'Да всякое. Подводчики жалуются, что извоз дорожает. А верить ли — сам решай: я пересказываю, что слышал.', choices: [
-    { text: 'Ещё вопрос', goto: 'kabak_hub' }, { text: 'Понятно.', do: 'end' }] }
+  traktir_tea: { who: 'Трактирщик', text: 'Вот, с баранками. Посиди, отдохни: за тем столом приказчики газету читают, а в углу подводчики спорят.', choices: [
+    { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Посижу.', do: 'end' }] },
+  traktir_vodka: { who: 'Трактирщик', text: 'Пей на здоровье. Только меру знай: завтра тебе за прилавок.', choices: [
+    { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Посижу.', do: 'end' }] },
+  traktir_talk: { who: 'Трактирщик', text: 'Да всякое. Подводчики жалуются, что извоз дорожает. А верить ли — сам решай: я пересказываю, что слышал.', choices: [
+    { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Понятно.', do: 'end' }] }
 };
 
 // ================= КАРТЫ (экран «Карта», клавиша M) =================
@@ -413,8 +416,8 @@ const MAP = {
           desc: 'Тесные переулки между Варваркой и рекой: мастерские, постоялые дворы, склады.' },
         { id: 'labaz', name: 'Лабаз Сорокина', kind: 'trade', x: 0.86, y: -0.3, at: 'b', scene: 'labaz',
           desc: 'Хлебный лабаз купца Сорокина у реки: крупа и мука мешками, оптом. Здесь Андрей берёт товар для лавки.' },
-        { id: 'kabak', name: 'Кабак «Зарядный»', kind: 'place', x: 0.74, y: -0.22, at: 't', scene: 'kabak',
-          desc: 'Питейный дом под горкой у набережной. Вечером тут грузчики, подводчики, приказчики с лабазов, а на крыльце нищие. Здесь пьют, спорят и пересказывают слухи.' },
+        { id: 'traktir', name: 'Трактир «Зарядный»', kind: 'place', x: 0.74, y: -0.22, at: 't', scene: 'traktir',
+          desc: 'Трактир у набережной. По вечерам за столами купцы и приказчики с лабазов, подводчики, грузчики; пьют чай и водку, читают вслух газету, на крыльце нищие. Здесь узнают все новости и слухи.' },
         { id: 'most', name: 'Москворецкий мост', kind: 'place', x: 0.37, y: -0.4, at: 'l',
           desc: 'Мост через Москву-реку из Китай-города в Замоскворечье.' },
         { id: 'vospit', name: 'Воспитательный дом', kind: 'place', x: 1.2, y: -0.28, at: 'r',
