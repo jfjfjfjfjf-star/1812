@@ -247,7 +247,16 @@ const SUPPLY = {
 const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a', node: 'mother_hub',
   // мать за делом: перебирает крупу в миске, 8 кадров PixelLab со стабилизацией (tools/make_mother_work.py), цикл без пауз;
   // прежняя фигура без миски — mother_idle.png
-  sprite: { src: 'assets/characters/mother/mother_work.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 8, frameTime: 0.18 } };
+  sprite: { src: 'assets/characters/mother/mother_work.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 8, frameTime: 0.18 },
+  // дела матери: каждый день она случайно выбирает одно (не то же, что вчера; выбор дня не меняется после перезагрузки).
+  // Лист кадров в ряд (ячейка 144×120, опора 72/114, нарисована лицом вправо), x/y — где стоит, dir -1 — лицом влево.
+  // Дело без файла пропускается; если нет ни одного — мать стоит в SCENE.motherX/motherY со sprite выше.
+  activities: [
+    { id: 'sort', name: 'перебирает крупу', src: 'assets/characters/mother/mother_work.png', frames: 8, frameTime: 0.18, x: 112, y: 212, dir: -1 },
+    { id: 'broom', name: 'метёт пол', src: 'assets/characters/mother/mother_broom.png', frames: 8, frameTime: 0.16, x: 182, y: 225, dir: -1 },
+    { id: 'wipe', name: 'протирает бочонки', src: 'assets/characters/mother/mother_wipe.png', frames: 8, frameTime: 0.18, x: 172, y: 212, dir: -1 },
+    { id: 'bags', name: 'насыпает крупу в мешочки', src: 'assets/characters/mother/mother_bags.png', frames: 8, frameTime: 0.18, x: 112, y: 212, dir: -1 },
+  ] };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {

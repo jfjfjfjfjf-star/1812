@@ -392,6 +392,7 @@ loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
+(MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
@@ -403,7 +404,20 @@ function resetPlayer() { Object.assign(player, { x: scn().startX, y: laneAt(scn(
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
 const near = (x, r) => Math.abs(player.x - x) < (r || scn().talkRange);
-const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX, SCENE.motherTalk);
+// Дело матери на сегодня: по номеру дня, без повтора вчерашнего; только дела, чьи файлы загрузились.
+function motherAct() {
+  const ready = (MOTHER.activities || []).filter(a => spr['ma_' + a.id] && spr['ma_' + a.id].ok);
+  if (!ready.length) return null;
+  let prev = null;
+  for (let d = 0; d <= state.day; d++) {
+    const opts = ready.length > 1 ? ready.filter(a => a !== prev) : ready;
+    let t = Math.imul((d + 1) ^ 0x5bd1e995, 0x6d2b79f5); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    prev = opts[Math.floor(((t ^ t >>> 14) >>> 0) / 4294967296 * opts.length)];   // ровное псевдослучайное число по номеру дня
+  }
+  return prev;
+}
+const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, dir: a.dir } : { x: SCENE.motherX, y: SCENE.motherY || LANE, dir: SCENE.motherDir || 1 }; };
+const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
 
@@ -831,9 +845,9 @@ function person(x, y, color, dir) {
   R('#d8d0b0', -2, -48, 5, 20);
 }
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
-function drawPerson(who, x, y, dir) {
+function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — другой лист кадров (например, дело матери)
   shadow(x, y);
-  const sp = who.sprite, im = sp && spr['s_' + who.id];
+  const sp = spOver || who.sprite, im = imOver || (sp && spr['s_' + who.id]);
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
   const f = sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
@@ -1087,7 +1101,9 @@ function draw() {
   drawBackdrop();
   drawPassersby();
   drawStock();
-  drawPerson(MOTHER, SCENE.motherX, SCENE.motherY || LANE, SCENE.motherDir || 1);
+  const ma = motherAct(), mp = motherPos();
+  if (ma) drawPerson(MOTHER, mp.x, mp.y, mp.dir, { cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: ma.frames, frameTime: ma.frameTime }, spr['ma_' + ma.id]);
+  else drawPerson(MOTHER, mp.x, mp.y, mp.dir);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
   drawVisitors();
