@@ -407,7 +407,7 @@ loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
-Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
+Object.keys(SCENES).forEach(id => { loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H); if (SCENES[id].front) loadImage('fr_' + id, SCENES[id].front, SCENES[id].worldW, H, true); });
 (MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
@@ -1113,6 +1113,7 @@ function drawPlace() {
   }
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
   drawAndrey(player.x, player.y, player.dir, player.moving);
+  const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
   drawLight();
   ctx.restore();
 }
