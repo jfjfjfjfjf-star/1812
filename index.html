@@ -143,7 +143,9 @@ Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)
 DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
 Object.keys(SUPPLY).forEach(s => { if (!speakers().some(p => p.id === s)) console.error('[данные] SUPPLY: нет персонажа ' + s);
   Object.keys(SUPPLY[s].goods).forEach(k => { if (!GOODS[k]) console.error('[данные] SUPPLY.' + s + ': нет товара ' + k); }); });
-const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
+// spent — сколько заплачено продавцам (SUPPLY) за день: { seller: монеты }; seen — сколько из этого уже показано в итогах дня
+const newToday = () => ({ revenue: 0, profit: 0, sold: {}, spent: {}, seen: 0 });   // итоги текущего дня
+const spentToday = () => Object.values(state.today.spent).reduce((n, v) => n + v, 0);
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
 const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefined;
 const deal = () => state.deals[C().visit];
@@ -228,7 +230,7 @@ function placeOrder() {                                // деньги спис�
   if (!sum || sum > state.money || lastDay()) return;
   const o = state.orders[s] = state.orders[s] || {};
   Object.keys(dlg.qty).forEach(k => { if (dlg.qty[k]) o[k] = (o[k] || 0) + dlg.qty[k]; });
-  state.money -= sum; save(); sfx.coins();
+  state.money -= sum; state.today.spent[s] = (state.today.spent[s] || 0) + sum; save(); sfx.coins();
   toast('Заказано: ' + orderText(o) + '. Привезут завтра утром');
   showNode(SUPPLY[s].doneNode);
 }
@@ -270,6 +272,7 @@ function act(c) {
   if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
   if (op === 'close') return closeShop();
+  if (op === 'sleep') return endDay();
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
@@ -321,6 +324,9 @@ function load() {                                      // старое сохр�
       Object.keys(s.ctx).forEach(k => { if (!CONTEXT[k]) delete s.ctx[k]; });
       if (s.ctx.mother_same_source && s.heard.pavel_neighbor_price)        // текст дополнения матери тоже переписан
         s.heard.pavel_neighbor_price.ctx = s.heard.pavel_neighbor_price.ctx.map(t => t.startsWith('Мать:') ? CONTEXT.mother_same_source.text : t);
+      if (!s.today.spent || typeof s.today.spent !== 'object') s.today.spent = {};   // миграция: трат на закупку в итогах дня раньше не было
+      Object.keys(s.today.spent).forEach(id => { if (!SUPPLY[id] || !num(s.today.spent[id]) || s.today.spent[id] < 0) delete s.today.spent[id]; });
+      if (!num(s.today.seen)) s.today.seen = Object.values(s.today.spent).reduce((n, v) => n + v, 0);
       if (!s.orders || typeof s.orders !== 'object') s.orders = {};     // миграция: заказов у оптовика раньше не было
       Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
         if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
@@ -416,7 +422,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
   if (nearMom()) showNode(MOTHER.node);
-  else if (nearWork()) ({ morning: openShop, day: enterService, evening: endDay })[state.phase]();
+  else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
   else if (nearNpc()) showNode(nearNpc().node);
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
@@ -461,11 +467,16 @@ function renderDlg() {
     list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Закрыть лавку', do: 'close' }, { text: 'Отойти от прилавка', do: 'leave' }]);
     pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
   } else if (dlg.summary) {                           // вечер: итоги дня
-    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего';
-    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.'; list = [{ text: 'Хорошо', do: 'end' }];
+    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего', paid = spentToday(), net = t.revenue - paid;
+    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.';
+    list = dlg.sleep ? [{ text: 'Закончить день', do: 'sleep' }, { text: 'Не сейчас', do: 'end' }] : [{ text: 'Хорошо', do: 'end' }];
+    t.seen = paid; save();
     pn.style.display = 'flex'; pn.className = 'full';
     pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
-      '<i>выручка минус закупка проданного</i><div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
+      '<i>выручка минус закупка проданного</i>' +
+      (paid ? '<div style="margin-top:4px"><b>Закупка</b><br>' + Object.keys(t.spent).map(id => npcName(id) + ': ' + t.spent[id]).join('<br>') + '</div>' +
+        '<div class="row">Монет за день: <b>' + (net > 0 ? '+' : net < 0 ? '−' : '') + Math.abs(net) + '</b></div><i>выручка минус закупка</i>' : '') +
+      '<div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
   } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, монеты
     const s = SUPPLY[dlg.order], sum = orderSum();
     sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
@@ -739,6 +750,10 @@ function card(html, ms) {
 }
 const chapterCard = n => { const d = DAYS[n];           // глава и перемотка перед днём n (если есть) — ждёт игрока
   return card((d.chapter ? '<b>' + d.chapter + '</b>' : '') + (d.skip ? '<p>' + d.skip + '</p>' : '') + '<i>' + dateOf(n) + ' года, утро</i><small>E — продолжить</small>', 0); };
+function finishDay() {                                 // закупки после закрытия лавки ещё не видны в итогах — сначала показать их
+  if (spentToday() !== state.today.seen) { dlg = { summary: true, sleep: true }; return renderDlg(); }
+  endDay();
+}
 async function endDay() {                              // ночь, затем следующий день из DAYS (с главой и перемоткой, если они есть)
   if (state.phase !== 'evening' || sleeping) return;
   if (state.day + 1 >= DAYS.length) { toast('Это последний день в текущей версии игры. «Новая игра» — заново.'); return; }
