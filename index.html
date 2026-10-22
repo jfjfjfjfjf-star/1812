@@ -129,6 +129,13 @@ const W = 480, H = 270;                                // сетка пиксе�
 const scn = () => state.scene === 'shop' ? SCENE : SCENES[state.scene];
 const inShop = () => state.scene === 'shop';
 const LANE = SCENE.lane;                               // линия пола лавки
+const laneAt = x => {                                  // y линии пола в точке x (с учётом floorPath места)
+  const c = scn(), p = c.floorPath;
+  if (!p) return c.lane;
+  if (x <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (x <= p[i][0]) { const [x0, y0] = p[i - 1], [x1, y1] = p[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); }
+  return p[p.length - 1][1];
+};
 const floorX = () => { const c = scn(); return { l: c.walkMin, r: c.walkMax !== undefined ? c.walkMax : c.worldW - c.walkMin }; };   // без walkMax — симметрично
 const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c => c.npcs || [])];
 
@@ -250,12 +257,12 @@ function openCustomer() {                              // показывает �
 }
 function enterService() {
   if (dlg || notesOpen || serving || state.phase !== 'day') return;
-  serving = true; player.x = SCENE.workX; player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
+  serving = true; player.x = SCENE.workX; player.y = laneAt(player.x); player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
   openCustomer();
 }
 function stepAway() {                                  // сделка не продаётся и не отменяется: условия остаются в state.deals
   if (!serving) return;
-  serving = false; dlg = null; player.x = SCENE.workX; player.moving = false;     // свободная позиция перед рабочим местом
+  serving = false; dlg = null; player.x = SCENE.workX; player.y = laneAt(player.x); player.moving = false;     // свободная позиция перед рабочим местом
   save(); renderDlg();
 }
 const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
@@ -392,7 +399,7 @@ Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadIma
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 70 };                // скорость — пикселей сетки в секунду (было 47 при сетке 320×180)
-function resetPlayer() { Object.assign(player, { x: scn().startX, y: scn().lane, dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
+function resetPlayer() { Object.assign(player, { x: scn().startX, y: laneAt(scn().startX), dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
 const near = (x, r) => Math.abs(player.x - x) < (r || scn().talkRange);
@@ -724,7 +731,7 @@ let sleeping = false;                                  // идёт экран н
 function openShop() { if (state.phase !== 'morning') return; state.phase = 'day'; state.visit = 0; save(); toast('Лавка открыта'); }
 function closeShop() {                                 // покупатели, которые не успели, сегодня уже не придут
   if (state.phase !== 'day') return;
-  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.moving = false;
+  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.y = laneAt(player.x); player.moving = false;
   dlg = { summary: true }; save(); renderDlg();
 }
 // Экран поверх сцены (ночь, глава, перемотка). ms > 0 — исчезает сам; ms = 0 — ждёт E, пробел, Enter или щелчок.
@@ -794,7 +801,7 @@ function update(dt) {
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
   const d = Math.abs(nx - player.x);
-  player.x = nx;
+  player.x = nx; player.y = laneAt(nx);
   if (d > 0) {
     player.moving = true; player.dist += d;
     const f = walkFrame(player.dist);                  // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
