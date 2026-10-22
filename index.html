@@ -1080,7 +1080,7 @@ function draw() {
   drawBackdrop();
   drawPassersby();
   drawStock();
-  drawPerson(MOTHER, SCENE.motherX, LANE, SCENE.motherDir || 1);
+  drawPerson(MOTHER, SCENE.motherX, SCENE.motherY || LANE, SCENE.motherDir || 1);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
   drawVisitors();
