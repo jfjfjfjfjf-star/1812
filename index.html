@@ -385,7 +385,7 @@ loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
-speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
@@ -829,9 +829,10 @@ function drawPerson(who, x, y, dir) {
   const sp = who.sprite, im = sp && spr['s_' + who.id];
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
+  const f = sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  ctx.drawImage(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
   ctx.restore();
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,

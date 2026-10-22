@@ -16,6 +16,7 @@
 | `assets/characters/andrey/andrey_give.png` | **подготовлен 21.10.2026** из 3 генераций ChatGPT (`assets/characters/andrey/source/andrey_give_1..3.webp`; 432×120): мешочек у пояса → на вытянутых руках → руки пустые; один раз после продажи, 0,3 с на кадр. Голова (строки 0–26) во всех кадрах взята из кадра ожидания: в генерации 3 было другое лицо. Поклона нет. Нужен глазами Кирилла |
 | `assets/characters/<имя>/<имя>_portrait.png` (Павел, Дарья, Фёдор, мать) | **нет**. Пока вместо них цветная заглушка с буквой |
 | `assets/characters/mother/mother_idle.png` | **подготовлен 21.10.2026** из генерации ChatGPT (144×120, рост 96), нужен глазами Кирилла |
+| `assets/characters/mother/mother_work.png` | **подготовлен 22.10.2026** из 8 кадров PixelLab (1152×120): мать перебирает крупу; голова и юбка стабилизированы (`tools/make_mother_work.py`), нужен глазами Кирилла |
 | `assets/characters/pavel/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png`, `sorokin_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |
 | `assets/places/shop/shop_front.png` | **подготовлен** из фона: передние ящики справа, точная копия пикселей фона по силуэту (раздел 3) |
 | `assets/goods/grain.png`, `bread.png`, `apples.png` | необязательны, нет (пока цветной квадрат) |

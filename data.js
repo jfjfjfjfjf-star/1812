@@ -239,7 +239,9 @@ const SUPPLY = {
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
 };
 const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a', node: 'mother_hub',
-  sprite: { src: 'assets/characters/mother/mother_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } };
+  // мать за делом: перебирает крупу в миске, 8 кадров PixelLab со стабилизацией (tools/make_mother_work.py), цикл без пауз;
+  // прежняя фигура без миски — mother_idle.png
+  sprite: { src: 'assets/characters/mother/mother_work.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 8, frameTime: 0.18 } };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {
