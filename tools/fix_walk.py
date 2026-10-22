@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import palette_lib
 
 ORDER = [10, 25, 18, 13, 15, 27, 19, 17]
-SRC = 'assets/source/andrey_walk_gen_%02d.webp'
+SRC = 'assets/characters/andrey/source/andrey_walk_gen_%02d.webp'
 FIX = {}   # номер кадра -> (файл правки, с какой строки и левее какого x стирать); сейчас правок нет
 HEAD_FROM, HEAD_ROWS = 17, 16
-OUT, TMP = 'assets/characters/andrey_walk.png', 'assets/characters/_walk_tmp.png'
+OUT, TMP = 'assets/characters/andrey/andrey_walk.png', 'assets/characters/andrey/_walk_tmp.png'
 COL = {'D': (38, 27, 21), 'E': (51, 37, 29), 'F': (54, 44, 36), 'G': (66, 51, 41), 'H': (70, 55, 43), 'A': (87, 45, 21),
        'P': (111, 56, 23), 'N': (107, 54, 23), 'I': (61, 38, 23), 'O': (119, 65, 32)}
 

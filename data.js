@@ -17,10 +17,10 @@ const DATA_VERSION = 20;
 // stockMarks — временные квадратики остатка товара: show 'auto' = рисовать только пока фон ещё заглушка; true/false — принудительно.
 //   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
 const ART = {
-  background:   { src: 'assets/backgrounds/shop.png' },
-  counterFront: { src: 'assets/backgrounds/shop_counter.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
-  foreground:   { src: 'assets/backgrounds/shop_front.png' },
-  glass:        { src: 'assets/backgrounds/shop_glass.png' },   // стёкла окна (по ним проходят прохожие), собирает tools/make_shop.py
+  background:   { src: 'assets/places/shop/shop.png' },
+  counterFront: { src: 'assets/places/shop/shop_counter.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
+  foreground:   { src: 'assets/places/shop/shop_front.png' },
+  glass:        { src: 'assets/places/shop/shop_glass.png' },   // стёкла окна (по ним проходят прохожие), собирает tools/make_shop.py
   portrait:  { w: 180, h: 204 },
   goodsIcon: { w: 36, h: 36 },
   stockMarks: { show: 'auto', x: 240, y: 147, groupStep: 90, perRow: 5, gap: 6, size: 4 }
@@ -31,12 +31,12 @@ const ANDREY = {                      // утверждённые парамет
   // ходьба: 8 кадров (лист 1152×120) из рисунков ChatGPT, утверждена Кириллом (tools/fix_walk.py, одна голова на все кадры).
   // weights — сколько пикселей пути держится каждый кадр: столько опорная стопа уходит назад до следующего кадра.
   // Пока нет файла: статичный кадр покоя (НЕ анимация)
-  walk: { src: 'assets/characters/andrey_walk.png', frames: 8, weights: [19, 15, 5, 11, 18, 14, 4, 10] },
-  idle: { src: 'assets/characters/andrey_idle.png' },
+  walk: { src: 'assets/characters/andrey/andrey_walk.png', frames: 8, weights: [19, 15, 5, 11, 18, 14, 4, 10] },
+  idle: { src: 'assets/characters/andrey/andrey_idle.png' },
   // за прилавком (необязательные файлы; пока их нет — кадр покоя): ждёт покупателя (2 кадра, второй — короткое постукивание
   // пальцами) и передаёт товар при продаже (3 кадра, проигрываются один раз). Ячейки 144×120, опора и подошвы как у покоя.
-  counter: { src: 'assets/characters/andrey_counter.png', frames: 2, times: [3, 0.35] },   // секунд на кадр
-  give: { src: 'assets/characters/andrey_give.png', frames: 3, time: 0.3 },
+  counter: { src: 'assets/characters/andrey/andrey_counter.png', frames: 2, times: [3, 0.35] },   // секунд на кадр
+  give: { src: 'assets/characters/andrey/andrey_give.png', frames: 3, time: 0.3 },
   cycleDistance: 96                   // пикселей пути на цикл (два шага) = сумма walk.weights
 };
 
@@ -160,12 +160,12 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
 //   Пока файла нет (или размер не тот) — человечек-заглушка. Кадров ходьбы нет: идущий показан тем же кадром (не анимация).
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 const CUSTOMERS = [
-  { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/portraits/pavel.png', color: '#4a5a3a',
-    sprite: { src: 'assets/characters/pavel_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
-  { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/portraits/darya.png', color: '#7a4a6b',
-    sprite: { src: 'assets/characters/darya_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
-  { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/portraits/fedor.png', color: '#5a4a3a',
-    sprite: { src: 'assets/characters/fedor_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }
+  { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/characters/pavel/pavel_portrait.png', color: '#4a5a3a',
+    sprite: { src: 'assets/characters/pavel/pavel_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+  { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/characters/darya/darya_portrait.png', color: '#7a4a6b',
+    sprite: { src: 'assets/characters/darya/darya_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+  { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
+    sprite: { src: 'assets/characters/fedor/fedor_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -220,9 +220,9 @@ const VISITS = {
 // Чтобы сцена была доступна, у места на карте (MAP) указывается scene с её id.
 const SCENES = {
   labaz: { name: 'Лабаз Сорокина', worldW: 480, lane: 225, startX: 75, walkMin: 36, walkMax: 444, talkRange: 35,
-    background: 'assets/backgrounds/labaz.png', wall: '#3a2c1e', floor: '#6b5236',
-    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 345, color: '#3b4a6b', portrait: 'assets/portraits/sorokin.png', node: 'sorokin_hub',
-             sprite: { src: 'assets/characters/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
+    background: 'assets/places/labaz/labaz.png', wall: '#3a2c1e', floor: '#6b5236',
+    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 345, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
+             sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
 // и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
@@ -238,8 +238,8 @@ const SUPPLY = {
     lastDayMsg: 'Не сегодня, Андрей. (Это последний день в текущей версии игры: привезти заказ будет некуда.)',
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
 };
-const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/portraits/mother.png', color: '#8a5a5a', node: 'mother_hub',
-  sprite: { src: 'assets/characters/mother_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } };
+const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a', node: 'mother_hub',
+  sprite: { src: 'assets/characters/mother/mother_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {

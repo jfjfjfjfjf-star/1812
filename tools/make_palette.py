@@ -10,11 +10,11 @@ import numpy as np
 from PIL import Image
 import palette_lib as P
 COLORS = 96
-bg = Image.open('assets/source/shop_v2_original.webp').convert('RGB').resize((594, 270), Image.BOX)
+bg = Image.open('assets/places/shop/source/shop_v2_original.webp').convert('RGB').resize((594, 270), Image.BOX)
 bgp = np.asarray(bg).reshape(-1, 3)
 sp = []
 for f in ['andrey_idle.png', 'andrey_walk.png', 'mother_idle.png']:
-    a = np.asarray(Image.open('assets/characters/' + f).convert('RGBA')).reshape(-1, 4)
+    a = np.asarray(Image.open('assets/characters/' + f.split('_')[0] + '/' + f).convert('RGBA')).reshape(-1, 4)
     sp.append(a[a[:, 3] > 0][:, :3])
 sp = np.concatenate(sp)
 rgb = np.concatenate([bgp, sp])
