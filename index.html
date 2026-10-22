@@ -106,7 +106,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 18) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 19) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -259,7 +259,9 @@ function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
   if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) { state.promises[c.keep].done = true; toast('Обещание выполнено'); }
+  if (c.pay) { if (state.money < c.pay) { toast('Не хватает монет'); return; } state.money -= c.pay; save(); }
   const op = c.do || '', cu = C(), d = cu && deal();
+  if (op === 'home') return goHome();
   if (op === 'order') return showOrder(c.seller);
   if (op === 'buy') return placeOrder();
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
@@ -676,14 +678,24 @@ function renderMap() {
   });
   $('mapmarks').innerHTML = marks.join('') + labels.join('');
   const p = places.find(q => q.id === mapSel[mapId]);
-  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
+  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>'
+    : !p.scene ? '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>'
+    : eveningTaken() ? '<p><i>Вечер прошёл здесь: отсюда только домой, спать.</i></p><p><button id="maphome">Домой, спать</button></p>'
+    : closedNow(p.scene) ? '<p><i>' + SCENES[p.scene].closedMsg + '</i></p>' : '<p><button id="mapgo">Отправиться</button></p>';
   $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
   if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
+  if ($('maphome')) $('maphome').onclick = () => { mapOpen = false; renderMap(); goHome(); };
 }
 // Переход через карту: Андрей оказывается в начальной точке выбранного места, открытый разговор закрывается.
 const shopOpenBlocks = () => !TIME.travelWhenOpen && state.phase === 'day';   // пока лавка открыта, уходить нельзя
+const closedNow = scene => { const o = SCENES[scene] && SCENES[scene].open; return !!o && !o.includes(state.phase); };   // место сейчас закрыто
+const eveningTaken = () => !inShop() && !!scn().endsEvening && state.day + 1 < DAYS.length;   // в последний день уйти можно как обычно
+function goHome() {                                    // из места, которое занимает вечер, — домой спать; иначе просто в лавку
+  if (eveningTaken()) return endDay();
+  travel('shop', 'Лавка Андрея');
+}
 function travel(scene, name) {
-  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene])) return;
+  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene]) || closedNow(scene) || eveningTaken()) return;
   state.scene = scene; dlg = null; resetPlayer(); save();
   mapOpen = false; renderMap(); renderDlg(); toast(name);
 }
