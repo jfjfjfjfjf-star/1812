@@ -19,7 +19,7 @@
 | `assets/characters/mother/mother_work.png` | **подготовлен 22.10.2026** из 8 кадров PixelLab (1152×120): мать перебирает крупу; голова и юбка стабилизированы (`tools/make_mother_work.py`), нужен глазами Кирилла |
 | `assets/characters/pavel/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png`, `sorokin_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |
 | `assets/places/shop/shop_front.png` | **подготовлен** из фона: передние ящики справа, точная копия пикселей фона по силуэту (раздел 3) |
-| `assets/goods/grain.png`, `bread.png`, `apples.png` | необязательны, нет (пока цветной квадрат) |
+| `assets/goods/grain.png`, `bread.png`, `apples.png`, `flour.png`, `millet.png`, `peas.png` | необязательны, нет (пока цветной квадрат) |
 
 Оригинал нового фона лежит в `assets/places/shop/source/shop_v2_original.webp`. Игра их не загружает.
 
@@ -146,7 +146,7 @@
 
 ## 6. Значки товаров (необязательные)
 
-`assets/goods/grain.png`, `bread.png`, `apples.png`, ровно 36×36, прозрачность 0/255. Показываются в торговой панели. Без файла там цветной квадрат (надпись «Временная графика» из-за них не появляется).
+`assets/goods/grain.png`, `bread.png`, `apples.png`, `flour.png` (мука), `millet.png` (пшено), `peas.png` (горох), ровно 36×36, прозрачность 0/255. Показываются в торговой панели. Без файла там цветной квадрат (надпись «Временная графика» из-за них не появляется).
 
 ## 7. Товары на фоне и остаток
 

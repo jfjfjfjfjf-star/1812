@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 20;
+const DATA_VERSION = 21;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -44,7 +44,11 @@ const ANDREY = {                      // утверждённые парамет
 const GOODS = {
   grain:  { name: 'Крупа',          unit: 'мешочек', stock: 10, cost: 6, price: 10, color: '#c9893a', icon: 'assets/goods/grain.png' },
   bread:  { name: 'Хлеб',           unit: 'буханку', stock: 8,  cost: 3, price: 5,  color: '#a8672a', icon: 'assets/goods/bread.png' },
-  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0', icon: 'assets/goods/apples.png' }
+  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0', icon: 'assets/goods/apples.png' },
+  // Товары лабаза Сорокина (21.10.2026): в лавке на старте их нет, появляются только после заказа. Покупателей на них пока нет.
+  flour:  { name: 'Мука',           unit: 'мешочек', stock: 0,  cost: 5, price: 8,  color: '#e6dcc4', icon: 'assets/goods/flour.png' },
+  millet: { name: 'Пшено',          unit: 'мешочек', stock: 0,  cost: 5, price: 8,  color: '#e0b84a', icon: 'assets/goods/millet.png' },
+  peas:   { name: 'Горох',          unit: 'мешочек', stock: 0,  cost: 4, price: 7,  color: '#9aa84e', icon: 'assets/goods/peas.png' }
 };
 const START = { money: 30 };
 
@@ -238,8 +242,10 @@ const SCENES = {
 //   (заказывать нельзя: привезти будет некуда); doneNode — реплика после заказа; backNode — куда ведёт «Назад».
 // ТЕСТОВОЕ: цены, количества, реплики.
 const SUPPLY = {
-  sorokin: { title: 'Заказ у Сорокина', goods: { grain: { cost: 6, max: 20 } },
-    askMsg: 'Сколько мешочков возьмёшь? Деньги вперёд, а завтра поутру работник привезёт к лавке.',
+  // Сорокин — хлебный лабаз: крупа, мука, пшено, горох и сушёные яблоки (сушка — тоже лабазный товар).
+  sorokin: { title: 'Заказ у Сорокина',
+    goods: { grain: { cost: 6, max: 20 }, flour: { cost: 5, max: 20 }, millet: { cost: 5, max: 20 }, peas: { cost: 4, max: 20 }, apples: { cost: 4, max: 10 } },
+    askMsg: 'Что возьмёшь и сколько? Деньги вперёд, а завтра поутру работник привезёт к лавке.',
     noMoneyMsg: 'На столько у тебя денег не хватит, Андрей.',
     lastDayMsg: 'Не сегодня, Андрей. (Это последний день в текущей версии игры: привезти заказ будет некуда.)',
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
@@ -368,13 +374,13 @@ const NODES = {
   mother_price: { who: 'Мать', context: 'mother_same_source', text: 'Сосед и мне то же говорил. Это всё один рассказ. У Сорокина сам спроси.', choices: [
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Понятно.', do: 'end' }] },
   // Купец Сорокин (лабаз в Зарядье). Тестовые реплики; заказ товара — SUPPLY.sorokin.
-  sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, гречневая и овсяная, мешками.', choices: [
-    { text: 'Хочу заказать крупы', do: 'order', seller: 'sorokin' },
+  sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, мука, пшено, горох. Сушёные яблоки тоже имеются.', choices: [
+    { text: 'Хочу заказать товар', do: 'order', seller: 'sorokin' },
     { text: 'Почём нынче крупа?', goto: 'sorokin_price' },
     { text: 'Говорят, крупа у тебя подорожает?', need: { heard: 'pavel_neighbor_price' }, id: 'c_s_price', once: true, goto: 'sorokin_rumor' },
     { text: 'Что слышно на реке?', goto: 'sorokin_news', id: 'c_sorokin_news', once: true },
     { text: 'Пока ничего, зайду позже.', do: 'end' }] },
-  sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: шесть за мешочек. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
+  sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: крупа по шесть, мука и пшено по пять, горох и яблоки по четыре. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
   sorokin_ordered: { who: 'Сорокин', text: 'Сговорились. Завтра поутру будет у тебя в лавке.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Спасибо.', do: 'end' }] },
