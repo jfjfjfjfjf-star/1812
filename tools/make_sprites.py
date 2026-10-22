@@ -1,17 +1,17 @@
 # Подготовка спрайтов из крупных генераций на белом фоне: фон -> прозрачность, уменьшение по площади, ячейка 144×120
 # (сетка 480×270), при необходимости перекрашивание части фигуры и перевод на общую палитру игры (assets/palette.png).
-# Нужен Python 3, numpy, Pillow. Так собраны файлы 21.10.2026 (исходники в assets/source/), порядок важен:
+# Нужен Python 3, numpy, Pillow. Так собраны файлы 21.10.2026 (исходники в assets/characters/<имя>/source/), порядок важен:
 #   1) спрайты без палитры (из них строится палитра), 2) python tools/make_palette.py, 3) python tools/make_shop.py,
 #   4) те же команды спрайтов с "palette":"assets/palette.png".
 #   кадр покоя Андрея (рост 104):
-#   python tools/make_sprites.py '{"src":["assets/source/andrey_idle_original.png"],"height":104,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_idle.png"}'
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_idle_original.png"],"height":104,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_idle.png"}'
 #   ходьба Андрея собирается отдельно: python tools/fix_walk.py (рисунки ChatGPT + ручная правка)
 #   Андрей за прилавком (2 кадра; потом кадр 2 = кадр 1 + область кистей [50:60, 76:100] из кадра 2, см. docs/ART_REQUIREMENTS.md):
-#   python tools/make_sprites.py '{"src":["assets/source/andrey_counter_1.webp","assets/source/andrey_counter_2.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_counter.png"}'
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_counter_1.webp","assets/characters/andrey/source/andrey_counter_2.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_counter.png"}'
 #   Андрей передаёт товар (3 кадра; потом строки 0–26 каждого кадра = голова из кадра ожидания andrey_counter.png):
-#   python tools/make_sprites.py '{"src":["assets/source/andrey_give_1.webp","assets/source/andrey_give_2.webp","assets/source/andrey_give_3.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey_give.png"}'
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_give_1.webp","assets/characters/andrey/source/andrey_give_2.webp","assets/characters/andrey/source/andrey_give_3.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_give.png"}'
 #   мать (рост 96):
-#   python tools/make_sprites.py '{"src":["assets/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother_idle.png"}'
+#   python tools/make_sprites.py '{"src":["assets/characters/mother/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother/mother_idle.png"}'
 import sys, os, json, colorsys
 from collections import deque
 import numpy as np

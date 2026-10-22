@@ -10,10 +10,10 @@
 | Точка привязки | x=72, линия пола y=114 |
 | Направление рисунков | Вправо |
 | Ходьба | 8 рисунков в ряд: проход, промежуточный, шаг, нога встала — и то же с другой ноги; время кадров `ANDREY.walk.weights` (пиксели пути на кадр) |
-| Лист ходьбы | assets/characters/andrey_walk.png, 1152×120 (8 кадров), число кадров — `ANDREY.walk.frames` в data.js |
-| Покой | assets/characters/andrey_idle.png, 144×120, PNG с альфа-каналом |
-| За прилавком | assets/characters/andrey_counter.png, 288×120 (2 кадра: ждёт; постукивает пальцами), время кадров `ANDREY.counter.times`; необязательный |
-| Передаёт товар | assets/characters/andrey_give.png, 432×120 (3 кадра, один раз после продажи), `ANDREY.give.time` на кадр; необязательный |
+| Лист ходьбы | assets/characters/andrey/andrey_walk.png, 1152×120 (8 кадров), число кадров — `ANDREY.walk.frames` в data.js |
+| Покой | assets/characters/andrey/andrey_idle.png, 144×120, PNG с альфа-каналом |
+| За прилавком | assets/characters/andrey/andrey_counter.png, 288×120 (2 кадра: ждёт; постукивает пальцами), время кадров `ANDREY.counter.times`; необязательный |
+| Передаёт товар | assets/characters/andrey/andrey_give.png, 432×120 (3 кадра, один раз после продажи), `ANDREY.give.time` на кадр; необязательный |
 | Отображение | Целочисленный масштаб, без сглаживания |
 
 ## Координаты
