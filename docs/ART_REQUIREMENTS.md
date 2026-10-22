@@ -17,6 +17,7 @@
 | `assets/characters/<имя>/<имя>_portrait.png` (Павел, Дарья, Фёдор, мать) | **нет**. Пока вместо них цветная заглушка с буквой |
 | `assets/characters/mother/mother_idle.png` | **подготовлен 21.10.2026** из генерации ChatGPT (144×120, рост 96), нужен глазами Кирилла |
 | `assets/characters/mother/mother_work.png` | **подготовлен 22.10.2026** из 8 кадров PixelLab (1152×120): мать перебирает крупу; голова и юбка стабилизированы (`tools/make_mother_work.py`), нужен глазами Кирилла |
+| `assets/places/labaz/labaz.png`, `labaz_front.png` | **подготовлены 22.10.2026** из генерации ChatGPT (`assets/places/labaz/source/labaz_original.webp`), `tools/make_labaz.py`; фон 594×270, передний план по силуэтам |
 | `assets/characters/sorokin/sorokin_idle.png` | **подготовлен 22.10.2026** из генерации ChatGPT от Кирилла (144×120, рост 108) |
 | `assets/characters/pavel/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |
 | `assets/places/shop/shop_front.png` | **подготовлен** из фона: передние ящики справа, точная копия пикселей фона по силуэту (раздел 3) |
