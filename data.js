@@ -201,7 +201,7 @@ const SCENES = {
     background: 'assets/backgrounds/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
     open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
     npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/portraits/traktirshchik.png', node: 'traktir_hub',
-             sprite: { src: 'assets/characters/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'left' } }] }
+             sprite: { src: 'assets/characters/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
 // и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
