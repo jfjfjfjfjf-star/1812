@@ -395,8 +395,8 @@ const player = { y: LANE, speed: 70 };                // скорость — п
 function resetPlayer() { Object.assign(player, { x: scn().startX, y: scn().lane, dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
-const near = x => Math.abs(player.x - x) < scn().talkRange;
-const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX);
+const near = (x, r) => Math.abs(player.x - x) < (r || scn().talkRange);
+const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
 
@@ -1080,7 +1080,7 @@ function draw() {
   drawBackdrop();
   drawPassersby();
   drawStock();
-  drawPerson(MOTHER, SCENE.motherX, LANE, 1);
+  drawPerson(MOTHER, SCENE.motherX, LANE, SCENE.motherDir || 1);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
   drawVisitors();
