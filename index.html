@@ -5,77 +5,112 @@
 <title>Летописи: 1812</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0805; overflow: hidden; font-family: Georgia, serif; }
-  /* Сцена всегда в целое число раз больше 320x180 (переменная --s): пиксели остаются чёткими */
+  /* Сцена всегда в целое число раз больше 480×270 (переменная --s): пиксели остаются чёткими.
+     Размеры интерфейса заданы в единицах --u = 1,5 × --s (единица прежней сетки 320×180), поэтому на экране интерфейс прежний. */
   #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-           width: calc(var(--s) * 320px); height: calc(var(--s) * 180px); }
+           width: calc(var(--s) * 480px); height: calc(var(--s) * 270px); }
   canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
-  #hud, #hint, #newgame, #dbg, #back { position: absolute; color: #f0e2c0; font-size: calc(var(--s) * 5px); text-shadow: 1px 1px #000; }
-  #hud { right: calc(var(--s) * 4px); top: calc(var(--s) * 3px); }
-  #hint { left: 0; right: 0; top: calc(var(--s) * 13px); text-align: center; display: none; }
-  #newgame { left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
+  #hud, #hint, #newgame, #dbg, #back { position: absolute; color: #f0e2c0; font-size: calc(var(--u) * 5px); text-shadow: 1px 1px #000; }
+  #hud { right: calc(var(--u) * 4px); top: calc(var(--u) * 3px); text-align: right; }
+  #night { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: #05070d; color: #f0e2c0;
+           font-size: calc(var(--u) * 9px); opacity: 0; pointer-events: none; transition: opacity .6s; }
+  #night.on { opacity: 1; pointer-events: auto; }
+  #night div { max-width: 70%; text-align: center; line-height: 1.4; }
+  #night b { display: block; color: #e8c36a; font-size: calc(var(--u) * 11px); margin-bottom: calc(var(--u) * 4px); }
+  #night p { font-size: calc(var(--u) * 7px); margin: 0 0 calc(var(--u) * 4px); }
+  #night i { opacity: .8; } #night small { display: block; opacity: .5; font-size: calc(var(--u) * 5px); margin-top: calc(var(--u) * 6px); }
+  #hint { left: 0; right: 0; top: calc(var(--u) * 13px); text-align: center; display: none; }
+  #newgame { left: calc(var(--u) * 4px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
              font-family: inherit; opacity: .6; cursor: pointer; }
-  #dbg { left: calc(var(--s) * 4px); top: calc(var(--s) * 15px); color: #c9b98a; opacity: .75; }
-  #back { display: none; left: calc(var(--s) * 4px); top: calc(var(--s) * 3px); font-family: inherit; cursor: pointer; text-shadow: none;
-          background: rgba(20,12,6,.92); border: calc(var(--s) * 1px) solid #8c7647; padding: calc(var(--s) * 1.5px) calc(var(--s) * 5px); }
+  #dbg { left: calc(var(--u) * 4px); top: calc(var(--u) * 15px); color: #c9b98a; opacity: .75; }
+  #back { display: none; left: calc(var(--u) * 4px); top: calc(var(--u) * 3px); font-family: inherit; cursor: pointer; text-shadow: none;
+          background: rgba(20,12,6,.92); border: calc(var(--u) * 1px) solid #8c7647; padding: calc(var(--u) * 1.5px) calc(var(--u) * 5px); }
   body.serving #newgame, body.serving #notesbtn { display: none; }
-  #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--s) * 24px); display: none; z-index: 5;
-           background: rgba(20,12,6,.92); border: 2px solid #e8c36a; color: #f0e2c0; padding: calc(var(--s) * 2px) calc(var(--s) * 6px);
-           font-size: calc(var(--s) * 6px); }
-  #notes { position: absolute; inset: calc(var(--s) * 10px) calc(var(--s) * 30px); display: none; overflow: auto; box-sizing: border-box; z-index: 4;
-           background: rgba(20,12,6,.96); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--s) * 4px) calc(var(--s) * 8px);
-           font-size: calc(var(--s) * 6px); line-height: 1.35; }
-  #notes h3 { margin: 0 0 calc(var(--s) * 3px); } #notes p { margin: 0 0 calc(var(--s) * 3px); }
-  #notesbtn { position: absolute; left: calc(var(--s) * 52px); top: calc(var(--s) * 3px); background: none; border: 1px solid #f0e2c066;
-              color: #f0e2c0; font-family: inherit; font-size: calc(var(--s) * 5px); opacity: .6; cursor: pointer; }
-  /* Режим обслуживания (по макету): портрет слева внизу, реплика внизу, панель справа. Всё размещено в долях сетки 320x180. */
+  #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--u) * 24px); display: none; z-index: 5;
+           background: rgba(20,12,6,.92); border: 2px solid #e8c36a; color: #f0e2c0; padding: calc(var(--u) * 2px) calc(var(--u) * 6px);
+           font-size: calc(var(--u) * 6px); }
+  #notes { position: absolute; inset: calc(var(--u) * 10px) calc(var(--u) * 30px); display: none; overflow: auto; box-sizing: border-box; z-index: 4;
+           background: rgba(20,12,6,.96); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--u) * 4px) calc(var(--u) * 8px);
+           font-size: calc(var(--u) * 6px); line-height: 1.35; }
+  #notes h3 { margin: 0 0 calc(var(--u) * 3px); } #notes p { margin: 0 0 calc(var(--u) * 3px); }
+  #notesbtn { position: absolute; left: calc(var(--u) * 52px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
+              color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
+  /* Режим обслуживания (по макету): портрет слева внизу, реплика внизу, панель справа. Всё размещено в единицах --u (доли прежней сетки 320×180). */
   #dlg { position: absolute; inset: 0; display: none; pointer-events: none; }
   #dlg > * { pointer-events: auto; }
-  #portrait { position: absolute; left: 0; bottom: 0; width: calc(var(--s) * 120px); height: calc(var(--s) * 136px); display: none; pointer-events: none; }
+  #portrait { position: absolute; left: 0; bottom: 0; width: calc(var(--u) * 120px); height: calc(var(--u) * 136px); display: none; pointer-events: none; }
   #portrait img { width: 100%; height: 100%; display: block; image-rendering: pixelated; object-fit: contain; object-position: left bottom; }
   #portrait .ph { position: absolute; left: 0; bottom: 0; width: 62%; height: 80%; opacity: .8; display: flex; align-items: center; justify-content: center;
-                  font-size: calc(var(--s) * 40px); color: #f0e2c0aa; border: calc(var(--s) * 1px) solid #8c7647; border-bottom: 0; box-sizing: border-box; }
-  #col { position: absolute; left: calc(var(--s) * 118px); right: calc(var(--s) * 4px); bottom: calc(var(--s) * 4px); display: flex; flex-direction: column; gap: calc(var(--s) * 2px); }
-  body.paneled #col { right: calc(var(--s) * 92px); }
-  #box { background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0; white-space: pre-line;
-         padding: calc(var(--s) * 3px) calc(var(--s) * 6px); min-height: calc(var(--s) * 22px); font-size: calc(var(--s) * 6px); line-height: 1.35; }
-  #who { color: #e8c36a; font-weight: bold; font-size: calc(var(--s) * 7px); }
+                  font-size: calc(var(--u) * 40px); color: #f0e2c0aa; border: calc(var(--u) * 1px) solid #8c7647; border-bottom: 0; box-sizing: border-box; }
+  #col { position: absolute; left: calc(var(--u) * 118px); right: calc(var(--u) * 4px); bottom: calc(var(--u) * 4px); display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
+  body.paneled #col { right: calc(var(--u) * 92px); }
+  #box { background: rgba(20,12,6,.94); border: calc(var(--u) * 1px) solid #8c7647; color: #f0e2c0; white-space: pre-line;
+         padding: calc(var(--u) * 3px) calc(var(--u) * 6px); min-height: calc(var(--u) * 22px); font-size: calc(var(--u) * 6px); line-height: 1.35; }
+  #who { color: #e8c36a; font-weight: bold; font-size: calc(var(--u) * 7px); }
   #who:empty { display: none; }
-  #choices { display: flex; flex-wrap: wrap; gap: calc(var(--s) * 2px); }
-  #choices button, #pact button { font: inherit; font-size: calc(var(--s) * 5.5px); padding: calc(var(--s) * 2px) calc(var(--s) * 3px); cursor: pointer;
-                  background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--s) * 1px) solid #8c7647; flex: 1 1 auto; }
+  #choices { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2px); }
+  #choices button, #pact button { font: inherit; font-size: calc(var(--u) * 5.5px); padding: calc(var(--u) * 2px) calc(var(--u) * 3px); cursor: pointer;
+                  background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; flex: 1 1 auto; }
   #choices button:hover, #pact button:hover, #back:hover { border-color: #e8c36a; }
-  #choices button:disabled { opacity: .4; cursor: not-allowed; }
+  #choices button:disabled, #pact button:disabled { opacity: .4; cursor: not-allowed; }
   #pact button:first-child.main { background: #c9a96a; color: #1a1008; font-weight: bold; }
-  #panel { position: absolute; right: calc(var(--s) * 4px); top: calc(var(--s) * 11px); width: calc(var(--s) * 84px); box-sizing: border-box; display: none;
-           flex-direction: column; background: rgba(20,12,6,.94); border: calc(var(--s) * 1px) solid #8c7647; color: #f0e2c0;
-           padding: calc(var(--s) * 2.5px); font-size: calc(var(--s) * 5.5px); line-height: 1.25; }
-  #panel.full { bottom: calc(var(--s) * 3px); overflow-y: auto; }
-  #panel i { opacity: .7; font-size: calc(var(--s) * 4.5px); line-height: 1.15; display: block; }
-  #panel .head { display: flex; gap: calc(var(--s) * 3px); align-items: center; margin-bottom: calc(var(--s) * 2px); }
-  #panel .gi { flex: none; width: calc(var(--s) * 20px); height: calc(var(--s) * 20px); border: calc(var(--s) * 1px) solid #8c7647; box-sizing: border-box; }
+  #panel { position: absolute; right: calc(var(--u) * 4px); top: calc(var(--u) * 17px); width: calc(var(--u) * 84px); box-sizing: border-box; display: none;
+           flex-direction: column; background: rgba(20,12,6,.94); border: calc(var(--u) * 1px) solid #8c7647; color: #f0e2c0;
+           padding: calc(var(--u) * 2.5px); font-size: calc(var(--u) * 5.5px); line-height: 1.25; }
+  #panel.full { bottom: calc(var(--u) * 3px); overflow-y: auto; }
+  #panel i { opacity: .7; font-size: calc(var(--u) * 4.5px); line-height: 1.15; display: block; }
+  #panel .head { display: flex; gap: calc(var(--u) * 3px); align-items: center; margin-bottom: calc(var(--u) * 2px); }
+  #panel .gi { flex: none; width: calc(var(--u) * 20px); height: calc(var(--u) * 20px); border: calc(var(--u) * 1px) solid #8c7647; box-sizing: border-box; }
   #panel .gi img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
   #panel .row { display: flex; justify-content: space-between; align-items: center; }
-  #panel .step { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--s) * 1px) 0; }
-  #panel .step button { font: inherit; font-size: calc(var(--s) * 6px); width: calc(var(--s) * 14px); cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--s) * 1px) solid #8c7647; }
-  #panel .step b { font-size: calc(var(--s) * 8px); }
-  #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--s) * 1.5px); padding-top: calc(var(--s) * 2px); }
-  #pact button { padding: calc(var(--s) * 1.5px) calc(var(--s) * 3px); }
+  #panel .step { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--u) * 1px) 0; }
+  #panel .step button { font: inherit; font-size: calc(var(--u) * 6px); width: calc(var(--u) * 14px); cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; }
+  #panel .step b { font-size: calc(var(--u) * 8px); }
+  #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.5px); padding-top: calc(var(--u) * 2px); }
+  #pact button { padding: calc(var(--u) * 1.5px) calc(var(--u) * 3px); }
+  /* Карта: экран поверх сцены. Сама карта — SVG в рамке 1000×560 (растягивается на всю сцену), карточка места — HTML */
+  #mapbtn { position: absolute; left: calc(var(--u) * 89px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
+            color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
+  body.serving #mapbtn, body.serving #screenbtn, body.serving #soundbtn { display: none; }
+  #soundbtn { position: absolute; left: calc(var(--u) * 166px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
+              color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
+  #screenbtn { position: absolute; left: calc(var(--u) * 122px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
+               color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
+  #map { position: absolute; inset: 0; display: none; z-index: 6; background: #0b0805; overflow: hidden; }
+  #map svg { width: 100%; height: 100%; display: block; font-family: Georgia, serif; }
+  #map .loc { cursor: pointer; }
+  #map .loc:hover .dot { stroke: #fff; }
+  #mapclose { position: absolute; left: calc(var(--u) * 4px); top: calc(var(--u) * 3px); font-family: inherit; cursor: pointer; color: #f0e2c0;
+              font-size: calc(var(--u) * 5px); background: rgba(20,12,6,.92); border: calc(var(--u) * 1px) solid #8c7647; padding: calc(var(--u) * 1.5px) calc(var(--u) * 5px); }
+  #mapswitch { position: absolute; left: calc(var(--u) * 60px); top: calc(var(--u) * 3px); font-family: inherit; cursor: pointer; color: #f0e2c0;
+               font-size: calc(var(--u) * 5px); background: rgba(20,12,6,.92); border: calc(var(--u) * 1px) solid #8c7647; padding: calc(var(--u) * 1.5px) calc(var(--u) * 5px); }
+  #mapclose:hover, #mapswitch:hover { border-color: #e8c36a; }
+  #mapcard { position: absolute; left: calc(var(--u) * 4px); bottom: calc(var(--u) * 4px); width: calc(var(--u) * 92px); box-sizing: border-box;
+             background: rgba(20,12,6,.94); border: calc(var(--u) * 1px) solid #8c7647; color: #f0e2c0; padding: calc(var(--u) * 3px) calc(var(--u) * 4px);
+             font-size: calc(var(--u) * 5.5px); line-height: 1.3; }
+  #mapcard b { color: #e8c36a; font-size: calc(var(--u) * 6.5px); display: block; }
+  #mapcard i { opacity: .7; font-size: calc(var(--u) * 4.5px); display: block; margin-bottom: calc(var(--u) * 1.5px); }
+  #mapcard p { margin: calc(var(--u) * 1.5px) 0 0; }
+  #mapgo { font: inherit; cursor: pointer; background: #c9a96a; color: #1a1008; font-weight: bold; border: calc(var(--u) * 1px) solid #8c7647;
+           padding: calc(var(--u) * 1.5px) calc(var(--u) * 5px); width: 100%; }
+  #mapgo:hover { border-color: #e8c36a; }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
-  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="back">← Отойти от прилавка</button>
+  <button id="newgame">Новая игра</button><button id="notesbtn">Заметки (N)</button><button id="mapbtn">Карта (M)</button><button id="screenbtn"></button><button id="soundbtn"></button><button id="back">← Отойти от прилавка</button>
   <div id="hud"></div>
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
-  <div id="toast"></div><div id="notes"></div>
+  <div id="toast"></div><div id="notes"></div><div id="night"></div>
+  <div id="map"><svg viewBox="0 0 1000 560" preserveAspectRatio="none"><g id="mapbase"></g><g id="mapmarks"></g></svg><button id="mapclose">← Вернуться (M)</button><button id="mapswitch"></button><div id="mapcard"></div></div>
 </div>
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 8) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 20) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -89,24 +124,44 @@ if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 8) {
 }
 
 // ================= НАСТРОЙКИ ЭКРАНА =================
-const W = 320, H = 180;                                // утверждённая сетка пикселей (экран)
-const WORLD_W = SCENE.worldW, LANE = SCENE.lane;       // ширина лавки и линия пола берутся из data.js (ходьба только влево-вправо)
-const FLOOR = { l: SCENE.walkMin, r: SCENE.walkMax !== undefined ? SCENE.walkMax : SCENE.worldW - SCENE.walkMin };   // без walkMax — симметрично
+const W = 480, H = 270;                                // сетка пикселей экрана (с 21.10.2026; раньше 320×180)
+// Текущая сцена: лавка (SCENE в data.js) или другое место из SCENES. Ширина мира, линия пола и границы ходьбы берутся из неё.
+const scn = () => state.scene === 'shop' ? SCENE : SCENES[state.scene];
+const inShop = () => state.scene === 'shop';
+const LANE = SCENE.lane;                               // линия пола лавки
+const floorX = () => { const c = scn(); return { l: c.walkMin, r: c.walkMax !== undefined ? c.walkMax : c.worldW - c.walkMin }; };   // без walkMax — симметрично
+const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c => c.npcs || [])];
 
 // ================= РАЗГОВОРЫ И ТОРГОВЛЯ (логика; реплики, числа и условия — в data.js) =================
-const C = () => CUSTOMERS[state.visit];                // текущий покупатель (undefined, когда очередь кончилась)
-const deal = () => state.deals[C().id];
+// ----- Дни и части дня (настройки и расписание — TIME и DAYS в data.js) -----
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const dateOf = n => { const [d, m] = DAYS[n].date; return d + ' ' + MONTHS[m - 1] + ' ' + TIME.year; };   // дата n-го играбельного дня (старый стиль)
+const todayQueue = () => (DAYS[state.day] || { visits: [] }).visits;
+// Приход = человек (CUSTOMERS) + что ему нужно в этот раз (VISITS). id — человек (портрет, имя), visit — приход (сделка).
+const VIS = Object.fromEntries(Object.keys(VISITS).map(v => [v, Object.assign({}, CUSTOMERS.find(p => p.id === VISITS[v].who), VISITS[v], { id: VISITS[v].who, visit: v })]));
+Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)) console.error('[данные] приход ' + v + ': нет покупателя ' + VISITS[v].who); });
+DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
+Object.keys(SUPPLY).forEach(s => { if (!speakers().some(p => p.id === s)) console.error('[данные] SUPPLY: нет персонажа ' + s);
+  Object.keys(SUPPLY[s].goods).forEach(k => { if (!GOODS[k]) console.error('[данные] SUPPLY.' + s + ': нет товара ' + k); }); });
+const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
+// Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
+const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefined;
+const deal = () => state.deals[C().visit];
 const G = () => GOODS[C().want];
 const total = d => C().qty * d.price;
 const profit = d => C().qty * (d.price - G().cost);
 const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
 const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
 const heard = id => !!state.heard[id];
-const okChoice = c => (!c.need || !c.need.heard || heard(c.need.heard)) && !(c.once && c.id && state.asked[c.id]);
+// Условие need: heard — слух известен; ctx — запись уже дополнена (CONTEXT); sold — в указанном приходе была продажа;
+// notSold — продажи не было (или приход ещё не был).
+const okNeed = n => !n || ((!n.heard || heard(n.heard)) && (!n.ctx || !!state.ctx[n.ctx]) && (!n.sold || !!(state.deals[n.sold] || {}).sold) && (!n.notSold || !(state.deals[n.notSold] || {}).sold));
+const okChoice = c => okNeed(c.need) && !(c.once && c.id && state.asked[c.id]);
+const pickNode = x => typeof x === 'string' ? x : x.find(o => okNeed(o.need)).node;   // первая реплика: строка или список вариантов
 
 function learn(id) {                                   // запись о сведении появляется один раз
   if (!id || heard(id)) return;
-  state.heard[id] = { n: Object.keys(state.heard).length + 1, visit: state.visit, ctx: [] };
+  state.heard[id] = { n: Object.keys(state.heard).length + 1, day: state.day, visit: state.visit, ctx: [] };
   if (RUMORS[id].toast) toast(RUMORS[id].toast);
   save();
 }
@@ -123,7 +178,8 @@ function sell() {                                      // деньги и тов
   if (d.stage === 'after' || d.stage === 'done') return;
   if (state.stock[c.want] < c.qty) return;             // подстраховка: основная проверка в verdict()
   d.stage = 'after'; d.afterNode = c.soldNode; d.sold = true;
-  state.money += total(d); state.stock[c.want] -= c.qty;
+  state.money += total(d); state.stock[c.want] -= c.qty; sfx.coins(); giveStart = performance.now() / 1000;
+  const t = state.today; t.revenue += total(d); t.profit += profit(d); t.sold[c.want] = (t.sold[c.want] || 0) + c.qty;
   save(); showNode(c.soldNode);
 }
 // Согласие возможно, только если одновременно: цена за единицу <= предела, сумма <= бюджета, товар есть в лавке.
@@ -149,17 +205,51 @@ function tradeChoices() {
   if (d.counter) l.push({ text: 'Принять ' + d.counter, do: 'accept' });
   return l.concat(c.kind === 'story' ? c.tradeTalk.filter(okChoice) : [], [{ text: 'Отказаться', do: 'refuse' }]);
 }
+// ----- Закупка у оптовика (SUPPLY в data.js): платится сразу, товар привозят в лавку на следующее утро -----
+// state.orders — оплаченные заказы, которые привезут утром: { seller: { товар: количество } }. Черновик заказа живёт только в dlg.
+const lastDay = () => state.day + 1 >= DAYS.length;    // в последний день текущей версии утра не будет — заказ не принимается
+const npcName = id => speakers().find(p => p.id === id).name;
+const ordered = (s, k) => (state.orders[s] || {})[k] || 0;
+const orderSum = () => Object.keys(dlg.qty).reduce((n, k) => n + dlg.qty[k] * SUPPLY[dlg.order].goods[k].cost, 0);
+const orderText = o => Object.keys(o).map(k => GOODS[k].name + ' × ' + o[k]).join(', ');
+function showOrder(seller, msg) {
+  const s = SUPPLY[seller];
+  dlg = { order: seller, qty: dlg && dlg.order === seller ? dlg.qty : {}, msg: msg || (lastDay() ? s.lastDayMsg : s.askMsg) }; renderDlg();
+}
+function orderStep(k, n) {
+  const s = SUPPLY[dlg.order], was = dlg.qty[k] || 0;
+  if (lastDay()) return;
+  dlg.qty[k] = Math.max(0, Math.min(s.goods[k].max - ordered(dlg.order, k), was + n));
+  if (orderSum() > state.money) { dlg.qty[k] = was; return showOrder(dlg.order, s.noMoneyMsg); }
+  showOrder(dlg.order, n < 0 ? s.askMsg : dlg.msg === s.noMoneyMsg ? s.askMsg : dlg.msg);
+}
+function placeOrder() {                                // деньги списываются здесь и один раз; товар приходит в deliver()
+  const s = dlg.order, sum = orderSum();
+  if (!sum || sum > state.money || lastDay()) return;
+  const o = state.orders[s] = state.orders[s] || {};
+  Object.keys(dlg.qty).forEach(k => { if (dlg.qty[k]) o[k] = (o[k] || 0) + dlg.qty[k]; });
+  state.money -= sum; save(); sfx.coins();
+  toast('Заказано: ' + orderText(o) + '. Привезут завтра утром');
+  showNode(SUPPLY[s].doneNode);
+}
+function deliver() {                                   // утро: всё заказанное накануне уже в лавке; возвращает строку для сообщения
+  const got = Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
+    .map(s => { Object.keys(state.orders[s]).forEach(k => { state.stock[k] += state.orders[s][k]; }); return npcName(s) + ' привёз: ' + orderText(state.orders[s]); });
+  state.orders = {};
+  return got.join('; ');
+}
+
 // ----- Режим обслуживания: Андрей занимает место за прилавком (переход между двумя заранее заданными позициями) -----
 let serving = false;                                   // не сохраняется: после загрузки Андрей стоит перед прилавком, сделка продолжается
 function openCustomer() {                              // показывает текущего покупателя с того места, где сделка остановилась
   const c = C();
-  if (!c) { dlg = { idle: true }; return renderDlg(); }
+  if (!c || !visitorReady()) { dlg = { idle: true }; return renderDlg(); }   // никого нет или покупатель ещё идёт
   const d = deal();
   if (d.stage === 'price') return showTrade();
-  showNode(d.stage === 'open' ? c.openNode : d.afterNode);
+  showNode(d.stage === 'open' ? pickNode(c.openNode) : d.afterNode);
 }
 function enterService() {
-  if (dlg || notesOpen || serving) return;
+  if (dlg || notesOpen || serving || state.phase !== 'day') return;
   serving = true; player.x = SCENE.workX; player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
   openCustomer();
 }
@@ -172,26 +262,32 @@ const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
 function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
+  if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) { state.promises[c.keep].done = true; toast('Обещание выполнено'); }
   const op = c.do || '', cu = C(), d = cu && deal();
+  if (op === 'order') return showOrder(c.seller);
+  if (op === 'buy') return placeOrder();
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
-  if (op === 'next') return openCustomer();
+  if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
+  if (op === 'close') return closeShop();
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
   if (op === 'refuse') return leave(cu.refusedNode);
-  if (op === 'back') return d.stage === 'open' ? showNode(cu.openNode) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
+  if (op === 'back') return d.stage === 'open' ? showNode(pickNode(cu.openNode)) : d.stage === 'price' ? showTrade() : showNode(d.afterNode);
   if (op === 'finish' && d && d.stage === 'after') { d.stage = 'done'; state.visit++; }   // следующий покупатель
   if (c.goto) { save(); return showNode(c.goto); }
   save(); endDlg();
 }
 
 // ================= СОСТОЯНИЕ И СОХРАНЕНИЕ =================
-const SAVE_KEY = 'letopisi1812_save_v6';
-const newState = () => ({ money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {},
+const SAVE_KEY = 'letopisi1812_save_v7';               // v7: дни и части дня (сохранения v6 не загружаются — новая игра)
+const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
+const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {}, orders: {},
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
-  deals: Object.fromEntries(CUSTOMERS.map(c => [c.id, { stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false }])) });
-let state = load() || newState();
+  deals: Object.fromEntries(Object.keys(VIS).map(v => [v, newDeal(VIS[v])])) });   // сделка у каждого прихода своя
+const loaded = load();
+let state = loaded || newState();
 let dlg = null, notesOpen = false;                     // dlg: {node} или {trade:true} или null
 
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
@@ -199,15 +295,36 @@ function load() {                                      // старое сохр�
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     const num = v => typeof v === 'number' && isFinite(v);
-    if (s && num(s.money) && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= CUSTOMERS.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
+    if (s && s.deals) Object.keys(VIS).forEach(v => {  // миграция: раньше сделка хранилась по человеку (pavel), теперь по приходу (pavel_1)
+      const who = VISITS[v].who;
+      if (!s.deals[v]) s.deals[v] = v === who + '_1' && s.deals[who] ? s.deals[who] : newDeal(VIS[v]);
+    });
+    if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
+        s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { visits: [] }).visits.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
-        CUSTOMERS.every(c => s.deals[c.id] && num(s.deals[c.id].price) && ['open', 'price', 'after', 'done'].includes(s.deals[c.id].stage))) {
-      CUSTOMERS.forEach(c => {                         // миграция: у сделки появился признак «продано»
-        const d = s.deals[c.id];
+        Object.keys(VIS).every(v => num(s.deals[v].price) && ['open', 'price', 'after', 'done'].includes(s.deals[v].stage))) {
+      Object.values(VIS).forEach(c => {                // миграция: у сделки появился признак «продано»
+        const d = s.deals[c.visit];
         if (typeof d.sold !== 'boolean') d.sold = d.stage !== 'open' && d.stage !== 'price' && d.afterNode === c.soldNode;
         if (!num(d.fails)) d.fails = 0;
         if (typeof d.msg !== 'string') d.msg = '';
       });
+      if (s.scene !== 'shop' && !SCENES[s.scene]) s.scene = 'shop';   // миграция: раньше сцена была одна
+      // миграция (DATA_VERSION 17): июньский слух и обещание переписаны — прежние записи переносятся на новые id;
+      // записи с неизвестными id отбрасываются, чтобы заметки не ломались
+      const RENAME = { pavel_neighbor_cart: 'pavel_neighbor_price', tell_pavel_carrier: 'tell_pavel_price' };
+      [['heard', RUMORS], ['promises', PROMISES]].forEach(([f, known]) => Object.keys(s[f]).forEach(k => {
+        if (RENAME[k] && !s[f][RENAME[k]]) s[f][RENAME[k]] = s[f][k];
+        if (!known[k]) delete s[f][k];
+      }));
+      Object.keys(s.heard).forEach(k => { if (!Array.isArray(s.heard[k].ctx)) s.heard[k].ctx = []; });
+      Object.keys(s.ctx).forEach(k => { if (!CONTEXT[k]) delete s.ctx[k]; });
+      if (s.ctx.mother_same_source && s.heard.pavel_neighbor_price)        // текст дополнения матери тоже переписан
+        s.heard.pavel_neighbor_price.ctx = s.heard.pavel_neighbor_price.ctx.map(t => t.startsWith('Мать:') ? CONTEXT.mother_same_source.text : t);
+      if (!s.orders || typeof s.orders !== 'object') s.orders = {};     // миграция: заказов у оптовика раньше не было
+      Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
+        if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
+        Object.keys(o).forEach(k => { if (!GOODS[k] || !Number.isInteger(o[k]) || o[k] <= 0) delete o[k]; }); });
       return s;
     }
   } catch (e) {}
@@ -218,9 +335,26 @@ function load() {                                      // старое сохр�
 const $ = id => document.getElementById(id);
 const canvas = $('game'); canvas.width = W; canvas.height = H;
 const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+// Режим экрана (F или кнопка, запоминается в браузере):
+//   fill  — во весь экран без полей: кадр рисуется резко в целое число раз крупнее нужного (px) и плавно уменьшается под окно,
+//           поэтому все пиксели одинаковой ширины, края чуть мягче;
+//   pixel — пиксель в пиксель: только целое увеличение, по краям могут быть поля.
+const SCREEN_KEY = 'letopisi1812_screen';
+let screenMode = (() => { try { return localStorage.getItem(SCREEN_KEY) === 'pixel' ? 'pixel' : 'fill'; } catch (e) { return 'fill'; } })();
+let px = 1;                                            // во сколько раз холст крупнее сетки 480×270
 function fit() {
-  const s = Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H)));
-  $('stage').style.setProperty('--s', s);
+  const exact = Math.min(innerWidth / W, innerHeight / H);
+  const s = screenMode === 'fill' ? exact : Math.max(1, Math.floor(exact));
+  px = screenMode === 'fill' ? Math.max(1, Math.ceil(exact - 1e-6)) : 1;
+  if (canvas.width !== W * px) { canvas.width = W * px; canvas.height = H * px; ctx.imageSmoothingEnabled = false; }
+  canvas.style.imageRendering = Math.abs(s - px) < 1e-6 || px === 1 ? 'pixelated' : 'auto';
+  $('stage').style.setProperty('--s', s); $('stage').style.setProperty('--u', s * 1.5);
+  $('screenbtn').textContent = screenMode === 'fill' ? 'Экран: весь (F)' : 'Экран: точный (F)';
+}
+function toggleScreen() {
+  screenMode = screenMode === 'fill' ? 'pixel' : 'fill';
+  try { localStorage.setItem(SCREEN_KEY, screenMode); } catch (e) {}
+  fit();
 }
 addEventListener('resize', fit); fit();
 
@@ -244,40 +378,61 @@ function loadImage(key, src, w, h, optional, note) {
 loadImage('walk', ANDREY.walk.src, ANDREY.cellW * ANDREY.walk.frames, ANDREY.cellH, false,
   'Покадровой ходьбы пока нет: при ходьбе показывается статичный кадр покоя (это НЕ готовая анимация).');
 loadImage('idle', ANDREY.idle.src, ANDREY.cellW, ANDREY.cellH);
+if (ANDREY.counter) loadImage('atCounter', ANDREY.counter.src, ANDREY.cellW * ANDREY.counter.frames, ANDREY.cellH, true);
+if (ANDREY.give) loadImage('give', ANDREY.give.src, ANDREY.cellW * ANDREY.give.frames, ANDREY.cellH, true);
 loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
-loadImage('front', ART.foreground.src, SCENE.worldW, H, true);
-[...CUSTOMERS, MOTHER].forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
+loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
+if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
+Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
+speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
+Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
-const player = { y: LANE, speed: 47 };
-function resetPlayer() { Object.assign(player, { x: SCENE.startX, dist: 0, dir: 1, moving: false }); }   // «Новая игра» вызывает то же самое
+const player = { y: LANE, speed: 70 };                // скорость — пикселей сетки в секунду (было 47 при сетке 320×180)
+function resetPlayer() { Object.assign(player, { x: scn().startX, y: scn().lane, dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
-const cameraX = () => Math.max(0, Math.min(WORLD_W - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
-const near = x => Math.abs(player.x - x) < SCENE.talkRange;
-const nearMom = () => !dlg && !serving && near(SCENE.motherX);
-const nearWork = () => !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
+const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
+const near = x => Math.abs(player.x - x) < scn().talkRange;
+const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX);
+const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
+const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
 addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
-  if (e.repeat) return;                                // удержание клавиши не повторяет действие (заметки не мигают)
+  if (e.repeat) return;                                // удержание клавиши не повторяет действие
+  sfx.unlock();                                        // звук можно включить только после действия игрока (правило браузеров)
+  if (e.code === 'KeyF') { toggleScreen(); return; }   // режим экрана — в любой момент
+  if (e.code === 'KeyS') { sfx.toggle(); return; }     // звук — в любой момент
+  if (sleeping) return;                                // ночью остальной ввод не действует
+  if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; if (mapOpen) mapId = MAP.start; renderMap(); return; }
+  if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
   if (nearMom()) showNode(MOTHER.node);
-  else if (nearWork()) enterService();
+  else if (nearWork()) ({ morning: openShop, day: enterService, evening: endDay })[state.phase]();
+  else if (nearNpc()) showNode(nearNpc().node);
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-$('newgame').onclick = e => { state = newState(); dlg = null; serving = false; notesOpen = false; resetPlayer(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); };
+$('newgame').onclick = e => { if (sleeping) return; state = newState(); dlg = null; serving = false; notesOpen = false; mapOpen = false; renderMap(); resetPlayer(); placeVisitor(); $('toast').style.display = 'none'; save(); renderDlg(); renderNotes(); e.target.blur(); intro(); };
 $('back').onclick = e => { stepAway(); e.target.blur(); };
 $('notesbtn').onclick = e => { notesOpen = !notesOpen; renderNotes(); e.target.blur(); };
+$('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.target.blur(); };
+$('screenbtn').onclick = e => { toggleScreen(); e.target.blur(); };
+$('soundbtn').onclick = e => { sfx.unlock(); sfx.toggle(); e.target.blur(); };
+addEventListener('pointerdown', () => sfx.unlock());
+$('mapclose').onclick = e => { mapOpen = false; renderMap(); e.target.blur(); };
+$('mapswitch').onclick = e => { mapId = nextMap(); renderMap(); e.target.blur(); };
+$('map').querySelector('svg').onclick = e => { const g = e.target.closest('.loc'); if (g) { mapSel[mapId] = g.dataset.id; renderMap(); } };
 
-// ================= ДИАЛОГ, ПАНЕЛЬ ЦЕНЫ, ЗАМЕТКИ (интерфейс — слой поверх сцены 320×180) =================
+// ================= ДИАЛОГ, ПАНЕЛЬ ЦЕНЫ, ЗАМЕТКИ (интерфейс — слой поверх сцены 480×270) =================
 function toast(t) {
   const el = $('toast'); el.textContent = t; el.style.display = 'block';
   clearTimeout(toast.t); toast.t = setTimeout(() => { el.style.display = 'none'; }, 3500);
@@ -301,9 +456,29 @@ function renderDlg() {
   if (!dlg) { box.style.display = 'none'; return; }
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
-    who = ''; text = c ? 'Следующий покупатель ждёт у прилавка.' : 'Пока покупателей нет.';
-    list = (c ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Отойти от прилавка', do: 'leave' }]);
+    const ready = c && visitorReady();
+    who = ''; text = ready ? 'Следующий покупатель ждёт у прилавка.' : c ? 'Покупатель заходит в лавку.' : 'Покупателей сегодня больше нет.';
+    list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Закрыть лавку', do: 'close' }, { text: 'Отойти от прилавка', do: 'leave' }]);
     pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
+  } else if (dlg.summary) {                           // вечер: итоги дня
+    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего';
+    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.'; list = [{ text: 'Хорошо', do: 'end' }];
+    pn.style.display = 'flex'; pn.className = 'full';
+    pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
+      '<i>выручка минус закупка проданного</i><div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
+  } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, монеты
+    const s = SUPPLY[dlg.order], sum = orderSum();
+    sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
+    list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + sum : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
+    pn.style.display = 'flex'; pn.className = 'full';
+    pn.innerHTML = Object.keys(s.goods).map(k => { const g = s.goods[k], u = GOODS[k];
+      return '<div class="head"><div class="gi">' + goodsIcon(k) + '</div><div><b>' + u.name + '</b><br>по ' + g.cost + ' за ' + u.unit + '</div></div>' +
+        '<div class="step"><button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>' +
+        '<i>в лавке: ' + state.stock[k] + (ordered(dlg.order, k) ? ', уже заказано: ' + ordered(dlg.order, k) : '') + '</i>'; }).join('') +
+      '<div class="row" style="margin-top:2px">Всего: <b>' + sum + '</b></div><div class="row">Монет: <b>' + state.money + '</b></div>' +
+      '<i>платим сразу, товар привезут в лавку завтра утром</i><div id="pact"></div>';
+    pn.querySelectorAll('.step button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
+    target = $('pact');
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
     const pf = profit(d);
@@ -317,7 +492,7 @@ function renderDlg() {
     $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
   } else {
     who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
-    sp = [...CUSTOMERS, MOTHER].find(x => x.name === who) || null;
+    sp = speakers().find(x => x.name === who) || null;
     if (c && who === c.name && d.stage === 'after' && d.sold) {          // итог продажи — в интерфейсе, а не в речи покупателя
       pn.style.display = 'flex';
       pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>Продано</b><br>' + G().name + ' × ' + c.qty + '</div></div>' +
@@ -334,7 +509,7 @@ function renderDlg() {
   document.body.classList.toggle('paneled', pn.style.display === 'flex');
   box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
-  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
+  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; b.disabled = !!x.off; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
 }
 function renderNotes() {
   const el = $('notes'); el.style.display = notesOpen ? 'block' : 'none';
@@ -344,19 +519,288 @@ function renderNotes() {
     return '<p><b>' + r.title + '</b><br>' + r.note + '<br><i>Сообщил: ' + r.who + '. Источник: ' + r.source + ' (' + r.kind + ')</i>' +
       h.ctx.map(t => '<br>' + t).join('') + '</p>';
   });
-  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — не выполнено</p>');
+  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + (state.promises[k].done ? ' — выполнено' : ' — не выполнено') + '</p>')
+    .concat(Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
+      .map(s => '<p><b>' + SUPPLY[s].title + ':</b> ' + orderText(state.orders[s]) + ' — оплачено, привезут завтра утром</p>'));
   el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';
+}
+
+// ================= КАРТЫ (экран поверх сцены; карты, места и география — в data.js, блок MAP) =================
+// Каждая карта рисуется один раз при первом показе: местность, вода, дороги, валы, застройка, рощи. Случайность с постоянным зерном,
+// поэтому карта всегда одинаковая. Точки мест, подписи и карточка перерисовываются при выборе места.
+// Карты отличаются масштабом (view) и крупностью деталей (k); география общая (MAP.geo).
+let mapOpen = false, mapId = MAP.start, mapShown = '', MV = MAP.maps[MAP.start].view;
+const mapSel = {}, mapCache = {};
+const nextMap = () => { const ids = Object.keys(MAP.maps); return ids[(ids.indexOf(mapId) + 1) % ids.length]; };
+const mp = ([x, y]) => [MV.cx + x * MV.kmPx, MV.cy - y * MV.kmPx];           // километры → точки карты
+const r1 = n => Math.round(n * 10) / 10;
+function curve(pts, closed) {                         // плавная линия через точки
+  const q = pts.map(mp), n = q.length, at = i => q[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
+  let d = 'M' + q[0].map(r1);
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const a = at(i - 1), b = at(i), c = at(i + 1), e = at(i + 2);
+    d += 'C' + [b[0] + (c[0] - a[0]) / 6, b[1] + (c[1] - a[1]) / 6, c[0] - (e[0] - b[0]) / 6, c[1] - (e[1] - b[1]) / 6, c[0], c[1]].map(r1);
+  }
+  return d + (closed ? 'Z' : '');
+}
+function rng(seed) {                                  // повторяемый генератор случайных чисел
+  return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function inPoly(x, y, poly) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+function lineDist(x, y, line) {                       // расстояние от точки до ломаной, км
+  let m = Infinity;
+  for (let i = 0; i < line.length - 1; i++) {
+    const [ax, ay] = line[i], [bx, by] = line[i + 1], dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+    m = Math.min(m, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+  }
+  return m;
+}
+const tree = (x, y, s) => '<circle cx="' + r1(x) + '" cy="' + r1(y) + '" r="' + r1(s) + '" fill="#2c4422"/><circle cx="' + r1(x - s * .3) + '" cy="' + r1(y - s * .35) + '" r="' + r1(s * .55) + '" fill="#4d6b31"/>';
+function buildMap() {
+  const rnd = rng(1812), o = [], M = MAP.geo, map = MAP.maps[mapId], K = map.k, art = spr['map_' + mapId];
+  const x0 = -MV.cx / MV.kmPx, x1 = (MV.w - MV.cx) / MV.kmPx, y0 = -(MV.h - MV.cy) / MV.kmPx, y1 = MV.cy / MV.kmPx;   // видимая область, км
+  const roads = M.roads.concat(map.streets || []);
+  o.push('<defs><filter id="mTerrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="4" seed="12"/>' +
+    '<feColorMatrix values="0 0 0 0 .13  0 0 0 0 .17  0 0 0 0 .07  0 0 0 1.6 -.6"/></filter>' +
+    '<filter id="mGrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3"/>' +
+    '<feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .28 0"/></filter>' +
+    '<filter id="mShade"><feDropShadow dx="1" dy="1.4" stdDeviation=".5" flood-color="#000" flood-opacity=".55"/></filter>' +
+    '<radialGradient id="mVig" cx="50%" cy="50%" r="72%"><stop offset="60%" stop-color="#0b0805" stop-opacity="0"/><stop offset="100%" stop-color="#0b0805" stop-opacity=".8"/></radialGradient></defs>');
+  if (art && art.ok) o.push('<image href="' + map.art.src + '" width="' + MV.w + '" height="' + MV.h + '" preserveAspectRatio="none"/>');
+  else {
+    // местность: земля, тёмные пятна, поля за городом
+    o.push('<rect width="' + MV.w + '" height="' + MV.h + '" fill="#5f6d3c"/><rect width="' + MV.w + '" height="' + MV.h + '" filter="url(#mTerrain)"/>');
+    for (let i = 0; i < 140; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      if (inPoly(x, y, M.cityLine) || lineDist(x, y, M.river) < .4) continue;
+      const [px, py] = mp([x, y]), w = 14 + rnd() * 30, h = 8 + rnd() * 18;
+      o.push('<rect x="' + r1(px) + '" y="' + r1(py) + '" width="' + r1(w) + '" height="' + r1(h) + '" transform="rotate(' + r1(rnd() * 50 - 25) + ' ' + r1(px) + ' ' + r1(py) + ')" fill="' +
+        ['#8a8a4c', '#7a8446', '#9a8a52', '#6f7c40'][i % 4] + '" opacity=".55"/>');
+    }
+    // город: утоптанная земля внутри Камер-Коллежского вала, плотнее внутри Земляного вала
+    o.push('<path d="' + curve(M.cityLine, true) + '" fill="#6f6442" opacity=".55"/><path d="' + curve(M.earthWall, true) + '" fill="#7d6b48" opacity=".55"/>');
+    M.squares.forEach(q => o.push('<polygon points="' + q.map(mp).map(p => p.map(r1).join(',')).join(' ') + '" fill="#a8956a" opacity=".6"/>'));
+    // холмы: штрихи склонов
+    const hills = [[[-5.3, -4.55], [-4.3, -4.65], [-3.2, -4.6], [-2.3, -4.1]], [[-7.7, -.1], [-7.2, -.25], [-6.7, -.1]]];
+    hills.forEach(h => { for (let i = 0; i < h.length - 1; i++) for (let t = 0; t < 1; t += .08) {
+      const x = h[i][0] + (h[i + 1][0] - h[i][0]) * t, y = h[i][1] + (h[i + 1][1] - h[i][1]) * t, [px, py] = mp([x, y]);
+      o.push('<path d="M' + r1(px) + ',' + r1(py) + 'l' + r1(rnd() * 2 - 1) + ',' + r1(7 + rnd() * 5) + '" stroke="#2e3a1c" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>');
+    } });
+    // вода
+    const water = (line, w) => '<path d="' + curve(line) + '" fill="none" stroke="#2a4b66" stroke-width="' + (w + 4) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + curve(line) + '" fill="none" stroke="#4f86ad" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + curve(line) + '" fill="none" stroke="#9cc8e0" stroke-width="' + r1(w / 4) + '" stroke-linecap="round" opacity=".45" stroke-dasharray="14 10"/>';
+    o.push(water(M.river, 9 * K), water(M.yauza, 4 * K), water(M.canal, 3 * K));
+    M.ponds.forEach(([x, y, rx, ry]) => { const [px, py] = mp([x, y]);
+      o.push('<ellipse cx="' + r1(px) + '" cy="' + r1(py) + '" rx="' + r1(rx * MV.kmPx) + '" ry="' + r1(ry * MV.kmPx + 1) + '" fill="#4f86ad" stroke="#2a4b66" stroke-width="1.5"/>'); });
+    // дороги
+    roads.forEach(l => o.push('<path d="' + curve(l) + '" fill="none" stroke="#4e3d22" stroke-width="' + r1(5.5 * Math.sqrt(K) * 1.3) + '" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>'));
+    roads.forEach(l => o.push('<path d="' + curve(l) + '" fill="none" stroke="#cdb07a" stroke-width="' + r1(3 * Math.sqrt(K) * 1.3) + '" stroke-linecap="round" stroke-linejoin="round"/>'));
+    // валы: Камер-Коллежский (граница города, пунктир) и Земляной
+    o.push('<path d="' + curve(M.earthWall, true) + '" fill="none" stroke="#9c845a" stroke-width="' + 3 * K + '" opacity=".85"/>');
+    o.push('<path d="' + curve(M.boulevards) + '" fill="none" stroke="#6f6442" stroke-width="' + 3 * K + '" opacity=".5"/>');
+    o.push('<path d="' + curve(M.cityLine, true) + '" fill="none" stroke="#e0c890" stroke-width="1.6" stroke-dasharray="7 5" opacity=".75"/>');
+    // застройка: сетка ячеек, вероятность дома зависит от части города
+    const dens = (x, y) => {
+      if (inPoly(x, y, M.kremlin) || M.squares.some(q => inPoly(x, y, q))) return 0;
+      if (lineDist(x, y, M.river) < .2 || lineDist(x, y, M.yauza) < .1 || lineDist(x, y, M.canal) < .07) return 0;
+      if (M.woods.some(w => Math.hypot(x - w[0], y - w[1]) < w[2] * .9)) return 0;
+      const road = Math.min(...roads.map(l => lineDist(x, y, l)));
+      if (road < .06 / Math.sqrt(K)) return 0;
+      if (inPoly(x, y, M.earthWall)) return Math.hypot(x - .3, y - .3) < 1.4 ? .85 : .6;
+      if (inPoly(x, y, M.cityLine)) return road < .5 ? .35 : .16;
+      return road < .3 ? .1 : 0;
+    };
+    const roofs = ['#8c3b2a', '#6f4a32', '#a39272', '#5b6a6e', '#a0522d', '#7c6f5a', '#b5a27e'], houses = [], churches = [];
+    const cell = .13 / K;
+    for (let gx = x0; gx < x1; gx += cell) for (let gy = y0; gy < y1; gy += cell) {
+      if (rnd() >= dens(gx, gy)) continue;
+      const [px, py] = mp([gx + rnd() * cell * .4, gy + rnd() * cell * .4]), w = (2.4 + rnd() * 2.6) * K, h = (2.2 + rnd() * 2.2) * K;
+      if (rnd() < .025) churches.push([px, py]);
+      else houses.push('<rect x="' + r1(px) + '" y="' + r1(py) + '" width="' + r1(w) + '" height="' + r1(h) + '" fill="' + roofs[Math.floor(rnd() * roofs.length)] + '"/>');
+    }
+    o.push('<g filter="url(#mShade)">' + houses.join('') + '</g>');
+    o.push('<g filter="url(#mShade)">' + churches.map(([x, y]) => '<rect x="' + r1(x - 2 * K) + '" y="' + r1(y - K) + '" width="' + 5 * K + '" height="' + 6 * K + '" fill="#ece5d2"/><circle cx="' + r1(x + .5 * K) +
+      '" cy="' + r1(y - 1.6 * K) + '" r="' + 2 * K + '" fill="#e2b33c"/>').join('') + '</g>');
+    // деревья: рощи и сады, бульвары Белого города, одиночные деревья за городом
+    const trees = [];
+    M.woods.forEach(([x, y, r, n]) => { for (let i = 0; i < n; i++) {
+      const a = rnd() * 6.283, d = Math.sqrt(rnd()) * r, tx = x + Math.cos(a) * d, ty = y + Math.sin(a) * d;
+      if (lineDist(tx, ty, M.river) > .2) { const [px, py] = mp([tx, ty]); trees.push([px, py, 2.6 + rnd() * 2]); }
+    } });
+    for (let i = 0; i < 260; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      if (!inPoly(x, y, M.cityLine) && lineDist(x, y, M.river) > .3) { const [px, py] = mp([x, y]); trees.push([px, py, 2.2 + rnd() * 1.8]); }
+    }
+    for (let i = 0; i < M.boulevards.length - 1; i++) for (let t = 0; t < 1; t += .2) {
+      const a = M.boulevards[i], b = M.boulevards[i + 1], [px, py] = mp([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      trees.push([px, py, 1.8 * K]);
+    }
+    trees.sort((a, b) => a[1] - b[1]);
+    o.push('<g filter="url(#mShade)">' + trees.map(t => tree(...t)).join('') + '</g>');
+    // Китай-город и Кремль: кирпичные стены с башнями, внутри соборы
+    const towers = (pts, closed, step) => { const q = pts.map(mp), out = [];
+      for (let i = 0; i < (closed ? q.length : q.length - 1); i++) { const a = q[i], b = q[(i + 1) % q.length], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+        for (let k = 0; k < n; k++) { const x = a[0] + (b[0] - a[0]) * k / n, y = a[1] + (b[1] - a[1]) * k / n; out.push('<rect x="' + r1(x - 2.5 * K) + '" y="' + r1(y - 2.5 * K) + '" width="' + 5 * K + '" height="' + 5 * K + '" fill="#7d2219"/>'); } }
+      if (!closed) { const e = q[q.length - 1]; out.push('<rect x="' + r1(e[0] - 2.5 * K) + '" y="' + r1(e[1] - 2.5 * K) + '" width="' + 5 * K + '" height="' + 5 * K + '" fill="#7d2219"/>'); }
+      return out.join(''); };
+    const kq = M.kremlin.map(mp).map(p => p.map(r1).join(',')).join(' ');
+    o.push('<polyline points="' + M.kitayWall.map(mp).map(p => p.map(r1).join(',')).join(' ') + '" fill="none" stroke="#a8322a" stroke-width="' + 2.5 * K + '"/>' + towers(M.kitayWall, false, 12 * K));
+    o.push('<g filter="url(#mShade)"><polygon points="' + kq + '" fill="#8a7650" stroke="#b5352b" stroke-width="' + 3.5 * K + '" stroke-linejoin="round"/>' + towers(M.kremlin, true, 9 * K));
+    const [kx, ky] = mp([-.1, .05]);
+    [[-6, -4], [3, -6], [-2, 4], [5, 2]].forEach(([dx, dy]) => o.push('<rect x="' + r1(kx + (dx - 2.5) * K) + '" y="' + r1(ky + (dy - 2) * K) + '" width="' + 5.5 * K + '" height="' + 5 * K + '" fill="#ece5d2"/><circle cx="' +
+      r1(kx + (dx + .3) * K) + '" cy="' + r1(ky + (dy - 2.5) * K) + '" r="' + 2.3 * K + '" fill="#e9bb3f"/>'));
+    o.push('<rect x="' + r1(kx - 1.5 * K) + '" y="' + r1(ky - 6 * K) + '" width="' + 3 * K + '" height="' + 9 * K + '" fill="#f4efe0"/><circle cx="' + r1(kx) + '" cy="' + r1(ky - 6.5 * K) + '" r="' + 2 * K + '" fill="#f2c24a"/></g>');
+    o.push('<rect width="' + MV.w + '" height="' + MV.h + '" filter="url(#mGrain)"/>');
+  }
+  o.push('<rect width="' + MV.w + '" height="' + MV.h + '" fill="url(#mVig)"/>');
+  // обозначения (слева под кнопкой), заголовок (справа вверху), роза ветров и масштаб (справа внизу)
+  const kinds = Object.keys(MAP.kinds), lh = 17;
+  o.push('<rect x="14" y="48" width="196" height="' + (32 + kinds.length * lh) + '" fill="rgba(20,12,6,.88)" stroke="#8c7647" stroke-width="1.5"/>' +
+    '<text x="26" y="68" fill="#e8c36a" font-size="13" font-weight="bold">Обозначения</text>');
+  kinds.forEach((k, i) => o.push('<circle cx="32" cy="' + (84 + i * lh) + '" r="4.5" fill="' + MAP.kinds[k].color + '" stroke="#1a1008" stroke-width="1.4"/>' +
+    '<text x="44" y="' + (88 + i * lh) + '" fill="#f0e2c0" font-size="12">' + MAP.kinds[k].name + '</text>'));
+  o.push('<g transform="translate(800 14)"><rect width="186" height="66" fill="rgba(20,12,6,.88)" stroke="#8c7647" stroke-width="1.5"/>' +
+    '<rect x="4" y="4" width="178" height="58" fill="none" stroke="#8c764788"/>' +
+    '<text x="93" y="38" text-anchor="middle" fill="#e8c36a" font-size="' + (map.title.length > 8 ? 21 : 28) + '" letter-spacing="2">' + map.title.toUpperCase() + '</text>' +
+    '<text x="93" y="55" text-anchor="middle" fill="#f0e2c0" font-size="12" font-style="italic">' + map.subtitle + '</text></g>');
+  o.push('<g transform="translate(958 462)" opacity=".9"><circle r="22" fill="rgba(20,12,6,.7)" stroke="#8c7647"/>' +
+    '<polygon points="0,-19 4,0 0,19 -4,0" fill="#f0e2c0"/><polygon points="0,-19 4,0 -4,0" fill="#e8c36a"/><polygon points="-19,0 0,4 19,0 0,-4" fill="#8c7647"/>' +
+    '<text y="-25" text-anchor="middle" fill="#f0e2c0" font-size="11" font-weight="bold">С</text></g>');
+  const vn = MV.kmPx > 150 ? .5 : 2, vw = vn * 1.0668 * MV.kmPx;   // масштаб: 2 версты или полверсты
+  o.push('<g transform="translate(' + r1(986 - vw) + ' 528)"><rect x="-6" y="-16" width="' + r1(vw + 12) + '" height="26" fill="rgba(20,12,6,.7)"/>' +
+    '<rect width="' + r1(vw / 2) + '" height="4" fill="#f0e2c0"/><rect x="' + r1(vw / 2) + '" width="' + r1(vw / 2) + '" height="4" fill="#1a1008" stroke="#f0e2c0" stroke-width=".8"/>' +
+    '<text x="' + r1(vw / 2) + '" y="-4" text-anchor="middle" fill="#f0e2c0" font-size="11">' + (vn === 2 ? '2 версты' : 'полверсты') + '</text></g>');
+  return o.join('');
+}
+function renderMap() {
+  $('map').style.display = mapOpen ? 'block' : 'none';
+  if (!mapOpen) return;
+  if (notesOpen) { notesOpen = false; renderNotes(); }
+  const map = MAP.maps[mapId], places = map.places;
+  MV = map.view;
+  if (mapShown !== mapId) { $('mapbase').innerHTML = mapCache[mapId] || (mapCache[mapId] = buildMap()); mapShown = mapId; }
+  $('mapswitch').textContent = '→ ' + MAP.maps[nextMap()].name;
+  const here = places.find(q => q.scene === state.scene);   // где сейчас Андрей (если это место есть на этой карте)
+  if (!places.some(q => q.id === mapSel[mapId])) mapSel[mapId] = here ? here.id : places[0].id;
+  const marks = [], labels = [];
+  places.forEach(p => {
+    const [x, y] = mp([p.x, p.y]).map(r1), k = MAP.kinds[p.kind], home = p === here, sel = p.id === mapSel[mapId], r = home ? 6.5 : 5;
+    const g = ['<g class="loc" data-id="' + p.id + '" transform="translate(' + x + ' ' + y + ')"><circle r="11" fill="transparent"/>'];
+    if (home) g.push('<circle r="7" fill="none" stroke="' + k.color + '" stroke-width="2"><animate attributeName="r" values="7;17" dur="1.6s" repeatCount="indefinite"/>' +
+      '<animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="indefinite"/></circle>');
+    if (sel) g.push('<circle r="' + (r + 4) + '" fill="none" stroke="#fff" stroke-width="2"/>');
+    g.push('<circle class="dot" r="' + r + '" fill="' + k.color + '" stroke="#1a1008" stroke-width="1.6"/><circle cx="-1.4" cy="-1.4" r="' + r1(r / 3) + '" fill="#fff" opacity=".55"/></g>');
+    marks.push(g.join(''));
+    const off = { r: [r + 6, 4, 'start'], l: [-r - 6, 4, 'end'], t: [0, -r - 6, 'middle'], b: [0, r + 15, 'middle'] }[p.at || 'r'];
+    labels.push('<text class="loc" data-id="' + p.id + '" x="' + r1(x + off[0]) + '" y="' + r1(y + off[1]) + '" text-anchor="' + off[2] + '" font-size="' + (home ? 14 : 12.5) +
+      '" font-weight="' + (home || sel ? 'bold' : 'normal') + '" fill="' + (home ? '#ffe9a8' : '#fdf6e3') + '" stroke="#1a1008" stroke-width="3.4" paint-order="stroke" stroke-linejoin="round">' + p.name + '</text>');
+  });
+  $('mapmarks').innerHTML = marks.join('') + labels.join('');
+  const p = places.find(q => q.id === mapSel[mapId]);
+  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
+  $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
+  if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
+}
+// Переход через карту: Андрей оказывается в начальной точке выбранного места, открытый разговор закрывается.
+const shopOpenBlocks = () => !TIME.travelWhenOpen && state.phase === 'day';   // пока лавка открыта, уходить нельзя
+function travel(scene, name) {
+  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene])) return;
+  state.scene = scene; dlg = null; resetPlayer(); save();
+  mapOpen = false; renderMap(); renderDlg(); toast(name);
+}
+
+// ================= ОТКРЫТИЕ И ЗАКРЫТИЕ ЛАВКИ, СМЕНА ДНЕЙ =================
+let sleeping = false;                                  // идёт экран ночи: ввод и движение отключены
+function openShop() { if (state.phase !== 'morning') return; state.phase = 'day'; state.visit = 0; save(); toast('Лавка открыта'); }
+function closeShop() {                                 // покупатели, которые не успели, сегодня уже не придут
+  if (state.phase !== 'day') return;
+  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.moving = false;
+  dlg = { summary: true }; save(); renderDlg();
+}
+// Экран поверх сцены (ночь, глава, перемотка). ms > 0 — исчезает сам; ms = 0 — ждёт E, пробел, Enter или щелчок.
+function card(html, ms) {
+  const n = $('night'); n.innerHTML = '<div>' + html + '</div>'; n.classList.add('on');
+  return new Promise(done => {
+    if (ms) return setTimeout(done, ms);
+    const go = e => { if (e.type === 'keydown' && !['KeyE', 'Space', 'Enter'].includes(e.code)) return;
+      removeEventListener('keydown', go); n.removeEventListener('click', go); done(); };
+    setTimeout(() => { addEventListener('keydown', go); n.addEventListener('click', go); }, 400);   // случайное двойное нажатие не пропускает текст
+  });
+}
+const chapterCard = n => { const d = DAYS[n];           // глава и перемотка перед днём n (если есть) — ждёт игрока
+  return card((d.chapter ? '<b>' + d.chapter + '</b>' : '') + (d.skip ? '<p>' + d.skip + '</p>' : '') + '<i>' + dateOf(n) + ' года, утро</i><small>E — продолжить</small>', 0); };
+async function endDay() {                              // ночь, затем следующий день из DAYS (с главой и перемоткой, если они есть)
+  if (state.phase !== 'evening' || sleeping) return;
+  if (state.day + 1 >= DAYS.length) { toast('Это последний день в текущей версии игры. «Новая игра» — заново.'); return; }
+  sleeping = true; dlg = null; renderDlg();
+  await card('Ночь', 1300);
+  Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
+  const got = deliver();                               // заказ у оптовика привезли ночью
+  resetPlayer(); placeVisitor(); save();
+  const d = DAYS[state.day];
+  await (d.chapter || d.skip ? chapterCard(state.day) : card('Утро, ' + dateOf(state.day) + ' года', 1600));
+  $('night').classList.remove('on'); sleeping = false;
+  if (got) toast(got);
+}
+async function intro() {                               // начало игры: заголовок первой главы
+  sleeping = true; await chapterCard(0); $('night').classList.remove('on'); sleeping = false;
+}
+
+// ================= ПОКУПАТЕЛИ ПРИХОДЯТ И УХОДЯТ =================
+// Текущий покупатель (C) входит в дверь и идёт к прилавку; после прощания (visit вырос) уходит к двери, следующий появляется
+// через arrivalDelay секунд. Движение не сохраняется: после загрузки текущий покупатель уже стоит у прилавка.
+// Покупатель привязан к ключу «день / номер в очереди / открыта ли лавка»: ключ сменился — прежний уходит (в том числе при закрытии лавки).
+const vkey = () => state.day + '/' + state.visit + '/' + state.phase;
+const visitor = { key: '', cust: null, x: 0, phase: 'none', wait: 0 }; // phase: in — идёт к прилавку, here — стоит, none — никого
+let leaving = [];                                      // ушедшие покупатели, которые ещё идут к двери: { x, cust }
+function placeVisitor() { Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.customerX, phase: C() ? 'here' : 'none', wait: 0 }); leaving = []; }
+const visitorReady = () => visitor.key === vkey() && visitor.phase === 'here';
+function updateVisitors(dt) {
+  const v = SCENE.customerSpeed * dt;
+  if (visitor.key !== vkey()) {                        // очередь сдвинулась или лавка закрылась: прежний уходит, следующий скоро войдёт
+    if (visitor.cust && visitor.phase !== 'none' && visitor.wait <= 0) leaving.push({ x: visitor.x, cust: visitor.cust });
+    Object.assign(visitor, { key: vkey(), cust: C() || null, x: SCENE.doorX, phase: C() ? 'in' : 'none', wait: SCENE.arrivalDelay });
+  }
+  leaving.forEach(l => { l.x += v; if (l.x >= SCENE.doorX && inShop()) sfx.bell(0.6); }); leaving = leaving.filter(l => l.x < SCENE.doorX);   // ушёл — колокольчик
+  if (visitor.phase !== 'in') return;
+  if (visitor.wait > 0) { visitor.wait -= dt; if (visitor.wait <= 0 && inShop()) sfx.bell(1); return; }   // вошёл — колокольчик
+  visitor.x -= v;
+  if (visitor.x <= SCENE.customerX) {
+    visitor.x = SCENE.customerX; visitor.phase = 'here';
+    if (dlg && dlg.idle) renderDlg();                  // Андрей за прилавком ждёт: появляется «Обслужить следующего»
+  }
+}
+function drawVisitors() {                              // слой 6: покупатели перед прилавком (идут без кадров ходьбы — это не анимация)
+  leaving.forEach(l => drawPerson(l.cust, l.x, LANE, 1));
+  if (visitor.cust && visitor.key === vkey() && visitor.wait <= 0 && visitor.phase !== 'none')
+    drawPerson(visitor.cust, visitor.x, LANE, visitor.phase === 'in' ? -1 : 1);
 }
 
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt) {
+  updateVisitors(dt);
   player.moving = false;
-  if (dlg || notesOpen || serving) return;             // во время диалога, заметок и обслуживания движение заблокировано
+  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
   const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  const nx = Math.min(Math.max(player.x + dx * player.speed * dt, FLOOR.l), FLOOR.r);
+  const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
   const d = Math.abs(nx - player.x);
   player.x = nx;
-  if (d > 0) { player.moving = true; player.dist += d; }
+  if (d > 0) {
+    player.moving = true; player.dist += d;
+    const f = walkFrame(player.dist);                  // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
+    if (f !== player.frame && f % (ANDREY.walk.frames / 2) === 0) sfx.step();
+    player.frame = f;
+  }
   if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)
 }
 
@@ -369,29 +813,220 @@ function shelf(x, y, n) {
     for (let i = 0; i < n; i++) rect(cols[(i + r) % 4], x + 4 + i * 13, y + r * 20, 5, 9);
   }
 }
-// Заглушка-человечек (ростом ~66 px, как будущие спрайты). Нужна для покупателей и пока нет картинок Андрея.
-function person(x, y, color, swing, dir) {
-  const k = SCENE.charScale, R = (c, dx, dy, w, h) => rect(c, Math.round(x + dx * k), Math.round(y + dy * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
-  R('#1d1510', -8 + swing, -22, 6, 22);
-  R('#1d1510', 2 - swing, -22, 6, 22);
+// Заглушка-человечек (ростом ~66 px, как будущие спрайты): пока нет файла спрайта. Неподвижный: ходьбу не изображает.
+function person(x, y, color, dir) {
+  const k = SCENE.charScale * (SCENE.placeholderScale || 1), R = (c, dx, dy, w, h) => rect(c, Math.round(x + dx * k), Math.round(y + dy * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  R('#1d1510', -8, -22, 6, 22);
+  R('#1d1510', 2, -22, 6, 22);
   R(color, -11, -50, 22, 28);
   R('#e0b890', -7, -66, 14, 16);
   R('#2a1a0e', dir > 0 ? 2 : -7, -60, 5, 3);
-  R('#d8d0b0', -2 - swing, -48, 5, 20);
+  R('#d8d0b0', -2, -48, 5, 20);
 }
-// Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Файла ходьбы пока нет — при движении показывается тот же статичный
-// кадр покоя: это НЕ анимация. Когда walk.png появится, кадр выбирается по пройденному пути.
-function drawAndrey(x, y, dir, moving) {
-  const A = ANDREY, cycle = (player.dist / A.cycleDistance) % 1;
-  if (!spr.idle.ok) { person(x, y, '#6b8a3a', moving ? Math.round(Math.sin(cycle * 2 * Math.PI) * 5) : 0, dir); return; }
-  const useWalk = moving && spr.walk.ok, img = useWalk ? spr.walk : spr.idle;
-  const f = useWalk ? Math.floor(cycle * A.walk.frames) : 0;
+// Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
+function drawPerson(who, x, y, dir) {
+  shadow(x, y);
+  const sp = who.sprite, im = sp && spr['s_' + who.id];
+  if (!im || !im.ok) { person(x, y, who.color, dir); return; }
+  const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
+  ctx.save(); ctx.translate(Math.round(x), 0);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  ctx.restore();
+}
+// Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
+// при движении показывается статичный кадр покоя — это НЕ анимация.
+// За прилавком (atCounter = true): передача товара после продажи, иначе ожидание; без этих файлов — кадр покоя.
+let giveStart = -1e9;                                    // время последней продажи (секунды), не сохраняется
+function counterFrame() {
+  const t = performance.now() / 1000, g = ANDREY.give;
+  if (spr.give.ok && t - giveStart < g.frames * g.time) return [spr.give, Math.floor((t - giveStart) / g.time)];
+  if (!spr.atCounter.ok) return [spr.idle, 0];
+  const ts = ANDREY.counter.times, sum = ts.reduce((a, b) => a + b, 0);
+  let r = t % sum, f = 0;
+  while (r >= ts[f]) r -= ts[f++];
+  return [spr.atCounter, f];
+}
+// Кадр ходьбы по пройденному пути: каждый кадр держится walk.weights[i] пикселей (без weights — поровну).
+function walkFrame(dist) {
+  const w = ANDREY.walk.weights, n = ANDREY.walk.frames;
+  if (!w) return Math.floor((dist / ANDREY.cycleDistance) % 1 * n);
+  let r = dist % w.reduce((a, b) => a + b, 0), f = 0;
+  while (f < n - 1 && r >= w[f]) r -= w[f++];
+  return f;
+}
+function drawAndrey(x, y, dir, moving, atCounter) {
+  const A = ANDREY;
+  shadow(x, y);
+  if (!spr.idle.ok) { person(x, y, '#6b8a3a', dir); return; }
+  const useWalk = moving && spr.walk.ok;
+  let img = useWalk ? spr.walk : spr.idle, f = useWalk ? walkFrame(player.dist) : 0;
+  if (atCounter) [img, f] = counterFrame();
   ctx.save();
   ctx.translate(Math.round(x), 0);
   if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
   const k = SCENE.charScale;                               // опора (48, 76) остаётся на месте, увеличивается всё вокруг неё
   ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
   ctx.restore();
+}
+// ================= ЗВУК =================
+// Все звуки синтезируются в браузере (файлов нет): колокольчик над дверью, монеты, шаги, тихий фон комнаты.
+// Браузер разрешает звук только после действия игрока — первое нажатие клавиши или щелчок включает его.
+// S или кнопка «Звук» — выключить и включить (запоминается).
+const SOUND_KEY = 'letopisi1812_sound';
+const sfx = (() => {
+  let ac = null, master = null, amb = null, on = (() => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch (e) { return true; } })();
+  const label = () => { $('soundbtn').textContent = on ? 'Звук: вкл (S)' : 'Звук: выкл (S)'; };
+  const noiseBuf = (sec, brown) => {
+    const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate), d = b.getChannelData(0); let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; d[i] = brown ? (last = (last + 0.02 * w) / 1.02) * 3.5 : w; }
+    return b;
+  };
+  function ambience() {                                 // фон: тихий низкий шум комнаты и улицы за стеной
+    if (amb) return;
+    const src = ac.createBufferSource(); src.buffer = noiseBuf(4, true); src.loop = true;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+    const g = ac.createGain(); g.gain.value = 0.05;
+    src.connect(lp).connect(g).connect(master); src.start(); amb = g;
+  }
+  function tone(freq, start, dur, vol, type) {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(vol, start + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g).connect(master); o.start(start); o.stop(start + dur + 0.05);
+  }
+  const ready = () => on && ac && ac.state === 'running';
+  return {
+    unlock() {
+      if (!on || ac) { if (ac && ac.state === 'suspended') ac.resume(); return; }
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.6; master.connect(ac.destination); ambience(); } catch (e) { ac = null; }
+    },
+    toggle() {
+      on = !on; try { localStorage.setItem(SOUND_KEY, on ? 'on' : 'off'); } catch (e) {}
+      if (ac) { if (on) ac.resume(); else ac.suspend(); } else if (on) this.unlock();
+      label();
+    },
+    label,
+    bell(v) {                                           // колокольчик над дверью: два удара
+      if (!ready()) return; const t = ac.currentTime, k = (v || 1) * 0.16;
+      [0, 0.13].forEach((d, i) => [1760, 2637, 3951].forEach((f, j) => tone(f * (1 + (Math.random() - 0.5) * 0.01), t + d, 1.4 - j * 0.3, k / (j + 1) * (i ? 0.7 : 1))));
+    },
+    coins() {                                           // монеты: несколько коротких звонких щелчков
+      if (!ready()) return; const t = ac.currentTime;
+      for (let i = 0; i < 3; i++) [4200, 5600, 7100].forEach(f => tone(f * (0.95 + Math.random() * 0.1), t + i * 0.07 + Math.random() * 0.02, 0.09, 0.05));
+    },
+    step() {                                            // шаг по доскам: короткий глухой удар
+      if (!ready()) return; const t = ac.currentTime;
+      const src = ac.createBufferSource(); src.buffer = noiseBuf(0.08, false);
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 180 + Math.random() * 60; bp.Q.value = 1.2;
+      const g = ac.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      src.connect(bp).connect(g).connect(master); src.start(t);
+    }
+  };
+})();
+sfx.label();
+
+// ================= ПРОХОЖИЕ ЗА ОКНОМ =================
+// Тёмные силуэты в длинной одежде (кафтан, платье) проходят за стеклом. Рисуются только на стекле (слой shop_glass.png),
+// поэтому идут позади рамы и кувшинов на подоконнике. Ног не видно — шагов не изображаем.
+const walkers = { list: [], next: 2, last: 0 };
+const glassCv = document.createElement('canvas'), gctx = glassCv.getContext('2d');
+const rnd = (a, b) => a + Math.random() * (b - a);
+function drawPassersby() {                             // слой 1а: в координатах мира, сразу после фона
+  const P = SCENE.passersby, gl = spr.glass;
+  if (!P || !gl || !gl.ok) return;
+  const t = performance.now() / 1000, dt = Math.min(0.1, t - (walkers.last || t)); walkers.last = t;
+  if (P.phases.includes(state.phase)) {
+    walkers.next -= dt;
+    if (walkers.next <= 0) {
+      const dir = Math.random() < 0.5 ? 1 : -1, h = rnd(P.height[0], P.height[1]);
+      walkers.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress' });
+      walkers.next = rnd(P.every[0], P.every[1]);
+    }
+  }
+  walkers.list.forEach(w => { w.x += w.dir * w.v * dt; });
+  walkers.list = walkers.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
+  if (!walkers.list.length) return;
+  if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
+  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.drawImage(gl, 0, 0);
+  gctx.globalCompositeOperation = 'source-atop'; gctx.fillStyle = P.color;
+  walkers.list.forEach(w => {                          // силуэт: голова, плечи, длинная одежда до земли
+    const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
+    gctx.beginPath();
+    gctx.moveTo(x - sh, f - h * 0.8); gctx.lineTo(x + sh, f - h * 0.8); gctx.lineTo(x + hw, f); gctx.lineTo(x - hw, f); gctx.closePath(); gctx.fill();
+    gctx.beginPath(); gctx.arc(x, f - h * 0.89, h * (w.kind === 'dress' ? 0.1 : 0.085), 0, Math.PI * 2); gctx.fill();
+    if (w.kind === 'coat') gctx.fillRect(x - h * 0.1, f - h * 0.99, h * 0.2, h * 0.05);   // шапка
+  });
+  ctx.drawImage(glassCv, 0, 0);
+}
+
+// ================= СВЕТ (настройки — TIME.light и lights у сцены в data.js) =================
+// Поверх сцены: сумрак с просветами вокруг источников, затем свечение (сложение цветов): мерцающее пламя, ровное тёплое
+// свечение, луч из окна с пылинками. Плюс тени под ногами. Интерфейс (HTML) не затемняется.
+// ?light=0 в адресе — без света, теней и цветокоррекции (для попиксельных проверок).
+const LIGHT_ON = !/[?&]light=0\b/.test(location.search);
+const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + Math.max(0, Math.min(1, a)) + ')'; };
+const flick = (t, seed, amp) => 1 + amp * (0.6 * Math.sin(t * 7.1 + seed) + 0.3 * Math.sin(t * 13.7 + seed * 2.3) + 0.1 * Math.sin(t * 31 + seed * 5.1));
+let dust = { scene: '', list: [], last: 0 };
+function shadow(x, y) {                                // тень под ногами (в координатах мира)
+  const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
+  ctx.fillStyle = 'rgba(0,0,0,' + sh.alpha + ')';
+  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w / 2, sh.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+}
+function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
+  if (!LIGHT_ON) return;
+  const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
+  const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
+  // 1) сумрак: заливка цветом, в местах света — просветы
+  if (L.dark > 0) {
+    const w = canvas.width, h = canvas.height;
+    if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
+    lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, w, h);
+    lctx.fillStyle = rgba(L.darkColor, L.dark); lctx.fillRect(0, 0, w, h);
+    lctx.setTransform(px, 0, 0, px, -cam * px, 0); lctx.globalCompositeOperation = 'destination-out';
+    lights.forEach((l, i) => {
+      const cx = l.kind === 'window' ? (l.x0 + l.x1) / 2 : l.x, cy = l.kind === 'window' ? (l.y0 + l.y1) / 2 : l.y, r = (l.r || 70) * 1.5;
+      const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(0,0,0,' + Math.min(1, 0.95 * power(l, i)) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      lctx.fillStyle = g; lctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(lightCv, 0, 0); ctx.restore();
+  }
+  // 2) свечение — складывается с цветами сцены
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  lights.forEach((l, i) => {
+    const k = power(l, i);
+    if (l.kind === 'window') {
+      const b = l.beam, top = b[0][1], bottom = b[2][1];
+      const g = ctx.createLinearGradient(0, top, 0, bottom);
+      g.addColorStop(0, rgba(l.color, 0.16 * k)); g.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = g; ctx.beginPath(); b.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+      const cx = (l.x0 + l.x1) / 2, cy = (l.y0 + l.y1) / 2, gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 45);
+      gr.addColorStop(0, rgba(l.color, 0.18 * k)); gr.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = gr; ctx.fillRect(cx - 45, cy - 45, 90, 90);
+      drawDust(l, k, t);
+    } else {
+      const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+      g.addColorStop(0, rgba(l.color, (l.kind === 'flame' ? 0.30 : 0.16) * k)); g.addColorStop(0.35, rgba(l.color, (l.kind === 'flame' ? 0.10 : 0.07) * k));
+      g.addColorStop(1, rgba(l.color, 0));
+      ctx.fillStyle = g; ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+    }
+  });
+  ctx.restore();
+}
+function drawDust(l, k, t) {                           // пылинки в луче окна: медленно плывут и мерцают
+  const b = l.beam, xs = b.map(p => p[0]), ys = b.map(p => p[1]);
+  const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  const spawn = () => { for (;;) { const x = box[0] + Math.random() * (box[2] - box[0]), y = box[1] + Math.random() * (box[3] - box[1]);
+    if (inPoly(x, y, b)) return { x, y, vx: 1 + Math.random() * 2.5, vy: -0.6 + Math.random() * 1.6, ph: Math.random() * 6.28 }; } };
+  if (dust.scene !== state.scene) dust = { scene: state.scene, list: Array.from({ length: 36 }, spawn), last: t };
+  const dt = Math.min(0.1, t - dust.last); dust.last = t;
+  dust.list.forEach((d, i) => {
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    if (!inPoly(d.x, d.y, b)) dust.list[i] = d = spawn();
+    const a = (0.25 + 0.25 * Math.sin(t * 1.3 + d.ph)) * k;
+    ctx.fillStyle = rgba(l.color, a); ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+  });
 }
 // Слои (снизу вверх): 1) фон помещения, 2) отметки остатка (только при заглушке фона), 3) мать,
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
@@ -414,30 +1049,55 @@ function drawStock() {                                 // слой 2: одна �
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
-  else rect('#3b2616', SCENE.counter.l, 100, SCENE.counter.r - SCENE.counter.l, 36);
+  else { const r = ART.counterFront.rect; rect('#3b2616', r.x, r.y, r.w, r.h); }
 }
 function drawFront() {                                 // слой 8
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
-  else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', WORLD_W - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
+  else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
+}
+// Другое место (не лавка): фон или заглушка, персонажи, Андрей.
+function drawPlace() {
+  const c = scn(), bg = spr['bg_' + state.scene];
+  ctx.save(); ctx.translate(-cameraX(), 0);
+  if (bg && bg.ok) ctx.drawImage(bg, 0, 0);
+  else {                                               // заглушка: стена, пол, мешки у стены
+    rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
+    for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
+  }
+  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
+  drawAndrey(player.x, player.y, player.dir, player.moving);
+  drawLight();
+  ctx.restore();
 }
 function draw() {
   const cam = cameraX();
+  ctx.setTransform(px, 0, 0, px, 0, 0);               // всё рисуется в пикселях сетки; холст может быть в px раз крупнее
   ctx.clearRect(0, 0, W, H);
+  if (!inShop()) { drawPlace(); drawHud(); return; }
   if (!spr.bg.ok) { rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120); }   // заглушка: стена и пол
   ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
   drawBackdrop();
+  drawPassersby();
   drawStock();
-  person(SCENE.motherX, LANE, MOTHER.color, 0, 1);
-  if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false);
+  drawPerson(MOTHER, SCENE.motherX, LANE, 1);
+  if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
-  if (C()) person(SCENE.customerX, LANE, C().color, 0, 1);    // ушедший покупатель (visit уже вырос) не рисуется
+  drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
+  drawLight();
   ctx.restore();
-  $('hud').textContent = 'Монет: ' + state.money;
+  drawHud();
+}
+function drawHud() {
+  const grade = LIGHT_ON ? (TIME.light[state.phase] || {}).grade || '' : '';   // цветокоррекция части дня
+  if (canvas.style.filter !== grade) canvas.style.filter = grade;
+  $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = serving ? '' : nearMom() ? 'E — Поговорить' : nearWork() ? 'E — Встать за прилавок' : (!C() && !dlg) ? 'Покупателей больше нет. «Новая игра» — заново.' : '';
+  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' :
+    nearWork() ? { morning: 'E — Открыть лавку', day: 'E — Встать за прилавок', evening: 'E — Закончить день' }[state.phase] :
+    (inShop() && state.phase === 'day' && !C() && !dlg) ? 'Покупателей сегодня больше нет. Закрыть лавку можно за прилавком.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
 }
 
@@ -447,7 +1107,8 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05); last = now;
   update(dt); draw(); requestAnimationFrame(loop);
 }
-renderDlg(); renderNotes(); requestAnimationFrame(loop);
+placeVisitor(); renderDlg(); renderNotes(); requestAnimationFrame(loop);
+if (!loaded) intro();                                  // новая игра (сохранения нет): заголовок первой главы
 </script>
 </body>
 </html>
