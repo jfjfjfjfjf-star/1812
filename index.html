@@ -44,6 +44,8 @@
                   font-size: calc(var(--u) * 40px); color: #f0e2c0aa; border: calc(var(--u) * 1px) solid #8c7647; border-bottom: 0; box-sizing: border-box; }
   #col { position: absolute; left: calc(var(--u) * 118px); right: calc(var(--u) * 4px); bottom: calc(var(--u) * 4px); display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
   body.paneled #col { right: calc(var(--u) * 92px); }
+  body.paneled.wide #col { right: calc(var(--u) * 116px); }
+  #panel.wide { width: calc(var(--u) * 108px); }
   #box { background: rgba(20,12,6,.94); border: calc(var(--u) * 1px) solid #8c7647; color: #f0e2c0; white-space: pre-line;
          padding: calc(var(--u) * 3px) calc(var(--u) * 6px); min-height: calc(var(--u) * 22px); font-size: calc(var(--u) * 6px); line-height: 1.35; }
   #who { color: #e8c36a; font-weight: bold; font-size: calc(var(--u) * 7px); }
@@ -66,6 +68,13 @@
   #panel .step { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--u) * 1px) 0; }
   #panel .step button { font: inherit; font-size: calc(var(--u) * 6px); width: calc(var(--u) * 14px); cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; }
   #panel .step b { font-size: calc(var(--u) * 8px); }
+  /* заказ у оптовика: одна строка на товар — значок, название и цена, −/+ */
+  #panel .oline { display: flex; align-items: center; gap: calc(var(--u) * 2px); margin-bottom: calc(var(--u) * 2px); }
+  #panel .oline .gi { width: calc(var(--u) * 12px); height: calc(var(--u) * 12px); }
+  #panel .oline .on { flex: 1; min-width: 0; line-height: 1.1; }
+  #panel .oline button { font: inherit; width: calc(var(--u) * 10px); padding: 0; cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; }
+  #panel .oline button:disabled { opacity: .4; cursor: not-allowed; }
+  #panel .oline b { width: calc(var(--u) * 9px); text-align: center; }
   #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.5px); padding-top: calc(var(--u) * 2px); }
   #pact button { padding: calc(var(--u) * 1.5px) calc(var(--u) * 3px); }
   /* Карта: экран поверх сцены. Сама карта — SVG в рамке 1000×560 (растягивается на всю сцену), карточка места — HTML */
@@ -110,7 +119,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 20) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 21) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -302,6 +311,7 @@ function load() {                                      // старое сохр�
       const who = VISITS[v].who;
       if (!s.deals[v]) s.deals[v] = v === who + '_1' && s.deals[who] ? s.deals[who] : newDeal(VIS[v]);
     });
+    if (s && s.stock) Object.keys(GOODS).forEach(k => { if (s.stock[k] === undefined) s.stock[k] = GOODS[k].stock; });   // миграция: новые товары
     if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
         s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { visits: [] }).visits.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
@@ -453,12 +463,13 @@ function setPortrait(sp) {
   if (spr['p_' + sp.id] && spr['p_' + sp.id].ok) { const im = document.createElement('img'); im.src = sp.portrait; im.alt = ''; pt.appendChild(im); }
   else { const ph = document.createElement('div'); ph.className = 'ph'; ph.style.background = sp.color; ph.textContent = sp.name[0]; pt.appendChild(ph); }   // запасной вариант
 }
-function stockList() { return Object.keys(GOODS).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
+// товары, которых не было на старте (только под заказ), показываются, когда они появились в лавке
+function stockList() { return Object.keys(GOODS).filter(k => GOODS[k].stock > 0 || state.stock[k] > 0).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
 function renderDlg() {
   const box = $('dlg'), ch = $('choices'), pn = $('panel');
   ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none'; pn.className = '';
   document.body.classList.toggle('serving', serving); $('back').style.display = serving ? 'block' : 'none';
-  document.body.classList.remove('paneled');
+  document.body.classList.remove('paneled', 'wide');
   if (!dlg) { box.style.display = 'none'; return; }
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
@@ -481,14 +492,13 @@ function renderDlg() {
     const s = SUPPLY[dlg.order], sum = orderSum();
     sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
     list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + sum : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
-    pn.style.display = 'flex'; pn.className = 'full';
+    pn.style.display = 'flex'; pn.className = 'full wide';                 // шире обычной: товаров у продавца несколько
     pn.innerHTML = Object.keys(s.goods).map(k => { const g = s.goods[k], u = GOODS[k];
-      return '<div class="head"><div class="gi">' + goodsIcon(k) + '</div><div><b>' + u.name + '</b><br>по ' + g.cost + ' за ' + u.unit + '</div></div>' +
-        '<div class="step"><button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>' +
-        '<i>в лавке: ' + state.stock[k] + (ordered(dlg.order, k) ? ', уже заказано: ' + ordered(dlg.order, k) : '') + '</i>'; }).join('') +
+      return '<div class="oline"><div class="gi">' + goodsIcon(k) + '</div><div class="on">' + u.name + '<i>' + g.cost + ' за ' + u.unit + ' · есть ' + state.stock[k] + (ordered(dlg.order, k) ? ' · +' + ordered(dlg.order, k) : '') + '</i></div>' +
+        '<button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>'; }).join('') +
       '<div class="row" style="margin-top:2px">Всего: <b>' + sum + '</b></div><div class="row">Монет: <b>' + state.money + '</b></div>' +
-      '<i>платим сразу, товар привезут в лавку завтра утром</i><div id="pact"></div>';
-    pn.querySelectorAll('.step button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
+      '<i>есть — в лавке; +N — уже заказано. Платим сразу, привезут в лавку завтра утром</i><div id="pact"></div>';
+    pn.querySelectorAll('.oline button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
     target = $('pact');
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
@@ -517,7 +527,7 @@ function renderDlg() {
     }
   }
   setPortrait(sp);
-  document.body.classList.toggle('paneled', pn.style.display === 'flex');
+  document.body.classList.toggle('paneled', pn.style.display === 'flex'); document.body.classList.toggle('wide', pn.classList.contains('wide'));
   box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
   list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; b.disabled = !!x.off; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
