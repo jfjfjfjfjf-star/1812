@@ -1,13 +1,23 @@
-# Подготовка спрайтов из крупных генераций на белом фоне: фон -> прозрачность, уменьшение по площади, общая палитра, ячейка 96×80.
-# Нужен Python 3, numpy, Pillow. Примеры (так собраны файлы 21.10.2026, исходники в assets/source/):
-#   ходьба Андрея (4 кадра, рост 69, кадры выровнены по голове как у кадра покоя):
-#   python tools/make_sprites.py '{"src":["assets/source/andrey_walk_gpt_1.webp","assets/source/andrey_walk_gpt_2.webp","assets/source/andrey_walk_gpt_3.webp","assets/source/andrey_walk_gpt_4.webp"],"height":69,"scaleRef":0,"align":"head","headOffset":0.8,"colors":24,"out":"assets/characters/andrey_walk.png"}'
-#   мать (рост 64):
-#   python tools/make_sprites.py '{"src":["assets/source/mother_gpt.webp"],"height":64,"colors":20,"out":"assets/characters/mother_idle.png"}'
-import sys, json
+# Подготовка спрайтов из крупных генераций на белом фоне: фон -> прозрачность, уменьшение по площади, ячейка 144×120
+# (сетка 480×270), при необходимости перекрашивание части фигуры и перевод на общую палитру игры (assets/palette.png).
+# Нужен Python 3, numpy, Pillow. Так собраны файлы 21.10.2026 (исходники в assets/characters/<имя>/source/), порядок важен:
+#   1) спрайты без палитры (из них строится палитра), 2) python tools/make_palette.py, 3) python tools/make_shop.py,
+#   4) те же команды спрайтов с "palette":"assets/palette.png".
+#   кадр покоя Андрея (рост 104):
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_idle_original.png"],"height":104,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_idle.png"}'
+#   ходьба Андрея собирается отдельно: python tools/fix_walk.py (рисунки ChatGPT + ручная правка)
+#   Андрей за прилавком (2 кадра; потом кадр 2 = кадр 1 + область кистей [50:60, 76:100] из кадра 2, см. docs/ART_REQUIREMENTS.md):
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_counter_1.webp","assets/characters/andrey/source/andrey_counter_2.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_counter.png"}'
+#   Андрей передаёт товар (3 кадра; потом строки 0–26 каждого кадра = голова из кадра ожидания andrey_counter.png):
+#   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_give_1.webp","assets/characters/andrey/source/andrey_give_2.webp","assets/characters/andrey/source/andrey_give_3.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_give.png"}'
+#   мать (рост 96):
+#   python tools/make_sprites.py '{"src":["assets/characters/mother/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother/mother_idle.png"}'
+import sys, os, json, colorsys
 from collections import deque
 import numpy as np
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import palette_lib
 
 CELL_W, CELL_H, FLOOR, ANCHOR = 144, 120, 114, 72   # сетка 480×270: ячейка 144×120, подошвы в строке 113, опора x = 72 (можно задать в cfg)
 
@@ -60,6 +70,21 @@ def to_cell(small, cx):
             if small[y, x, 3] and 0 <= y + oy < CELL_H and 0 <= x + ox < CELL_W: cell[y + oy, x + ox] = small[y, x]
     return cell
 
+def recolor(cell, rules):
+    """Перекрашивание части фигуры (например, жилета под цвет кадра покоя). Правило: rows — полоса по высоте фигуры (доли),
+    hue/sat/val — диапазоны тона (градусы), насыщенности и яркости; shift — сдвиг тона, satMul — множитель насыщенности."""
+    a = cell[..., 3] > 0; rows = np.where(a.any(axis=1))[0]
+    if not len(rows): return cell
+    t, b = rows[0], rows[-1]; h = b - t
+    for r in rules:
+        for y in range(t + int(h * r['rows'][0]), t + int(h * r['rows'][1])):
+            for x in range(cell.shape[1]):
+                if not cell[y, x, 3]: continue
+                hh, ss, vv = colorsys.rgb_to_hsv(*(np.clip(cell[y, x, :3], 0, 255) / 255))
+                if r['hue'][0] <= hh * 360 <= r['hue'][1] and r['sat'][0] <= ss <= r['sat'][1] and r['val'][0] <= vv <= r['val'][1]:
+                    cell[y, x, :3] = np.array(colorsys.hsv_to_rgb(((hh * 360 + r['shift']) % 360) / 360, min(1, ss * r.get('satMul', 1)), vv)) * 255
+    return cell
+
 def quantize(cells, colors):
     """Общая палитра для всех ячеек (чтобы кадры не отличались оттенками)."""
     strip = np.concatenate(cells, axis=1)
@@ -79,13 +104,19 @@ if __name__ == '__main__':
     masks = [figure_mask(s) for s in srcs]
     hs = [np.where(m.any(axis=1))[0] for m in masks]
     ref = hs[cfg.get('scaleRef', 0)]; scale = cfg['height'] / (ref[-1] - ref[0] + 1)
-    smalls = [shrink(s, m, scale)[0] for s, m in zip(srcs, masks)]
+    if cfg.get('heights'):   # свой рост для каждого кадра (масштаб всего кадра целиком): ровняет кадры разных генераций и задаёт подъём тела
+        scales = [hh / (h[-1] - h[0] + 1) for hh, h in zip(cfg['heights'], hs)]
+    else: scales = [scale] * len(srcs)
+    smalls = [shrink(s, m, sc)[0] for s, m, sc in zip(srcs, masks, scales)]
     if cfg.get('align') == 'head':
         cells = [to_cell(sm, head_center_x(sm) - cfg.get('headOffset', 0)) for sm in smalls]
     else:
         cells = [to_cell(sm, sm.shape[1] / 2) for sm in smalls]
+    if cfg.get('recolor'): cells = [recolor(c, cfg['recolor']) for c in cells]
     sheet = quantize(cells, cfg.get('colors', 24))
-    Image.fromarray(sheet, 'RGBA').save(cfg['out'])
+    img = Image.fromarray(sheet, 'RGBA')
+    if cfg.get('palette'): img = palette_lib.apply(img, palette_lib.load(cfg['palette']))   # общая палитра игры
+    img.save(cfg['out'])
     for i, sm in enumerate(smalls):
         a = sm[..., 3] > 0; print('кадр', i + 1, 'размер фигуры', a.any(axis=0).sum(), '×', a.any(axis=1).sum())
-    print('масштаб', round(scale, 4), '->', cfg['out'], sheet.shape[1], '×', sheet.shape[0])
+    print('масштаб', [round(float(x), 4) for x in scales], '->', cfg['out'], sheet.shape[1], '×', sheet.shape[0])
