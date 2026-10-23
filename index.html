@@ -119,7 +119,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 21) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 22) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -281,7 +281,9 @@ function act(c) {
   if (c.id) state.asked[c.id] = true;
   if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
   if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) { state.promises[c.keep].done = true; toast('Обещание выполнено'); }
+  if (c.pay) { if (state.money < c.pay) { toast('Не хватает монет'); return; } state.money -= c.pay; save(); }
   const op = c.do || '', cu = C(), d = cu && deal();
+  if (op === 'home') return goHome();
   if (op === 'order') return showOrder(c.seller);
   if (op === 'buy') return placeOrder();
   if (!cu && ['trade', 'offer', 'accept', 'refuse', 'back', 'next'].includes(op)) { endDlg(); return; }   // покупателей больше нет
@@ -436,6 +438,7 @@ const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, di
 const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
+const nearExit = () => !inShop() && !dlg ? (scn().exits || []).find(e => near(e.x)) : null;   // проход в соседнее место
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
@@ -455,6 +458,7 @@ addEventListener('keydown', e => {
   if (nearMom()) { faceSpeaker(motherPos().x); showNode(MOTHER.node); }
   else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
   else if (nearNpc()) { const n = nearNpc(); faceSpeaker(n.x); showNode(n.node); }
+  else if (nearExit()) passage(nearExit());
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -749,14 +753,30 @@ function renderMap() {
   });
   $('mapmarks').innerHTML = marks.join('') + labels.join('');
   const p = places.find(q => q.id === mapSel[mapId]);
-  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>' : p.scene ? '<p><button id="mapgo">Отправиться</button></p>' : '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>';
+  const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>'
+    : !p.scene ? '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>'
+    : eveningTaken() ? '<p><i>Вечер прошёл здесь: отсюда только домой, спать.</i></p><p><button id="maphome">Домой, спать</button></p>'
+    : closedNow(p.scene) ? '<p><i>' + SCENES[p.scene].closedMsg + '</i></p>' : '<p><button id="mapgo">Отправиться</button></p>';
   $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
   if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
+  if ($('maphome')) $('maphome').onclick = () => { mapOpen = false; renderMap(); goHome(); };
 }
 // Переход через карту: Андрей оказывается в начальной точке выбранного места, открытый разговор закрывается.
 const shopOpenBlocks = () => !TIME.travelWhenOpen && state.phase === 'day';   // пока лавка открыта, уходить нельзя
+const closedNow = scene => { const o = SCENES[scene] && SCENES[scene].open; return !!o && !o.includes(state.phase); };   // место сейчас закрыто
+const eveningTaken = () => !inShop() && !!scn().endsEvening && state.day + 1 < DAYS.length;   // в последний день уйти можно как обычно
+function goHome() {                                    // из места, которое занимает вечер, — домой спать; иначе просто в лавку
+  if (eveningTaken()) return endDay();
+  travel('shop', 'Лавка Андрея');
+}
+function passage(e) {                                  // проход без карты (трактир ↔ переулок): вечер не кончается
+  const to = SCENES[e.to], from = state.scene; if (!to || closedNow(e.to)) return;
+  state.scene = e.to; dlg = null; resetPlayer();
+  const back = (to.exits || []).find(x => x.to === from); if (back) { player.x = back.x; player.y = laneAt(back.x); player.dir = back.x > to.worldW / 2 ? -1 : 1; }
+  save(); renderDlg(); toast(to.name);
+}
 function travel(scene, name) {
-  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene])) return;
+  if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene]) || closedNow(scene) || eveningTaken()) return;
   state.scene = scene; dlg = null; resetPlayer(); save();
   mapOpen = false; renderMap(); renderDlg(); toast(name);
 }
@@ -1128,6 +1148,7 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
+  if (!(bg && bg.ok)) (c.exits || []).forEach(e => { rect('#0b0806', e.x - 15, c.lane - 78, 30, 78); rect('#3a2c1e', e.x - 17, c.lane - 80, 34, 3); });   // заглушка прохода
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
@@ -1162,7 +1183,7 @@ function drawHud() {
   $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' :
+  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' : nearExit() ? 'E — ' + nearExit().label :
     nearWork() ? { morning: 'E — Открыть лавку', day: 'E — Встать за прилавок', evening: 'E — Закончить день' }[state.phase] :
     (inShop() && state.phase === 'day' && !C() && !dlg) ? 'Покупателей сегодня больше нет. Закрыть лавку можно за прилавком.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
