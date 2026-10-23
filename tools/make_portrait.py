@@ -3,6 +3,7 @@
 # (Пробовали уменьшать до «родной» сетки рисунка и увеличивать ×3 — лицо расплывается; прямое уменьшение читается лучше.)
 # Запуск: python tools/make_portrait.py <исходник> <результат.png>
 #   мать: python tools/make_portrait.py assets/characters/mother/source/mother_portrait_gpt.webp assets/characters/mother/mother_portrait.png
+#   Сорокин: python tools/make_portrait.py assets/characters/sorokin/source/sorokin_portrait_gpt.webp assets/characters/sorokin/sorokin_portrait.png
 import os, sys
 import numpy as np
 from PIL import Image
