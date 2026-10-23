@@ -230,6 +230,8 @@ const VISITS = {
 // npcs — персонажи сцены: x — где стоит, color — цвет заглушки, portrait — портрет 180×204, sprite — фигура (как у покупателей), node — первая реплика (NODES).
 // open — в какие части дня туда можно прийти (нет — всегда, когда лавка закрыта), closedMsg — что сказано на карте в другое время;
 // endsEvening — место занимает весь вечер: уйти оттуда можно только домой спать (выбор с do: 'home' или кнопка на карте).
+// exits — проходы в соседнее место без карты (x — где проход, to — id сцены, label — подсказка «E — …»); Андрей появляется у обратного прохода.
+//   Так переход не тратит вечер: из трактира в переулок и обратно.
 // Чтобы сцена была доступна, у места на карте (MAP) указывается scene с её id.
 const SCENES = {
   // лабаз: фон 594×270 с прокруткой (tools/make_labaz.py); вход от ворот слева; front — передние бочки, ящики и мешки,
@@ -239,11 +241,19 @@ const SCENES = {
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] },
   // ТЕСТОВОЕ: название, реплики, цены. Фона и фигуры трактирщика пока нет — заглушки.
-  traktir: { name: 'Ильинский трактир', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35,
+  traktir: { name: 'Ильинский трактир', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
     background: 'assets/places/traktir/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
     open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
     npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/characters/traktirshchik/traktirshchik_portrait.png', node: 'traktir_hub',
-             sprite: { src: 'assets/characters/traktirshchik/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
+             sprite: { src: 'assets/characters/traktirshchik/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }],
+    exits: [{ x: 440, to: 'pereulok', label: 'Выйти чёрным ходом в переулок' }] },
+  // ТЕСТОВОЕ: тёмный переулок за трактиром — место для сомнительных сделок и встреч. На карте его нет: попасть можно только из трактира.
+  pereulok: { name: 'Переулок за трактиром', worldW: 480, lane: 225, startX: 40, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
+    background: 'assets/places/pereulok/pereulok.png', wall: '#1c1814', floor: '#2e2620',
+    open: ['evening'], endsEvening: true,
+    npcs: [{ id: 'neznakomets', name: 'Незнакомец', x: 320, color: '#2b2b33', portrait: 'assets/characters/neznakomets/neznakomets_portrait.png', node: 'pereulok_hub',
+             sprite: { src: 'assets/characters/neznakomets/neznakomets_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }],
+    exits: [{ x: 40, to: 'traktir', label: 'Вернуться в трактир' }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
 // и платит сразу; товар привозят в лавку на следующее утро (ночью, до открытия), где бы Андрей ни был.
@@ -411,7 +421,19 @@ const NODES = {
   traktir_vodka: { who: 'Трактирщик', text: 'Пей на здоровье. Только меру знай: завтра тебе за прилавок.', choices: [
     { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Посижу.', do: 'end' }] },
   traktir_talk: { who: 'Трактирщик', text: 'Да всякое. Подводчики жалуются, что извоз дорожает. А верить ли — сам решай: я пересказываю, что слышал.', choices: [
-    { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Понятно.', do: 'end' }] }
+    { text: 'Ещё вопрос', goto: 'traktir_hub' }, { text: 'Понятно.', do: 'end' }] },
+  // Переулок за трактиром. ТЕСТОВОЕ: предложения пока без последствий (позже — слава лавки и деньги).
+  pereulok_hub: { who: 'Незнакомец', text: 'Тише, лавочник, не шуми. Ты ведь крупой торгуешь? Дело есть, выгодное.', choices: [
+    { text: 'Какое дело?', goto: 'pereulok_offer' },
+    { text: 'Ты кто такой?', goto: 'pereulok_who' },
+    { text: 'Некогда мне.', do: 'end' }] },
+  pereulok_who: { who: 'Незнакомец', text: 'Кто надо. Спроси у полового, он скажет: человек тихий, платит сразу.', choices: [
+    { text: 'Так какое дело?', goto: 'pereulok_offer' }, { text: 'Некогда мне.', do: 'end' }] },
+  pereulok_offer: { who: 'Незнакомец', text: 'Есть мешки муки, задёшево. Откуда — не спрашивай. А к осени, помяни моё слово, хлеб вдвое подорожает: кто придержит, тот и при деньгах.', choices: [
+    { text: 'Подумаю.', do: 'end' },
+    { text: 'Нет. Я честно торгую.', goto: 'pereulok_refused' }] },
+  pereulok_refused: { who: 'Незнакомец', text: 'Честно... Ну-ну. Передумаешь — я тут по вечерам.', choices: [
+    { text: 'Уйти', do: 'end' }] }
 };
 
 // ================= КАРТЫ (экран «Карта», клавиша M) =================

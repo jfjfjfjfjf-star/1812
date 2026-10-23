@@ -438,6 +438,7 @@ const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, di
 const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
+const nearExit = () => !inShop() && !dlg ? (scn().exits || []).find(e => near(e.x)) : null;   // проход в соседнее место
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
@@ -457,6 +458,7 @@ addEventListener('keydown', e => {
   if (nearMom()) { faceSpeaker(motherPos().x); showNode(MOTHER.node); }
   else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
   else if (nearNpc()) { const n = nearNpc(); faceSpeaker(n.x); showNode(n.node); }
+  else if (nearExit()) passage(nearExit());
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -766,6 +768,12 @@ const eveningTaken = () => !inShop() && !!scn().endsEvening && state.day + 1 < D
 function goHome() {                                    // из места, которое занимает вечер, — домой спать; иначе просто в лавку
   if (eveningTaken()) return endDay();
   travel('shop', 'Лавка Андрея');
+}
+function passage(e) {                                  // проход без карты (трактир ↔ переулок): вечер не кончается
+  const to = SCENES[e.to], from = state.scene; if (!to || closedNow(e.to)) return;
+  state.scene = e.to; dlg = null; resetPlayer();
+  const back = (to.exits || []).find(x => x.to === from); if (back) { player.x = back.x; player.y = laneAt(back.x); player.dir = back.x > to.worldW / 2 ? -1 : 1; }
+  save(); renderDlg(); toast(to.name);
 }
 function travel(scene, name) {
   if (serving || shopOpenBlocks() || (scene !== 'shop' && !SCENES[scene]) || closedNow(scene) || eveningTaken()) return;
@@ -1140,6 +1148,7 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
+  if (!(bg && bg.ok)) (c.exits || []).forEach(e => { rect('#0b0806', e.x - 15, c.lane - 78, 30, 78); rect('#3a2c1e', e.x - 17, c.lane - 80, 34, 3); });   // заглушка прохода
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
@@ -1174,7 +1183,7 @@ function drawHud() {
   $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
-  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' :
+  const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' : nearExit() ? 'E — ' + nearExit().label :
     nearWork() ? { morning: 'E — Открыть лавку', day: 'E — Встать за прилавок', evening: 'E — Закончить день' }[state.phase] :
     (inShop() && state.phase === 'day' && !C() && !dlg) ? 'Покупателей сегодня больше нет. Закрыть лавку можно за прилавком.' : '';
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
