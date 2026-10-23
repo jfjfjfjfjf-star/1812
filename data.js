@@ -148,7 +148,9 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // Слева за табуретом переднего плана линия уходит вглубь (на линию мешков и матери), чтобы табурет был перед
                 // персонажем, а не под его ногами. По ней ходят Андрей и будущие персонажи.
                 floorPath: [[146, 212], [172, 225]],
-                workX: 448, serviceY: 200, customerX: 387, motherX: 112, motherY: 212, motherDir: -1, motherTalk: 55, counter: { l: 202, r: 530 },
+                workX: 448, serviceY: 200, customerX: 387,
+                doors: [{ x: 552, to: 'street', toX: 330, label: 'Выйти на улицу' }],   // дверь лавки справа (там же входят покупатели)
+                motherX: 112, motherY: 212, motherDir: -1, motherTalk: 55, counter: { l: 202, r: 530 },
                 doorX: 558, customerSpeed: 60, arrivalDelay: 1.5,
                 // Свет лавки (координаты мира, по фону): window — окно (стекло x0..x1, y0..y1) и косой луч beam на пол с пылинками;
                 // flame — пламя (мерцает, flicker — насколько); glow — ровное тёплое свечение. r — радиус света, color — цвет.
@@ -230,6 +232,15 @@ const VISITS = {
 // npcs — персонажи сцены: x — где стоит, color — цвет заглушки, portrait — портрет 180×204, sprite — фигура (как у покупателей), node — первая реплика (NODES).
 // Чтобы сцена была доступна, у места на карте (MAP) указывается scene с её id.
 const SCENES = {
+  // Улица Китай-города (22.10.2026: ЗАГЛУШКА без фона; какие реальные места 1812 года на ней будут — по исторической
+  // справке). doors — двери: x на улице, to — место, toX — где Андрей окажется внутри, label — подсказка.
+  street: { name: 'Китай-город', worldW: 1440, lane: 225, startX: 330, walkMin: 30, walkMax: 1410, talkRange: 35, talkGap: 40,
+    wall: '#4a3a2a', floor: '#6e6252',
+    doors: [{ x: 330, to: 'shop', toX: 540, label: 'Войти в лавку' }, { x: 900, to: 'tavern', toX: 60, label: 'Войти в трактир' }] },
+  // Трактир (ЗАГЛУШКА): название, хозяин и место — по исторической справке и задумке Кирилла.
+  tavern: { name: 'Трактир', worldW: 480, lane: 225, startX: 60, walkMin: 40, walkMax: 444, talkRange: 35, talkGap: 40,
+    wall: '#3a281c', floor: '#5a4030',
+    doors: [{ x: 40, to: 'street', toX: 900, label: 'Выйти на улицу' }] },
   // лабаз: фон 594×270 с прокруткой (tools/make_labaz.py); вход от ворот слева; front — передние бочки, ящики и мешки,
   // персонажи проходят за ними; Сорокин у своей конторки справа
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
