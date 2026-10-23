@@ -416,7 +416,7 @@ Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadIma
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 70 };                // скорость — пикселей сетки в секунду (было 47 при сетке 320×180)
-function resetPlayer() { Object.assign(player, { x: scn().startX, y: laneAt(scn().startX), dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
+function resetPlayer() { Object.assign(player, { x: scn().startX, y: laneAt(scn().startX), dist: 0, dir: 1, moving: false, auto: null }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
 const near = (x, r) => Math.abs(player.x - x) < (r || scn().talkRange);
@@ -452,9 +452,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
-  if (nearMom()) showNode(MOTHER.node);
+  if (nearMom()) { faceSpeaker(motherPos().x); showNode(MOTHER.node); }
   else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
-  else if (nearNpc()) showNode(nearNpc().node);
+  else if (nearNpc()) { const n = nearNpc(); faceSpeaker(n.x); showNode(n.node); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -833,12 +833,7 @@ function drawVisitors() {                              // слой 6: покуп
 }
 
 // ================= ОБНОВЛЕНИЕ =================
-function update(dt) {
-  updateVisitors(dt);
-  player.moving = false;
-  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
-  const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
+function stepTo(nx) {                                 // шаг Андрея к nx: путь для кадров ходьбы, линия пола, звук шага
   const d = Math.abs(nx - player.x);
   player.x = nx; player.y = laneAt(nx);
   if (d > 0) {
@@ -847,6 +842,28 @@ function update(dt) {
     if (f !== player.frame && f % (ANDREY.walk.frames / 2) === 0) sfx.step();
     player.frame = f;
   }
+}
+// Начало разговора: если Андрей подошёл вплотную, он сам отходит на talkGap от собеседника (шагами, с анимацией)
+// и поворачивается к нему лицом; если стоит дальше — только поворачивается.
+function faceSpeaker(tx) {
+  const gap = scn().talkGap || 0, side = player.x >= tx ? 1 : -1, f = floorX();
+  const target = Math.min(Math.max(tx + side * gap, f.l), f.r);
+  if (Math.abs(player.x - tx) < gap && Math.abs(target - player.x) > 1) player.auto = { x: target, face: -side };
+  else player.dir = -side;
+}
+function update(dt) {
+  updateVisitors(dt);
+  player.moving = false;
+  if (player.auto) {                                   // отходит к собеседнику на удобное расстояние (идёт и во время разговора)
+    const a = player.auto, s = Math.sign(a.x - player.x), nx = Math.abs(a.x - player.x) <= player.speed * dt ? a.x : player.x + s * player.speed * dt;
+    player.dir = s || player.dir; stepTo(nx);
+    if (nx === a.x) { player.dir = a.face; player.auto = null; }
+    return;
+  }
+  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
+  const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const f = floorX();
+  stepTo(Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r));
   if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)
 }
 
@@ -1111,7 +1128,7 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
-  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
+  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
   drawLight();

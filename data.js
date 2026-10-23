@@ -136,13 +136,14 @@ const DAYS = [
 // customerX — где стоит покупатель (перед прилавком), motherX — мать (у мешков с крупой слева, motherY — глубже линии ходьбы, на одной
 // линии пола с мешками, чтобы табурет на переднем плане был перед ней; motherDir -1 — лицом к мешкам;
 // Андрей ближе 162 не подходит, поэтому с матерью можно заговорить с motherTalk пикселей), talkRange — на каком расстоянии можно заговорить,
+// talkGap — на каком расстоянии от собеседника Андрей встаёт в разговоре (если подошёл ближе, сам отходит шагами),
 // counter — границы прилавка (нужны только для заглушки).
 // doorX — дверь (справа на фоне): отсюда покупатели входят и сюда уходят; customerSpeed — их скорость (пикселей в секунду);
 // arrivalDelay — через сколько секунд после ухода одного покупателя в двери появляется следующий.
 // charScale — во сколько раз игра увеличивает всех персонажей при рисовании. 1 = как нарисовано (Андрей 104 пикселя в ячейке 144×120).
 // placeholderScale — во сколько раз крупнее рисуются человечки-заглушки (они задуманы ростом 66 для старой сетки 320×180).
 // Сетка 480×270 с 21.10.2026 (раньше 320×180, все координаты умножены на 1,5).
-const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, startX: 225, walkMin: 140, walkMax: 558, talkRange: 35,
+const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, startX: 225, walkMin: 140, walkMax: 558, talkRange: 35, talkGap: 40,
                 // floorPath — линия пола, если она не прямая: точки [x, y]; между ними плавно, за крайними — как у крайней точки.
                 // Слева за табуретом переднего плана линия уходит вглубь (на линию мешков и матери), чтобы табурет был перед
                 // персонажем, а не под его ногами. По ней ходят Андрей и будущие персонажи.
@@ -231,7 +232,7 @@ const VISITS = {
 const SCENES = {
   // лабаз: фон 594×270 с прокруткой (tools/make_labaz.py); вход от ворот слева; front — передние бочки, ящики и мешки,
   // персонажи проходят за ними; Сорокин у своей конторки справа
-  labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35,
+  labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
