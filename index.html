@@ -44,6 +44,8 @@
                   font-size: calc(var(--u) * 40px); color: #f0e2c0aa; border: calc(var(--u) * 1px) solid #8c7647; border-bottom: 0; box-sizing: border-box; }
   #col { position: absolute; left: calc(var(--u) * 118px); right: calc(var(--u) * 4px); bottom: calc(var(--u) * 4px); display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
   body.paneled #col { right: calc(var(--u) * 92px); }
+  body.paneled.wide #col { right: calc(var(--u) * 116px); }
+  #panel.wide { width: calc(var(--u) * 108px); }
   #box { background: rgba(20,12,6,.94); border: calc(var(--u) * 1px) solid #8c7647; color: #f0e2c0; white-space: pre-line;
          padding: calc(var(--u) * 3px) calc(var(--u) * 6px); min-height: calc(var(--u) * 22px); font-size: calc(var(--u) * 6px); line-height: 1.35; }
   #who { color: #e8c36a; font-weight: bold; font-size: calc(var(--u) * 7px); }
@@ -66,6 +68,13 @@
   #panel .step { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--u) * 1px) 0; }
   #panel .step button { font: inherit; font-size: calc(var(--u) * 6px); width: calc(var(--u) * 14px); cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; }
   #panel .step b { font-size: calc(var(--u) * 8px); }
+  /* заказ у оптовика: одна строка на товар — значок, название и цена, −/+ */
+  #panel .oline { display: flex; align-items: center; gap: calc(var(--u) * 2px); margin-bottom: calc(var(--u) * 2px); }
+  #panel .oline .gi { width: calc(var(--u) * 12px); height: calc(var(--u) * 12px); }
+  #panel .oline .on { flex: 1; min-width: 0; line-height: 1.1; }
+  #panel .oline button { font: inherit; width: calc(var(--u) * 10px); padding: 0; cursor: pointer; background: rgba(20,12,6,.94); color: #f0e2c0; border: calc(var(--u) * 1px) solid #8c7647; }
+  #panel .oline button:disabled { opacity: .4; cursor: not-allowed; }
+  #panel .oline b { width: calc(var(--u) * 9px); text-align: center; }
   #pact { margin-top: auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.5px); padding-top: calc(var(--u) * 2px); }
   #pact button { padding: calc(var(--u) * 1.5px) calc(var(--u) * 3px); }
   /* Карта: экран поверх сцены. Сама карта — SVG в рамке 1000×560 (растягивается на всю сцену), карточка места — HTML */
@@ -110,7 +119,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 21) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 22) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -129,6 +138,13 @@ const W = 480, H = 270;                                // сетка пиксе�
 const scn = () => state.scene === 'shop' ? SCENE : SCENES[state.scene];
 const inShop = () => state.scene === 'shop';
 const LANE = SCENE.lane;                               // линия пола лавки
+const laneAt = x => {                                  // y линии пола в точке x (с учётом floorPath места)
+  const c = scn(), p = c.floorPath;
+  if (!p) return c.lane;
+  if (x <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (x <= p[i][0]) { const [x0, y0] = p[i - 1], [x1, y1] = p[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); }
+  return p[p.length - 1][1];
+};
 const floorX = () => { const c = scn(); return { l: c.walkMin, r: c.walkMax !== undefined ? c.walkMax : c.worldW - c.walkMin }; };   // без walkMax — симметрично
 const speakers = () => [...CUSTOMERS, MOTHER, ...Object.values(SCENES).flatMap(c => c.npcs || [])];
 
@@ -143,7 +159,9 @@ Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)
 DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
 Object.keys(SUPPLY).forEach(s => { if (!speakers().some(p => p.id === s)) console.error('[данные] SUPPLY: нет персонажа ' + s);
   Object.keys(SUPPLY[s].goods).forEach(k => { if (!GOODS[k]) console.error('[данные] SUPPLY.' + s + ': нет товара ' + k); }); });
-const newToday = () => ({ revenue: 0, profit: 0, sold: {} });   // итоги текущего дня
+// spent — сколько заплачено продавцам (SUPPLY) за день: { seller: монеты }; seen — сколько из этого уже показано в итогах дня
+const newToday = () => ({ revenue: 0, profit: 0, sold: {}, spent: {}, seen: 0 });   // итоги текущего дня
+const spentToday = () => Object.values(state.today.spent).reduce((n, v) => n + v, 0);
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
 const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefined;
 const deal = () => state.deals[C().visit];
@@ -228,7 +246,7 @@ function placeOrder() {                                // деньги спис�
   if (!sum || sum > state.money || lastDay()) return;
   const o = state.orders[s] = state.orders[s] || {};
   Object.keys(dlg.qty).forEach(k => { if (dlg.qty[k]) o[k] = (o[k] || 0) + dlg.qty[k]; });
-  state.money -= sum; save(); sfx.coins();
+  state.money -= sum; state.today.spent[s] = (state.today.spent[s] || 0) + sum; save(); sfx.coins();
   toast('Заказано: ' + orderText(o) + '. Привезут завтра утром');
   showNode(SUPPLY[s].doneNode);
 }
@@ -250,12 +268,12 @@ function openCustomer() {                              // показывает �
 }
 function enterService() {
   if (dlg || notesOpen || serving || state.phase !== 'day') return;
-  serving = true; player.x = SCENE.workX; player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
+  serving = true; player.x = SCENE.workX; player.y = laneAt(player.x); player.dir = -1; player.moving = false;   // лицом к покупателю (он слева)
   openCustomer();
 }
 function stepAway() {                                  // сделка не продаётся и не отменяется: условия остаются в state.deals
   if (!serving) return;
-  serving = false; dlg = null; player.x = SCENE.workX; player.moving = false;     // свободная позиция перед рабочим местом
+  serving = false; dlg = null; player.x = SCENE.workX; player.y = laneAt(player.x); player.moving = false;     // свободная позиция перед рабочим местом
   save(); renderDlg();
 }
 const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
@@ -272,6 +290,7 @@ function act(c) {
   if (op === 'next') return visitorReady() ? openCustomer() : renderDlg();
   if (op === 'leave') return stepAway();   // покупателей больше нет
   if (op === 'close') return closeShop();
+  if (op === 'sleep') return endDay();
   if (op === 'trade') { d.stage = 'price'; save(); return showTrade(cu.priceMsg); }   // только открывает панель цены, попытку не тратит
   if (op === 'offer') return offer();
   if (op === 'accept') { if (!d.counter) return; d.price = d.counterUnit; return settle(d); }
@@ -301,6 +320,7 @@ function load() {                                      // старое сохр�
       const who = VISITS[v].who;
       if (!s.deals[v]) s.deals[v] = v === who + '_1' && s.deals[who] ? s.deals[who] : newDeal(VIS[v]);
     });
+    if (s && s.stock) Object.keys(GOODS).forEach(k => { if (s.stock[k] === undefined) s.stock[k] = GOODS[k].stock; });   // миграция: новые товары
     if (s && num(s.money) && Number.isInteger(s.day) && s.day >= 0 && ['morning', 'day', 'evening'].includes(s.phase) && s.today && num(s.today.revenue) &&
         s.day < DAYS.length && Number.isInteger(s.visit) && s.visit >= 0 && s.visit <= (DAYS[s.day] || { visits: [] }).visits.length && s.heard && s.asked && s.promises && s.ctx && s.stock && s.deals &&
         Object.keys(GOODS).every(k => Number.isInteger(s.stock[k]) && s.stock[k] >= 0) &&
@@ -323,6 +343,9 @@ function load() {                                      // старое сохр�
       Object.keys(s.ctx).forEach(k => { if (!CONTEXT[k]) delete s.ctx[k]; });
       if (s.ctx.mother_same_source && s.heard.pavel_neighbor_price)        // текст дополнения матери тоже переписан
         s.heard.pavel_neighbor_price.ctx = s.heard.pavel_neighbor_price.ctx.map(t => t.startsWith('Мать:') ? CONTEXT.mother_same_source.text : t);
+      if (!s.today.spent || typeof s.today.spent !== 'object') s.today.spent = {};   // миграция: трат на закупку в итогах дня раньше не было
+      Object.keys(s.today.spent).forEach(id => { if (!SUPPLY[id] || !num(s.today.spent[id]) || s.today.spent[id] < 0) delete s.today.spent[id]; });
+      if (!num(s.today.seen)) s.today.seen = Object.values(s.today.spent).reduce((n, v) => n + v, 0);
       if (!s.orders || typeof s.orders !== 'object') s.orders = {};     // миграция: заказов у оптовика раньше не было
       Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
         if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
@@ -386,19 +409,33 @@ loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
-Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
-speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+Object.keys(SCENES).forEach(id => { loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H); if (SCENES[id].front) loadImage('fr_' + id, SCENES[id].front, SCENES[id].worldW, H, true); });
+(MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
+speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
 
 // ================= ПЕРСОНАЖИ И ЗОНЫ =================
 const player = { y: LANE, speed: 70 };                // скорость — пикселей сетки в секунду (было 47 при сетке 320×180)
-function resetPlayer() { Object.assign(player, { x: scn().startX, y: scn().lane, dist: 0, dir: 1, moving: false }); }   // «Новая игра» и переход вызывают то же самое
+function resetPlayer() { Object.assign(player, { x: scn().startX, y: laneAt(scn().startX), dist: 0, dir: 1, moving: false, auto: null }); }   // «Новая игра» и переход вызывают то же самое
 resetPlayer();
 const cameraX = () => Math.max(0, Math.min(scn().worldW - W, Math.round(player.x - W / 2)));   // камера следует по горизонтали, ограничена краями
-const near = x => Math.abs(player.x - x) < scn().talkRange;
-const nearMom = () => inShop() && !dlg && !serving && near(SCENE.motherX);
+const near = (x, r) => Math.abs(player.x - x) < (r || scn().talkRange);
+// Дело матери на сегодня: по номеру дня, без повтора вчерашнего; только дела, чьи файлы загрузились.
+function motherAct() {
+  const ready = (MOTHER.activities || []).filter(a => spr['ma_' + a.id] && spr['ma_' + a.id].ok);
+  if (!ready.length) return null;
+  let prev = null;
+  for (let d = 0; d <= state.day; d++) {
+    const opts = ready.length > 1 ? ready.filter(a => a !== prev) : ready;
+    let t = Math.imul((d + 1) ^ 0x5bd1e995, 0x6d2b79f5); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    prev = opts[Math.floor(((t ^ t >>> 14) >>> 0) / 4294967296 * opts.length)];   // ровное псевдослучайное число по номеру дня
+  }
+  return prev;
+}
+const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, dir: a.dir } : { x: SCENE.motherX, y: SCENE.motherY || LANE, dir: SCENE.motherDir || 1 }; };
+const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
 
@@ -417,9 +454,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
-  if (nearMom()) showNode(MOTHER.node);
-  else if (nearWork()) ({ morning: openShop, day: enterService, evening: endDay })[state.phase]();
-  else if (nearNpc()) showNode(nearNpc().node);
+  if (nearMom()) { faceSpeaker(motherPos().x); showNode(MOTHER.node); }
+  else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
+  else if (nearNpc()) { const n = nearNpc(); faceSpeaker(n.x); showNode(n.node); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -449,12 +486,13 @@ function setPortrait(sp) {
   if (spr['p_' + sp.id] && spr['p_' + sp.id].ok) { const im = document.createElement('img'); im.src = sp.portrait; im.alt = ''; pt.appendChild(im); }
   else { const ph = document.createElement('div'); ph.className = 'ph'; ph.style.background = sp.color; ph.textContent = sp.name[0]; pt.appendChild(ph); }   // запасной вариант
 }
-function stockList() { return Object.keys(GOODS).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
+// товары, которых не было на старте (только под заказ), показываются, когда они появились в лавке
+function stockList() { return Object.keys(GOODS).filter(k => GOODS[k].stock > 0 || state.stock[k] > 0).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
 function renderDlg() {
   const box = $('dlg'), ch = $('choices'), pn = $('panel');
   ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none'; pn.className = '';
   document.body.classList.toggle('serving', serving); $('back').style.display = serving ? 'block' : 'none';
-  document.body.classList.remove('paneled');
+  document.body.classList.remove('paneled', 'wide');
   if (!dlg) { box.style.display = 'none'; return; }
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
@@ -463,23 +501,27 @@ function renderDlg() {
     list = (ready ? [{ text: 'Обслужить следующего', do: 'next' }] : []).concat([{ text: 'Закрыть лавку', do: 'close' }, { text: 'Отойти от прилавка', do: 'leave' }]);
     pn.style.display = 'flex'; pn.innerHTML = '<b>В лавке</b> <i>— остаток товара</i>' + stockList();
   } else if (dlg.summary) {                           // вечер: итоги дня
-    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего';
-    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.'; list = [{ text: 'Хорошо', do: 'end' }];
+    const t = state.today, sold = Object.keys(t.sold).map(k => GOODS[k].name + ': ' + t.sold[k]).join('<br>') || 'ничего', paid = spentToday(), net = t.revenue - paid;
+    who = ''; text = 'Лавка закрыта. ' + dateOf(state.day) + ' года, вечер.';
+    list = dlg.sleep ? [{ text: 'Закончить день', do: 'sleep' }, { text: 'Не сейчас', do: 'end' }] : [{ text: 'Хорошо', do: 'end' }];
+    t.seen = paid; save();
     pn.style.display = 'flex'; pn.className = 'full';
     pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
-      '<i>выручка минус закупка проданного</i><div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
+      '<i>выручка минус закупка проданного</i>' +
+      (paid ? '<div style="margin-top:4px"><b>Закупка</b><br>' + Object.keys(t.spent).map(id => npcName(id) + ': ' + t.spent[id]).join('<br>') + '</div>' +
+        '<div class="row">Монет за день: <b>' + (net > 0 ? '+' : net < 0 ? '−' : '') + Math.abs(net) + '</b></div><i>выручка минус закупка</i>' : '') +
+      '<div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
   } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, монеты
     const s = SUPPLY[dlg.order], sum = orderSum();
     sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
     list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + sum : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
-    pn.style.display = 'flex'; pn.className = 'full';
+    pn.style.display = 'flex'; pn.className = 'full wide';                 // шире обычной: товаров у продавца несколько
     pn.innerHTML = Object.keys(s.goods).map(k => { const g = s.goods[k], u = GOODS[k];
-      return '<div class="head"><div class="gi">' + goodsIcon(k) + '</div><div><b>' + u.name + '</b><br>по ' + g.cost + ' за ' + u.unit + '</div></div>' +
-        '<div class="step"><button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>' +
-        '<i>в лавке: ' + state.stock[k] + (ordered(dlg.order, k) ? ', уже заказано: ' + ordered(dlg.order, k) : '') + '</i>'; }).join('') +
+      return '<div class="oline"><div class="gi">' + goodsIcon(k) + '</div><div class="on">' + u.name + '<i>' + g.cost + ' за ' + u.unit + ' · есть ' + state.stock[k] + (ordered(dlg.order, k) ? ' · +' + ordered(dlg.order, k) : '') + '</i></div>' +
+        '<button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>'; }).join('') +
       '<div class="row" style="margin-top:2px">Всего: <b>' + sum + '</b></div><div class="row">Монет: <b>' + state.money + '</b></div>' +
-      '<i>платим сразу, товар привезут в лавку завтра утром</i><div id="pact"></div>';
-    pn.querySelectorAll('.step button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
+      '<i>есть — в лавке; +N — уже заказано. Платим сразу, привезут в лавку завтра утром</i><div id="pact"></div>';
+    pn.querySelectorAll('.oline button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
     target = $('pact');
   } else if (dlg.trade) {
     who = c.name; text = d.msg; list = tradeChoices(); sp = c;
@@ -508,7 +550,7 @@ function renderDlg() {
     }
   }
   setPortrait(sp);
-  document.body.classList.toggle('paneled', pn.style.display === 'flex');
+  document.body.classList.toggle('paneled', pn.style.display === 'flex'); document.body.classList.toggle('wide', pn.classList.contains('wide'));
   box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
   list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; b.disabled = !!x.off; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
@@ -736,7 +778,7 @@ let sleeping = false;                                  // идёт экран н
 function openShop() { if (state.phase !== 'morning') return; state.phase = 'day'; state.visit = 0; save(); toast('Лавка открыта'); }
 function closeShop() {                                 // покупатели, которые не успели, сегодня уже не придут
   if (state.phase !== 'day') return;
-  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.moving = false;
+  state.phase = 'evening'; serving = false; player.x = SCENE.workX; player.y = laneAt(player.x); player.moving = false;
   dlg = { summary: true }; save(); renderDlg();
 }
 // Экран поверх сцены (ночь, глава, перемотка). ms > 0 — исчезает сам; ms = 0 — ждёт E, пробел, Enter или щелчок.
@@ -751,6 +793,10 @@ function card(html, ms) {
 }
 const chapterCard = n => { const d = DAYS[n];           // глава и перемотка перед днём n (если есть) — ждёт игрока
   return card((d.chapter ? '<b>' + d.chapter + '</b>' : '') + (d.skip ? '<p>' + d.skip + '</p>' : '') + '<i>' + dateOf(n) + ' года, утро</i><small>E — продолжить</small>', 0); };
+function finishDay() {                                 // закупки после закрытия лавки ещё не видны в итогах — сначала показать их
+  if (spentToday() !== state.today.seen) { dlg = { summary: true, sleep: true }; return renderDlg(); }
+  endDay();
+}
 async function endDay() {                              // ночь, затем следующий день из DAYS (с главой и перемоткой, если они есть)
   if (state.phase !== 'evening' || sleeping) return;
   if (state.day + 1 >= DAYS.length) { toast('Это последний день в текущей версии игры. «Новая игра» — заново.'); return; }
@@ -799,20 +845,37 @@ function drawVisitors() {                              // слой 6: покуп
 }
 
 // ================= ОБНОВЛЕНИЕ =================
-function update(dt) {
-  updateVisitors(dt);
-  player.moving = false;
-  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
-  const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  const f = floorX(), nx = Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r);
+function stepTo(nx) {                                 // шаг Андрея к nx: путь для кадров ходьбы, линия пола, звук шага
   const d = Math.abs(nx - player.x);
-  player.x = nx;
+  player.x = nx; player.y = laneAt(nx);
   if (d > 0) {
     player.moving = true; player.dist += d;
     const f = walkFrame(player.dist);                  // шаг слышен на кадрах касания (первый кадр каждой половины цикла)
     if (f !== player.frame && f % (ANDREY.walk.frames / 2) === 0) sfx.step();
     player.frame = f;
   }
+}
+// Начало разговора: если Андрей подошёл вплотную, он сам отходит на talkGap от собеседника (шагами, с анимацией)
+// и поворачивается к нему лицом; если стоит дальше — только поворачивается.
+function faceSpeaker(tx) {
+  const gap = scn().talkGap || 0, side = player.x >= tx ? 1 : -1, f = floorX();
+  const target = Math.min(Math.max(tx + side * gap, f.l), f.r);
+  if (Math.abs(player.x - tx) < gap && Math.abs(target - player.x) > 1) player.auto = { x: target, face: -side };
+  else player.dir = -side;
+}
+function update(dt) {
+  updateVisitors(dt);
+  player.moving = false;
+  if (player.auto) {                                   // отходит к собеседнику на удобное расстояние (идёт и во время разговора)
+    const a = player.auto, s = Math.sign(a.x - player.x), nx = Math.abs(a.x - player.x) <= player.speed * dt ? a.x : player.x + s * player.speed * dt;
+    player.dir = s || player.dir; stepTo(nx);
+    if (nx === a.x) { player.dir = a.face; player.auto = null; }
+    return;
+  }
+  if (dlg || notesOpen || serving || mapOpen || sleeping) return;  // во время диалога, заметок, обслуживания и карты движение заблокировано
+  const dx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const f = floorX();
+  stepTo(Math.min(Math.max(player.x + dx * player.speed * dt, f.l), f.r));
   if (dx !== 0) player.dir = dx;                       // взгляд меняется мгновенно (зеркалирование)
 }
 
@@ -836,14 +899,15 @@ function person(x, y, color, dir) {
   R('#d8d0b0', -2, -48, 5, 20);
 }
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
-function drawPerson(who, x, y, dir) {
+function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — другой лист кадров (например, дело матери)
   shadow(x, y);
-  const sp = who.sprite, im = sp && spr['s_' + who.id];
+  const sp = spOver || who.sprite, im = imOver || (sp && spr['s_' + who.id]);
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
+  const f = sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  ctx.drawImage(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
   ctx.restore();
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
@@ -1076,8 +1140,9 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
-  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, -1));
+  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
+  const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
   drawLight();
   ctx.restore();
 }
@@ -1091,7 +1156,9 @@ function draw() {
   drawBackdrop();
   drawPassersby();
   drawStock();
-  drawPerson(MOTHER, SCENE.motherX, LANE, 1);
+  const ma = motherAct(), mp = motherPos();
+  if (ma) drawPerson(MOTHER, mp.x, mp.y, mp.dir, { cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: ma.frames, frameTime: ma.frameTime }, spr['ma_' + ma.id]);
+  else drawPerson(MOTHER, mp.x, mp.y, mp.dir);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
   drawVisitors();
