@@ -1256,7 +1256,10 @@ function silhouette(img, sx, sw, sh) {                  // силуэт перс
 }
 
 Object.keys(CUTSCENES).forEach(id => { const d = CUTSCENES[id];
-  Object.keys(d.layers).forEach(k => { if (d.layers[k].src) loadImage('cine_' + id + '_' + k, d.layers[k].src, d.worldW, H, true); }); });
+  Object.keys(d.layers).forEach(k => { const L = d.layers[k]; if (L.src) loadImage('cine_' + id + '_' + k, L.src, d.worldW, H, true);
+    if (L.win) loadImage('cine_' + id + '_' + k + 'Win', L.win, d.worldW, H, true); });
+  if (d.flame) loadImage('cine_' + id + '_flame', d.flame.src, d.flame.w * d.flame.frames, d.flame.h, true);
+  ['andrey', 'mother'].forEach(k => { if (d.figures && d.figures[k]) loadImage('cine_' + id + '_' + k, d.figures[k], 144, 120, true); }); });
 DAYS.forEach((d, i) => { if (d.cutscene && !CUTSCENES[d.cutscene]) console.error('[данные] день ' + (i + 1) + ': нет сцены ' + d.cutscene); });
 const smokeCv = mkCv(W, H), sg = smokeCv.getContext('2d');
 const tintCv = mkCv(W, H), tg = tintCv.getContext('2d');
@@ -1270,7 +1273,8 @@ function buildCine(def) {                               // слои собира
   const r = rng(1812), w = def.worldW, b = {};
   ['far', 'mid', 'near'].forEach(k => {
     const L = def.layers[k], im = spr['cine_' + def.id + '_' + k];
-    if (im && im.ok) { b[k] = mkCv(w, H); b[k].getContext('2d').drawImage(im, 0, 0); }
+    const toCv = im => { const c = mkCv(w, H); c.getContext('2d').drawImage(im, 0, 0); return c; }, win = spr['cine_' + def.id + '_' + k + 'Win'];
+    if (im && im.ok) { b[k] = toCv(im); if (win && win.ok) b[k + 'Win'] = toCv(win); }
     else { const a = CINE_ART[k](w, r); if (Array.isArray(a)) { b[k] = a[0]; b[k + 'Win'] = a[1]; } else b[k] = a; }
     b[k + 'Rim'] = rimOf(b[k], k === 'far' ? [[0, -1]] : [[0, -1], [1, 0]]);
     b[k + 'Top'] = roofline(b[k], { far: 190, mid: 215, near: 250 }[k]); b[k + 'Par'] = L.par;
@@ -1281,14 +1285,16 @@ function buildCine(def) {                               // слои собира
   for (let i = 0; i < 14; i++) { const x = 20 + r() * 560; b.fires.push({ layer: 'far', x, s: 6 + r() * 7, th: 0.45 + r() * 0.5, seed: r() * 99 }); }
   b.stars = Array.from({ length: 40 }, () => [Math.floor(r() * W), Math.floor(CINE.bar + r() * 110)]);
   const sil = (key, sp) => sp && spr[key] && spr[key].ok ? silhouette(spr[key], 0, sp.cellW, sp.cellH) : null;
-  b.andrey = sil('idle', { cellW: ANDREY.cellW, cellH: ANDREY.cellH }); b.mother = sil('s_mother', MOTHER.sprite);
+  const back = k => sil('cine_' + def.id + '_' + k, { cellW: 144, cellH: 120 });   // со спины (PixelLab), иначе — из спрайта покоя
+  b.andrey = back('andrey') || sil('idle', { cellW: ANDREY.cellW, cellH: ANDREY.cellH }); b.mother = back('mother') || sil('s_mother', MOTHER.sprite);
+  const fl = spr['cine_' + def.id + '_flame']; b.flame = fl && fl.ok ? fl : null;
   b.andreyRim = b.andrey && rimOf(b.andrey, [[1, 0], [0, -1]]); b.motherRim = b.mother && rimOf(b.mother, [[1, 0], [0, -1]]);
   return def.built = b;
 }
 async function playCutscene(id) {
   const def = CUTSCENES[id]; if (!def) { console.error('[данные] нет сцены ' + id); return; }
   def.id = id;
-  const imgs = [spr.idle, spr.s_mother, ...Object.keys(def.layers).map(k => spr['cine_' + id + '_' + k])].filter(Boolean);   // ждём картинки (сразу после загрузки страницы)
+  const imgs = [spr.idle, spr.s_mother, ...[...Object.keys(def.layers).flatMap(k => [k, k + 'Win']), 'flame', 'andrey', 'mother'].map(k => spr['cine_' + id + '_' + k])].filter(Boolean);   // ждём картинки (сразу после загрузки страницы)
   await Promise.all(imgs.map(im => im.complete ? 0 : new Promise(r => { im.addEventListener('load', r); im.addEventListener('error', r); })));
   buildCine(def);
   return new Promise(done => {
@@ -1332,6 +1338,11 @@ function flame(x, y, s, t, seed) {                      // язык пламен
     if (k < 0.75 && w > 1) rect('#FA9521', x + off - Math.ceil(w * 0.55), y - i, Math.ceil(w * 0.55) * 2, 1);
     if (k < 0.4 && w > 2) rect('#FBB956', x + off - Math.ceil(w * 0.25), y - i, Math.ceil(w * 0.25) * 2, 1); }
 }
+function flameSprite(x, y, s, t, seed) {               // то же из кадров PixelLab: высота языка ≈ s, у каждого очага свой сдвиг по кадрам
+  const F = cine.def.flame, img = cine.def.built.flame, h = Math.round(s * 1.5); if (h < 3) return;
+  const w = Math.round(F.w * h / F.h), n = ((Math.floor(t * F.fps + seed * 7) % F.frames) + F.frames) % F.frames;
+  ctx.drawImage(img, n * F.w, 0, F.w, F.h, x - (w >> 1), y - h + Math.round(h * 0.08), w, h);
+}
 function drawCine() {
   const def = cine.def, b = def.built, s = def.shots[cine.n], heat = shotHeat(), t = performance.now() / 1000;
   const cam = Math.round(s.cam[0] + (s.cam[1] - s.cam[0]) * ease(Math.min(1, cine.t / s.time)));
@@ -1354,7 +1365,8 @@ function drawCine() {
       sm.forEach(p => { const rr = Math.round(p.r * Math.min(1, p.age * 1.5) * (1 - 0.5 * p.age / p.life)); if (rr > 0) { sg.beginPath(); sg.arc(Math.round(p.x + ox), Math.round(p.y), rr, 0, Math.PI * 2); sg.fill(); } });
       crisp(smokeCv); ctx.save(); ctx.setTransform(px, 0, 0, px, 0, 0); ctx.globalAlpha = 0.72; ctx.drawImage(tinted0(smokeCv, mixPal(CINE.smoke[0], CINE.smoke[1], heat)), 0, 0); ctx.restore(); }
     lit.forEach(f => { const fy = b[k + 'Top'][Math.round(f.x)] + 2, grow = Math.min(1, (heat - f.th) * 4);
-      for (let j = -1; j <= 1; j++) flame(Math.round(f.x + j * f.s * 0.45), fy, f.s * grow * (j ? 0.65 : 1), t, f.seed + j * 2); });
+      if (b.flame) { flameSprite(Math.round(f.x), fy, f.s * grow * 1.15, t, f.seed); flameSprite(Math.round(f.x + f.s * 0.55), fy, f.s * grow * 0.6, t, f.seed + 3); }
+      else for (let j = -1; j <= 1; j++) flame(Math.round(f.x + j * f.s * 0.45), fy, f.s * grow * (j ? 0.65 : 1), t, f.seed + j * 2); });
     ctx.restore();
   };
   layer('far'); layer('mid'); layer('near');
