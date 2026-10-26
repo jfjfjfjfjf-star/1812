@@ -16,10 +16,14 @@ const DATA_VERSION = 21;
 // portrait — размер крупного портрета в режиме обслуживания (пути портретов лежат у персонажей); goodsIcon — размер значка товара в панели.
 // stockMarks — временные квадратики остатка товара: show 'auto' = рисовать только пока фон ещё заглушка; true/false — принудительно.
 //   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
+// hd — те же слои в высоком разрешении (в hdScale раз крупнее, без палитры; собирает tools/make_shop_hd.py). Если файл есть,
+//   игра рисует его вместо обычного слоя, плавно уменьшая под окно: фон чёткий, а персонажи остаются пиксельными на сетке 480×270.
+//   ?hd=0 в адресе — обычные пиксельные слои.
 const ART = {
-  background:   { src: 'assets/places/shop/shop.png' },
-  counterFront: { src: 'assets/places/shop/shop_counter.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
-  foreground:   { src: 'assets/places/shop/shop_front.png' },
+  hdScale: 3,
+  background:   { src: 'assets/places/shop/shop.png', hd: 'assets/places/shop/shop_hd.png' },
+  counterFront: { src: 'assets/places/shop/shop_counter.png', hd: 'assets/places/shop/shop_counter_hd.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
+  foreground:   { src: 'assets/places/shop/shop_front.png', hd: 'assets/places/shop/shop_front_hd.png' },
   glass:        { src: 'assets/places/shop/shop_glass.png' },   // стёкла окна (по ним проходят прохожие), собирает tools/make_shop.py
   portrait:  { w: 180, h: 204 },
   goodsIcon: { w: 36, h: 36 },
@@ -60,11 +64,13 @@ const TIME = {
   // Свет и цвет в разное время суток (как свет рисуется — см. lights у сцены):
   //   dark — насколько темнеет сцена (0 — нисколько, 1 — полностью), darkColor — цвет сумрака;
   //   window — сила света из окна, warm — сила свечей и лампад (1 — полная);
-  //   grade — цветокоррекция всей сцены (CSS-фильтр: saturate — насыщенность, contrast — контраст, brightness — яркость).
+  //   grade — цветокоррекция всей сцены (CSS-фильтр: saturate — насыщенность, contrast — контраст, brightness — яркость);
+  //   vignette — затемнение краёв кадра (0 — нет, 1 — края чёрные), vignetteColor — его цвет.
+  //   Насыщенность снижена 26.10.2026: фон лавки в высоком разрешении (shop_hd.png) ярче пиксельного.
   light: {
-    morning: { dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, grade: 'saturate(1.25) contrast(1.08) brightness(1.03)' },
-    day:     { dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  grade: 'saturate(1.3) contrast(1.1) brightness(1.03)' },
-    evening: { dark: 0.55, darkColor: '#160c12', window: 0.1, warm: 1.0,  grade: 'saturate(1.22) contrast(1.12) brightness(1.0)' }
+    morning: { dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, vignette: 0.35, vignetteColor: '#0b1022', grade: 'saturate(1.05) contrast(1.06) brightness(1.02)' },
+    day:     { dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  vignette: 0.28, vignetteColor: '#140c08', grade: 'saturate(1.1) contrast(1.08) brightness(1.03)' },
+    evening: { dark: 0.55, darkColor: '#160c12', window: 0.1, warm: 1.0,  vignette: 0.6,  vignetteColor: '#080406', grade: 'saturate(1.08) contrast(1.1) brightness(1.0)' }
   }
 };
 // Играбельные дни по порядку. date — [число, месяц] по старому стилю. Дни можно пропускать: между главами время перематывается.
