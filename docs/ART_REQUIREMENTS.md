@@ -14,11 +14,16 @@
 | `assets/characters/andrey/andrey_walk.png` | **утверждён Кириллом 21.10.2026**: 8 кадров ChatGPT (1152×120), `tools/fix_walk.py` |
 | `assets/characters/andrey/andrey_counter.png` | **подготовлен 21.10.2026** из 2 генераций ChatGPT (`assets/characters/andrey/source/andrey_counter_1,2.webp`; 288×120): ждёт за прилавком, второй кадр — постукивание пальцами. Кадр 2 = кадр 1, в котором заменена только область кистей (строки 50–59, x 76–99) из второй генерации: иначе фигура мерцала бы по контуру от разницы генераций. Нужен глазами Кирилла |
 | `assets/characters/andrey/andrey_give.png` | **подготовлен 21.10.2026** из 3 генераций ChatGPT (`assets/characters/andrey/source/andrey_give_1..3.webp`; 432×120): мешочек у пояса → на вытянутых руках → руки пустые; один раз после продажи, 0,3 с на кадр. Голова (строки 0–26) во всех кадрах взята из кадра ожидания: в генерации 3 было другое лицо. Поклона нет. Нужен глазами Кирилла |
-| `assets/characters/<имя>/<имя>_portrait.png` (Павел, Дарья, Фёдор, мать) | **нет**. Пока вместо них цветная заглушка с буквой |
+| `assets/characters/mother/mother_portrait.png` | **подготовлен 23.10.2026** из генерации ChatGPT (`source/mother_portrait_gpt.webp`, промт «П»), `tools/make_portrait.py`: 180×204, общая палитра |
+| `assets/characters/sorokin/sorokin_portrait.png` | **подготовлен 23.10.2026** из генерации ChatGPT (`source/sorokin_portrait_gpt.webp`), `tools/make_portrait.py` |
+| `assets/characters/<имя>/<имя>_portrait.png` (Павел, Дарья, Фёдор) | **нет**. Пока вместо них цветная заглушка с буквой |
 | `assets/characters/mother/mother_idle.png` | **подготовлен 21.10.2026** из генерации ChatGPT (144×120, рост 96), нужен глазами Кирилла |
-| `assets/characters/pavel/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png`, `sorokin_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |
+| `assets/characters/mother/mother_work.png` | **подготовлен 22.10.2026** из 8 кадров PixelLab (1152×120): мать перебирает крупу; голова и юбка стабилизированы (`tools/make_mother_work.py`), нужен глазами Кирилла |
+| `assets/places/labaz/labaz.png`, `labaz_front.png` | **подготовлены 22.10.2026** из генерации ChatGPT (`assets/places/labaz/source/labaz_original.webp`), `tools/make_labaz.py`; фон 594×270, передний план по силуэтам |
+| `assets/characters/sorokin/sorokin_idle.png` | **подготовлен 22.10.2026** из генерации ChatGPT от Кирилла (144×120, рост 108) |
+| `assets/characters/pavel/pavel_idle.png`, `darya_idle.png`, `fedor_idle.png` (фигуры в сцене) | **нет**. Пока вместо них человечки-заглушки (раздел 4а) |
 | `assets/places/shop/shop_front.png` | **подготовлен** из фона: передние ящики справа, точная копия пикселей фона по силуэту (раздел 3) |
-| `assets/goods/grain.png`, `bread.png`, `apples.png` | необязательны, нет (пока цветной квадрат) |
+| `assets/goods/grain.png`, `bread.png`, `apples.png`, `flour.png`, `millet.png`, `peas.png` | необязательны, нет (пока цветной квадрат) |
 
 Оригинал нового фона лежит в `assets/places/shop/source/shop_v2_original.webp`. Игра их не загружает.
 
@@ -145,7 +150,7 @@
 
 ## 6. Значки товаров (необязательные)
 
-`assets/goods/grain.png`, `bread.png`, `apples.png`, ровно 36×36, прозрачность 0/255. Показываются в торговой панели. Без файла там цветной квадрат (надпись «Временная графика» из-за них не появляется).
+`assets/goods/grain.png`, `bread.png`, `apples.png`, `flour.png` (мука), `millet.png` (пшено), `peas.png` (горох), ровно 36×36, прозрачность 0/255. Показываются в торговой панели. Без файла там цветной квадрат (надпись «Временная графика» из-за них не появляется).
 
 ## 7. Товары на фоне и остаток
 
