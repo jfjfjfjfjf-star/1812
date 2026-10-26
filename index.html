@@ -401,11 +401,16 @@ loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя 
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
-  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.'); });
-function drawHd(im) {                                  // слой в высоком разрешении: плавно уменьшается под холст
-  if (!HD_ON || !im || !im.ok) return false;
+  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
+  if (a.hdNight) loadImage(k + 'Night', a.hdNight, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется дневной слой.'); });
+const nightBg = () => !!(TIME.light[state.phase] || {}).night && nightAvail();   // в эту часть дня рисуется ночной фон (с переходом — см. nightK)
+function drawHd(key) {                                 // слой в высоком разрешении: плавно уменьшается под холст; ночью — ночная версия (при смене части дня — наплыв)
+  const day = spr[key], night = spr[key + 'Night'], k = night && night.ok ? nightK() : 0;
+  if (!HD_ON || !day || !day.ok) return false;
   ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(im, 0, 0, SCENE.worldW, H); ctx.restore(); return true;
+  if (k < 1) ctx.drawImage(day, 0, 0, SCENE.worldW, H);
+  if (k > 0) { ctx.globalAlpha = k; ctx.drawImage(night, 0, 0, SCENE.worldW, H); }
+  ctx.restore(); return true;
 }
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
@@ -853,6 +858,46 @@ function person(x, y, color, dir) {
   R('#2a1a0e', dir > 0 ? 2 : -7, -60, 5, 3);
   R('#d8d0b0', -2, -48, 5, 20);
 }
+// Свет на персонажах (настройки — SCENE.charLight и TIME.light[…].ambient в data.js). Кадр собирается в отдельном холсте в пикселях спрайта:
+//   1) общий тон части дня (умножение на ambient: утром холоднее, вечером темнее);
+//   2) от каждого источника рядом (окно, свеча, лампада) — мягкая заливка с той стороны фигуры, откуда идёт свет,
+//   3) и контурный блик по краю силуэта с этой же стороны. Сила падает с расстоянием, пламя мерцает так же, как его свечение.
+// Только наложением (без чтения пикселей): при открытии игры файлом пиксели картинок читать нельзя.
+let litB = null, litF = null;
+function charLights(wx, wy) {                          // источники, которые светят на фигуру в точке (wx, wy) мира: [{ s, k, color }]
+  const C = SCENE.charLight, L = lightNow(), t = performance.now() / 1000;
+  return (scn().lights || []).map((l, i) => {
+    const win = l.kind === 'window', lx = win ? (l.beam[2][0] + l.beam[3][0]) / 2 : l.x, ly = win ? wy : l.y;
+    const p = win ? L.window : L.warm * flick(t, i * 1.7, l.flicker || 0), r = (win ? C.windowR : l.r) * C.reach;
+    const d = Math.hypot(lx - wx, (ly - (wy - 60)) * 0.6);
+    return { s: Math.sign(lx - wx) || 1, k: Math.max(0, p * (1 - d / r)), color: l.color };
+  }).filter(o => o.k > 0.02);
+}
+function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped) {
+  const C = SCENE.charLight, L = lightNow();
+  if (!LIGHT_ON || !C || L.ambient === '#ffffff') { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  if (!litB) { litB = mkCv(sw, sh); litF = mkCv(sw, sh); }
+  if (litB.width !== sw || litB.height !== sh) { litB.width = litF.width = sw; litB.height = litF.height = sh; }
+  const b = litB.getContext('2d'), f = litF.getContext('2d');
+  b.globalCompositeOperation = 'source-over'; b.clearRect(0, 0, sw, sh); b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  b.globalCompositeOperation = 'multiply'; b.fillStyle = L.ambient; b.fillRect(0, 0, sw, sh);
+  b.globalCompositeOperation = 'destination-in'; b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);   // умножение залило и пустоту — вернуть силуэт
+  charLights(wx, wy).forEach(o => {
+    const s = flipped ? -o.s : o.s, near = s > 0 ? sw : 0;   // в зеркальном кадре «справа» — это слева
+    f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, sw, sh); f.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    const g = f.createLinearGradient(near, 0, sw / 2 - s * sw * 0.05, 0);
+    g.addColorStop(0, rgba(o.color, Math.min(1, C.side * o.k))); g.addColorStop(1, rgba(o.color, 0));
+    f.globalCompositeOperation = 'source-in'; f.fillStyle = g; f.fillRect(0, 0, sw, sh);
+    b.globalCompositeOperation = 'lighter'; b.drawImage(litF, 0, 0);
+    f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, sw, sh); f.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    f.globalCompositeOperation = 'source-in'; f.fillStyle = rgba(o.color, Math.min(1, C.rim * o.k)); f.fillRect(0, 0, sw, sh);
+    f.globalCompositeOperation = 'destination-out'; f.drawImage(img, sx, sy, sw, sh, -s * C.rimWidth, 0, sw, sh);   // остаётся край со стороны света
+    const v = f.createLinearGradient(0, 0, 0, sh); v.addColorStop(0, '#000'); v.addColorStop(C.rimFade, 'rgba(0,0,0,0)');
+    f.globalCompositeOperation = 'destination-in'; f.fillStyle = v; f.fillRect(0, 0, sw, sh);   // свет сверху: кайма гаснет к ногам
+    b.globalCompositeOperation = 'lighter'; b.drawImage(litF, 0, 0);
+  });
+  ctx.drawImage(litB, 0, 0, sw, sh, dx, dy, dw, dh);
+}
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
 function drawPerson(who, x, y, dir) {
   shadow(x, y);
@@ -861,7 +906,7 @@ function drawPerson(who, x, y, dir) {
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  drawLit(im, 0, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip);
   ctx.restore();
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
@@ -896,7 +941,7 @@ function drawAndrey(x, y, dir, moving, atCounter) {
   ctx.translate(Math.round(x), 0);
   if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
   const k = SCENE.charScale;                               // опора (48, 76) остаётся на месте, увеличивается всё вокруг неё
-  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
+  drawLit(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k), x, y, dir < 0);
   ctx.restore();
 }
 // ================= ЗВУК =================
@@ -1012,6 +1057,28 @@ const LIGHT_ON = !/[?&]light=0\b/.test(location.search);
 const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + Math.max(0, Math.min(1, a)) + ')'; };
 const flick = (t, seed, amp) => 1 + amp * (0.6 * Math.sin(t * 7.1 + seed) + 0.3 * Math.sin(t * 13.7 + seed * 2.3) + 0.1 * Math.sin(t * 31 + seed * 5.1));
+// Плавная смена части дня: свет, ночной фон и тон персонажей переходят за TIME.lightFade секунд.
+// lightNow() — настройки света на этот кадр (смесь прежней и новой части дня), nightK() — доля ночного фона (0 — день, 1 — ночь).
+const mixHex = (a, b, k) => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), m = s => Math.round((x >> s & 255) * (1 - k) + (y >> s & 255) * k);
+  return '#' + ((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0'); };
+const nightAvail = () => LIGHT_ON && HD_ON && inShop() && !!(spr.bgHdNight && spr.bgHdNight.ok);
+function lightOf(L) {                                  // часть дня → числа для смешивания (сумрак уже с учётом ночного фона)
+  const n = !!L.night && nightAvail();
+  return { dark: L.night && !n && L.darkNoNight != null ? L.darkNoNight : L.dark, darkColor: L.darkColor || '#000000', window: L.window, warm: L.warm,
+    vignette: L.vignette || 0, vignetteColor: L.vignetteColor || '#000000', ambient: L.ambient || '#ffffff', night: n ? 1 : 0 };
+}
+let phaseFx = { ph: null, from: null, t0: 0 }, lightLast = null;
+function lightNow() {
+  const to = lightOf(TIME.light[state.phase] || TIME.light.day), now = performance.now();
+  if (phaseFx.ph !== state.phase) { phaseFx = { ph: state.phase, from: phaseFx.ph ? lightLast : null, t0: now }; }
+  let k = phaseFx.from ? (now - phaseFx.t0) / 1000 / (TIME.lightFade || 0.001) : 1;
+  if (k >= 1) { phaseFx.from = null; return lightLast = to; }
+  k = k * k * (3 - 2 * k);                             // мягкое начало и конец
+  const f = phaseFx.from, o = {};
+  Object.keys(to).forEach(key => { o[key] = typeof to[key] === 'string' ? mixHex(f[key], to[key], k) : f[key] + (to[key] - f[key]) * k; });
+  return lightLast = o;
+}
+const nightK = () => lightNow().night;
 let dust = { scene: '', list: [], last: 0 };
 function shadow(x, y) {                                // тень под ногами (в координатах мира)
   const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
@@ -1020,14 +1087,15 @@ function shadow(x, y) {                                // тень под ног
 }
 function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
   if (!LIGHT_ON) return;
-  const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
+  const L = lightNow(), lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
   const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
   // 1) сумрак: заливка цветом, в местах света — просветы
-  if (L.dark > 0) {
+  const dark = L.dark;                                  // нет ночного фона — сумрак сильнее (darkNoNight, см. lightOf)
+  if (dark > 0) {
     const w = canvas.width, h = canvas.height;
     if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
     lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, w, h);
-    lctx.fillStyle = rgba(L.darkColor, L.dark); lctx.fillRect(0, 0, w, h);
+    lctx.fillStyle = rgba(L.darkColor, dark); lctx.fillRect(0, 0, w, h);
     lctx.setTransform(px, 0, 0, px, -cam * px, 0); lctx.globalCompositeOperation = 'destination-out';
     lights.forEach((l, i) => {
       const cx = l.kind === 'window' ? (l.x0 + l.x1) / 2 : l.x, cy = l.kind === 'window' ? (l.y0 + l.y1) / 2 : l.y, r = (l.r || 70) * 1.5;
@@ -1083,7 +1151,7 @@ function drawDust(l, k, t) {                           // пылинки в лу
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
 // 8) передний план, 9) интерфейс (HTML поверх сцены). Покупатель всегда перед прилавком, Андрей за ним — и никогда не наоборот.
 function drawBackdrop() {                              // слой 1
-  if (drawHd(spr.bgHd)) return;
+  if (drawHd('bgHd')) return;
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
   shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
@@ -1099,13 +1167,13 @@ function drawStock() {                                 // слой 2: одна �
   });
 }
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
-  if (drawHd(spr.counterHd)) return;
+  if (drawHd('counterHd')) return;
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
   else { const r = ART.counterFront.rect; rect('#3b2616', r.x, r.y, r.w, r.h); }
 }
 function drawFront() {                                 // слой 8
-  if (drawHd(spr.frontHd)) return;
+  if (drawHd('frontHd')) return;
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
   else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }

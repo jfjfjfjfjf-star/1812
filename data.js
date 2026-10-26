@@ -18,12 +18,13 @@ const DATA_VERSION = 21;
 //   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
 // hd — те же слои в высоком разрешении (в hdScale раз крупнее, без палитры; собирает tools/make_shop_hd.py). Если файл есть,
 //   игра рисует его вместо обычного слоя, плавно уменьшая под окно: фон чёткий, а персонажи остаются пиксельными на сетке 480×270.
-//   ?hd=0 в адресе — обычные пиксельные слои.
+//   hdNight — ночная версия тех же слоёв (рисуется в части дня с night: true, см. TIME.light). ?hd=0 в адресе — обычные пиксельные слои.
 const ART = {
   hdScale: 3,
-  background:   { src: 'assets/places/shop/shop.png', hd: 'assets/places/shop/shop_hd.png' },
-  counterFront: { src: 'assets/places/shop/shop_counter.png', hd: 'assets/places/shop/shop_counter_hd.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
-  foreground:   { src: 'assets/places/shop/shop_front.png', hd: 'assets/places/shop/shop_front_hd.png' },
+  background:   { src: 'assets/places/shop/shop.png', hd: 'assets/places/shop/shop_hd.png', hdNight: 'assets/places/shop/shop_night_hd.png' },
+  counterFront: { src: 'assets/places/shop/shop_counter.png', hd: 'assets/places/shop/shop_counter_hd.png', hdNight: 'assets/places/shop/shop_counter_night_hd.png',
+                  rect: { x: 202, y: 142, w: 328, h: 62 } },
+  foreground:   { src: 'assets/places/shop/shop_front.png', hd: 'assets/places/shop/shop_front_hd.png', hdNight: 'assets/places/shop/shop_front_night_hd.png' },
   glass:        { src: 'assets/places/shop/shop_glass.png' },   // стёкла окна (по ним проходят прохожие), собирает tools/make_shop.py
   portrait:  { w: 180, h: 204 },
   goodsIcon: { w: 36, h: 36 },
@@ -61,16 +62,21 @@ const TIME = {
   year: 1812,
   phases: { morning: 'утро', day: 'день', evening: 'вечер' },
   travelWhenOpen: false,
+  lightFade: 2.5,
   // Свет и цвет в разное время суток (как свет рисуется — см. lights у сцены):
   //   dark — насколько темнеет сцена (0 — нисколько, 1 — полностью), darkColor — цвет сумрака;
   //   window — сила света из окна, warm — сила свечей и лампад (1 — полная);
   //   grade — цветокоррекция всей сцены (CSS-фильтр: saturate — насыщенность, contrast — контраст, brightness — яркость);
-  //   vignette — затемнение краёв кадра (0 — нет, 1 — края чёрные), vignetteColor — его цвет.
+  //   vignette — затемнение краёв кадра (0 — нет, 1 — края чёрные), vignetteColor — его цвет;
+  //   night: true — рисовать ночную версию фона лавки (ART …hdNight). Она уже тёмная, поэтому сумрак dark слабее;
+  //   darkNoNight — сумрак, когда ночного фона нет (другие места, ?hd=0);
+  //   ambient — общий тон персонажей (умножение цвета: белый — без изменений; вечером темнее, чтобы фигуры не «светились»).
+  //   lightFade — за сколько секунд свет, фон и тон персонажей плавно переходят при смене части дня.
   //   Насыщенность снижена 26.10.2026: фон лавки в высоком разрешении (shop_hd.png) ярче пиксельного.
   light: {
-    morning: { dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, vignette: 0.35, vignetteColor: '#0b1022', grade: 'saturate(1.05) contrast(1.06) brightness(1.02)' },
-    day:     { dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  vignette: 0.28, vignetteColor: '#140c08', grade: 'saturate(1.1) contrast(1.08) brightness(1.03)' },
-    evening: { dark: 0.55, darkColor: '#160c12', window: 0.1, warm: 1.0,  vignette: 0.6,  vignetteColor: '#080406', grade: 'saturate(1.08) contrast(1.1) brightness(1.0)' }
+    morning: { ambient: '#c8cde0', dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, vignette: 0.35, vignetteColor: '#0b1022', grade: 'saturate(1.05) contrast(1.06) brightness(1.02)' },
+    day:     { ambient: '#e8e0d2', dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  vignette: 0.28, vignetteColor: '#140c08', grade: 'saturate(1.1) contrast(1.08) brightness(1.03)' },
+    evening: { ambient: '#8c8299', dark: 0, darkNoNight: 0.55, night: true, darkColor: '#160c12', window: 0.1, warm: 1.0,  vignette: 0.4,  vignetteColor: '#080406', grade: 'saturate(1.08) contrast(1.1) brightness(1.0)' }
   }
 };
 // Играбельные дни по порядку. date — [число, месяц] по старому стилю. Дни можно пропускать: между главами время перематывается.
@@ -194,6 +200,10 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                   { kind: 'glow', x: 357, y: 122, r: 90, color: '#ff9c44', flicker: 0.03 }
                 ],
                 shadow: { w: 26, h: 6, alpha: 0.35 },   // тень под ногами персонажей (ширина, высота, плотность)
+                // Свет на персонажах: side — сила мягкой заливки со стороны источника, rim — сила блика по краю силуэта,
+                // rimWidth — толщина блика (пиксели), rimFade — на какой доле роста (сверху) блик гаснет, reach — во сколько раз дальше радиуса r источник ещё светит на фигуру,
+                // windowR — радиус света окна для фигур (окно светит от пятна луча на полу).
+                charLight: { side: 0.55, rim: 0.9, rimWidth: 1, rimFade: 0.75, reach: 1.6, windowR: 110 },
                 // Прохожие за окном: тёмные силуэты в длинной одежде видны только на стекле (позади рамы и кувшинов).
                 // x0..x1 — где идут (за окном), feetY — линия ног (ниже подоконника), height — рост, speed — скорость,
                 // every — через сколько секунд появляется следующий, phases — в какие части дня ходят.
