@@ -431,13 +431,14 @@ const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatM
 ((SCENE.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
 npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); const sp = npcSprite(t, +v); loadImage(npcKey(t, v), sp.src, sp.cellW * sp.frames, sp.cellH, true); });
 // Кадр покоя NPC (лист из 4: как есть, вдох, рот, вдох и рот): дыхание по времени со сдвигом seed (у каждого своё);
-// talk (0/1) — участник беседы: в свою очередь шевелит губами. Возвращает [кадр, говорит ли сейчас].
+// talk (0/1) — участник беседы: в свою очередь шевелит губами и меняет жест. Возвращает [кадр, говорит ли сейчас].
 function npcIdle(seed, talk) {
   const I = NPC_IDLE, t = performance.now() / 1000 + seed;
   const inhale = (t % I.breath) / I.breath < I.inhale;
   const speaking = talk != null && Math.floor((performance.now() / 1000) / I.turn) % 2 === talk;
   const h = Math.sin(Math.floor(t / I.mouth) * 12.9898 + seed) * 43758.5453, open = speaking && h - Math.floor(h) < I.open;
-  return [(inhale ? 1 : 0) + (open ? 2 : 0), speaking];
+  const g = speaking && Math.floor(t / I.gesture) % 2 ? 4 : 0;   // второй жест (у поз с жестом; у остальных лист короче — см. drawExtras)
+  return [(inhale ? 1 : 0) + (open ? 2 : 0) + g, speaking];
 }
 const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
@@ -992,7 +993,7 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 function drawExtras(list, lane) {
   (list || []).filter(e => !e.phases || e.phases.includes(state.phase)).sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
     const im = spr[npcKey(e.type, e.v)];
-    const t = performance.now() / 1000, [frame, speaking] = npcIdle(e.x * 0.37, e.talk);
+    const t = performance.now() / 1000, [f, speaking] = npcIdle(e.x * 0.37, e.talk), frame = f % npcSprite(e.type, e.v).frames;
     const turned = !speaking && e.look && (t + e.x * 0.37) % e.look > e.look * 2 / 3;   // оборачивается на треть времени, но не посреди своей речи
     if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, (e.dir || 1) * (turned ? -1 : 1), Object.assign(npcSprite(e.type, e.v), { frame }), im);
   });

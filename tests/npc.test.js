@@ -21,7 +21,7 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   check(needed > 0 && loaded === needed, `файлы NPC загружены (${loaded} из ${needed} нужных сцене)`);
   check(await page.evaluate(() => CUSTOMERS.every(c => spr['s_' + c.id] && spr['s_' + c.id].ok)), 'у Павла, Дарьи и Фёдора есть фигуры (типовые NPC), не заглушки');
   // лавка днём: очередь у прилавка, покупатель
-  await page.evaluate(() => { state.phase = 'day'; player.x = 300; }); await page.waitForTimeout(3500);
+  await page.evaluate(() => { state.phase = 'day'; player.x = 420; }); await page.waitForTimeout(3500);
   const [shopExtras, shopAll] = await page.evaluate(() => [SCENE.extras.filter(e => e.phases.includes('day') && spr[npcKey(e.type, e.v)].ok).length, SCENE.extras.length]);
   check(shopExtras === shopAll, `в лавке днём видны extras (${shopExtras} из ${shopAll})`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_day.png') });
@@ -32,7 +32,7 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   check(pass > 0, `за окном проходит типовой NPC (${pass})`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_window.png') });
   // лабаз
-  await page.evaluate(() => { state.phase = 'morning'; state.scene = 'labaz'; resetPlayer(); player.x = 300; }); await page.waitForTimeout(3500);
+  await page.evaluate(() => { state.phase = 'morning'; state.scene = 'labaz'; resetPlayer(); player.x = 250; }); await page.waitForTimeout(3500);
   const [lab, labAll] = await page.evaluate(() => [SCENES.labaz.extras.filter(e => spr[npcKey(e.type, e.v)].ok).length, SCENES.labaz.extras.length]);
   check(lab === labAll, `в лабазе стоят extras (${lab} из ${labAll})`);
   await page.screenshot({ path: path.join(OUT, 'npc_labaz.png') });

@@ -227,9 +227,10 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // talk — участник беседы: 0 или 1, чья очередь говорить (шевелит губами), пока говорит — не оборачивается.
                 // Рисуются перед прилавком, позади Андрея.
                 extras: [
-                  { type: 'woman', v: 1, x: 238, y: 207, dir: 1, phases: ['day'], look: 11, talk: 0 },          // две соседки разговорились
-                  { type: 'girl_young', v: 2, x: 264, y: 209, dir: -1, phases: ['day'], look: 14, talk: 1 },
-                  { type: 'old_man', v: 2, x: 322, y: 213, dir: -1, phases: ['day'], look: 7 }           // разглядывает бочонки и полки
+                  { type: 's_point', v: 2, x: 214, y: 210, dir: 1, phases: ['day'], look: 13 },               // показывает на полку
+                  { type: 's_talk', v: 2, x: 280, y: 208, dir: 1, phases: ['day'], talk: 0 },                 // разговорились две соседки
+                  { type: 's_listen', v: 1, x: 316, y: 210, dir: -1, phases: ['day'], look: 12, talk: 1 },
+                  { type: 's_look', v: 1, x: 506, y: 214, dir: -1, phases: ['day'], look: 9 }                 // старик разглядывает товар у прилавка
                 ] };
 
 // Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
@@ -240,13 +241,22 @@ const NPC_TYPES = {
   girl_young: { name: 'девушка', variants: 5 }, woman: { name: 'женщина', variants: 5 }, boy: { name: 'мальчик', variants: 4 },
   girl_child: { name: 'девочка', variants: 4 }, old_woman: { name: 'старуха', variants: 4 }, old_man: { name: 'старик', variants: 4 },
   soldier: { name: 'солдат', variants: 4 }, merchant: { name: 'купец', variants: 5 }, peasant: { name: 'мужик', variants: 5 },
-  priest: { name: 'священник', variants: 3 }
+  priest: { name: 'священник', variants: 3 },
+  // позы из листов ChatGPT (tools/make_npc_poses.py); gesture — у позы два жеста рукой (лист 8 кадров: покой и тот же покой со вторым жестом)
+  w_sit_talk: { name: 'работник сидит на мешке, рассказывает', variants: 3, gesture: true }, w_sit_mug: { name: 'работник сидит на ящике с кружкой', variants: 3 },
+  w_shovel: { name: 'работник опирается на лопату', variants: 3 }, w_sack: { name: 'работник несёт мешок', variants: 3 },
+  w_hips: { name: 'работник руки в боки', variants: 3 }, m_talk: { name: 'купец говорит', variants: 3, gesture: true },
+  m_listen: { name: 'купец слушает', variants: 3 }, m_coins: { name: 'купец на бочке считает монеты', variants: 3 },
+  s_point: { name: 'женщина показывает на полку', variants: 3 }, s_talk: { name: 'девушка с корзиной разговаривает', variants: 3, gesture: true },
+  s_listen: { name: 'пожилая женщина слушает', variants: 3 }, s_look: { name: 'старик разглядывает товар', variants: 3 }
 };
-// Файл — 4 кадра покоя в ряд (576×120): 0 как есть, 1 вдох, 2 рот приоткрыт, 3 вдох и рот (idle: кадр выбирает игра, см. NPC_IDLE).
-const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true });
+// Файл — 4 кадра покоя в ряд (576×120): 0 как есть, 1 вдох, 2 рот приоткрыт, 3 вдох и рот (idle: кадр выбирает игра, см. NPC_IDLE);
+// у поз с жестом ещё 4 таких же со вторым жестом (1152×120).
+const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right',
+                                   frames: NPC_TYPES[type].gesture ? 8 : 4, idle: true });
 // Покой NPC: breath — длина цикла дыхания (с), inhale — доля цикла на вдохе; разговор: turn — сколько секунд говорит один, потом другой
-// (у extras talk: 0 или 1 — чья очередь), mouth — как часто шевелятся губы (с), open — доля времени, когда рот приоткрыт.
-const NPC_IDLE = { breath: 3.6, inhale: 0.4, turn: 3.5, mouth: 0.14, open: 0.45 };
+// (у extras talk: 0 или 1 — чья очередь), mouth — как часто шевелятся губы (с), open — доля времени, когда рот приоткрыт;
+const NPC_IDLE = { breath: 3.6, inhale: 0.4, turn: 3.5, mouth: 0.14, open: 0.45, gesture: 1.1 };   // gesture — сколько секунд держится жест, пока говорит
 
 // Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
 // portrait — крупный портрет для диалога (180×204); sprite — фигура в сцене (отдельный файл, один кадр покоя):
@@ -318,11 +328,13 @@ const SCENES = {
   // персонажи проходят за ними; Сорокин у своей конторки справа
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
-    // типовые NPC лабаза: только люди Сорокина (работники) и пара купцов, как Андрей, — группками по бокам, беседуют
+    // NPC лабаза: только люди Сорокина (работники) и купцы, как Андрей, — группками, отдыхают, работают, беседуют
     extras: [
-      { type: 'peasant', v: 1, x: 128, y: 214, dir: 1, look: 12, talk: 0 }, { type: 'peasant', v: 3, x: 160, y: 212, dir: -1, look: 15, talk: 1 },   // работники у ворот
-      { type: 'peasant', v: 5, x: 344, y: 200, dir: 1, look: 9 },                                                                  // работник у мешков
-      { type: 'merchant', v: 4, x: 492, y: 206, dir: 1, look: 13, talk: 1 }, { type: 'merchant', v: 2, x: 522, y: 208, dir: -1, look: 10, talk: 0 }  // купцы у конторки
+      { type: 'w_sit_talk', v: 1, x: 102, y: 216, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 168, y: 214, dir: -1, talk: 1, look: 14 },   // работники отдыхают у ворот
+      { type: 'w_sack', v: 1, x: 236, y: 212, dir: 1 },                                                                                      // несёт мешок к ларям
+      { type: 'm_talk', v: 1, x: 298, y: 208, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 330, y: 208, dir: -1, talk: 1, look: 12 },     // купцы торгуются у ларей
+      { type: 'w_shovel', v: 2, x: 384, y: 206, dir: -1, look: 11 },                                                                         // у мешков с лопатой
+      { type: 'm_coins', v: 1, x: 522, y: 212, dir: -1 }                                                                                     // купец на бочке у конторки считает деньги
     ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
