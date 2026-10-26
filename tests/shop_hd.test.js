@@ -1,7 +1,7 @@
 // Проверки фона лавки в высоком разрешении (HD) и ночного фона.
 // Запуск из папки проекта: node tests/shop_hd.test.js   (нужен Playwright: npm i playwright && npx playwright install chromium)
 // Что проверяется: игра открывается без ошибок; HD-слои дня и ночи загружены и нужного размера; утром и днём рисуется дневной фон,
-// вечером — ночной (окно на кадре темнее); с ?hd=0 — прежние пиксельные слои и вечерний сумрак darkNoNight; Андрей за прилавком.
+// вечером — ночной (окно на кадре темнее); свет на персонажах (тон и ближние источники); с ?hd=0 — прежние пиксельные слои и вечерний сумрак darkNoNight; Андрей за прилавком.
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
@@ -39,6 +39,15 @@ const phase = async (page, ph) => { await page.evaluate(ph => { state.phase = ph
   check(await page.evaluate(() => nightBg()), 'вечером рисуется ночной фон');
   check(evening < day * 0.6 && evening < morning * 0.6, `вечером окно заметно темнее (утро ${morning | 0}, день ${day | 0}, вечер ${evening | 0})`);
   check(await page.evaluate(() => TIME.light.evening.dark < TIME.light.evening.darkNoNight), 'с ночным фоном вечерний сумрак слабее, чем без него');
+  // свет на персонажах: общий тон по времени суток + свет ближних источников с их стороны
+  check(await page.evaluate(() => ['morning', 'day', 'evening'].every(ph => TIME.light[ph].ambient)), 'у каждого времени суток есть общий тон для персонажей (ambient)');
+  const candle = await page.evaluate(() => { const c = scn().lights.find(l => l.kind === 'flame'); return charLights(c.x - 20, SCENE.lane).find(o => o.color === c.color); });
+  check(candle && candle.k > 0.3 && candle.s === 1, 'вечером у свечи на фигуру падает тёплый свет справа' + (candle ? ` (сила ${candle.k.toFixed(2)})` : ''));
+  const far = await page.evaluate(() => charLights(SCENE.motherX, SCENE.lane).filter(o => o.color === scn().lights.find(l => l.kind === 'flame').color).length);
+  check(far === 0, 'далеко от свечи (у матери) свет свечи на фигуру не падает');
+  await phase(page, 'day');
+  const win = await page.evaluate(() => charLights(SCENE.motherX, SCENE.lane).find(o => o.color === scn().lights.find(l => l.kind === 'window').color));
+  check(win && win.k > 0.2 && win.s === -1, 'днём у окна на фигуру падает свет окна слева' + (win ? ` (сила ${win.k.toFixed(2)})` : ''));
   await phase(page, 'morning');                        // как игрок: утром открыть лавку, днём встать за прилавок (HD-прилавок поверх Андрея)
   await page.evaluate(() => { player.x = SCENE.workX; }); await page.waitForTimeout(100);
   await page.keyboard.press('e');
