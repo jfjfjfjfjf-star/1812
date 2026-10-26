@@ -401,8 +401,11 @@ loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя 
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
-  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.'); });
-function drawHd(im) {                                  // слой в высоком разрешении: плавно уменьшается под холст
+  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
+  if (a.hdNight) loadImage(k + 'Night', a.hdNight, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется дневной слой.'); });
+const nightBg = () => LIGHT_ON && HD_ON && inShop() && !!(TIME.light[state.phase] || {}).night && !!(spr.bgHdNight && spr.bgHdNight.ok);
+function drawHd(key) {                                 // слой в высоком разрешении: плавно уменьшается под холст; в части дня night — ночная версия
+  const im = nightBg() && spr[key + 'Night'] && spr[key + 'Night'].ok ? spr[key + 'Night'] : spr[key];
   if (!HD_ON || !im || !im.ok) return false;
   ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(im, 0, 0, SCENE.worldW, H); ctx.restore(); return true;
@@ -1023,11 +1026,12 @@ function drawLight() {                                 // вызывается �
   const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
   const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
   // 1) сумрак: заливка цветом, в местах света — просветы
-  if (L.dark > 0) {
+  const dark = L.night && !nightBg() && L.darkNoNight != null ? L.darkNoNight : L.dark;   // нет ночного фона — сумрак сильнее
+  if (dark > 0) {
     const w = canvas.width, h = canvas.height;
     if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
     lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, w, h);
-    lctx.fillStyle = rgba(L.darkColor, L.dark); lctx.fillRect(0, 0, w, h);
+    lctx.fillStyle = rgba(L.darkColor, dark); lctx.fillRect(0, 0, w, h);
     lctx.setTransform(px, 0, 0, px, -cam * px, 0); lctx.globalCompositeOperation = 'destination-out';
     lights.forEach((l, i) => {
       const cx = l.kind === 'window' ? (l.x0 + l.x1) / 2 : l.x, cy = l.kind === 'window' ? (l.y0 + l.y1) / 2 : l.y, r = (l.r || 70) * 1.5;
@@ -1083,7 +1087,7 @@ function drawDust(l, k, t) {                           // пылинки в лу
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
 // 8) передний план, 9) интерфейс (HTML поверх сцены). Покупатель всегда перед прилавком, Андрей за ним — и никогда не наоборот.
 function drawBackdrop() {                              // слой 1
-  if (drawHd(spr.bgHd)) return;
+  if (drawHd('bgHd')) return;
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
   shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
@@ -1099,13 +1103,13 @@ function drawStock() {                                 // слой 2: одна �
   });
 }
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
-  if (drawHd(spr.counterHd)) return;
+  if (drawHd('counterHd')) return;
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
   else { const r = ART.counterFront.rect; rect('#3b2616', r.x, r.y, r.w, r.h); }
 }
 function drawFront() {                                 // слой 8
-  if (drawHd(spr.frontHd)) return;
+  if (drawHd('frontHd')) return;
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
   else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }
