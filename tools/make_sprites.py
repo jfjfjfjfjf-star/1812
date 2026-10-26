@@ -10,6 +10,8 @@
 #   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_counter_1.webp","assets/characters/andrey/source/andrey_counter_2.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_counter.png"}'
 #   Андрей передаёт товар (3 кадра; потом строки 0–26 каждого кадра = голова из кадра ожидания andrey_counter.png):
 #   python tools/make_sprites.py '{"src":["assets/characters/andrey/source/andrey_give_1.webp","assets/characters/andrey/source/andrey_give_2.webp","assets/characters/andrey/source/andrey_give_3.webp"],"height":104,"align":"head","headOffset":1.37,"colors":24,"palette":"assets/palette.png","out":"assets/characters/andrey/andrey_give.png"}'
+#   купец Сорокин (рост 108, 22.10.2026, генерация ChatGPT от Кирилла):
+#   python tools/make_sprites.py '{"src":["assets/characters/sorokin/source/sorokin_gpt.webp"],"height":108,"colors":24,"palette":"assets/palette.png","out":"assets/characters/sorokin/sorokin_idle.png"}'
 #   мать (рост 96):
 #   python tools/make_sprites.py '{"src":["assets/characters/mother/source/mother_gpt.webp"],"height":96,"colors":20,"palette":"assets/palette.png","out":"assets/characters/mother/mother_idle.png"}'
 import sys, os, json, colorsys
