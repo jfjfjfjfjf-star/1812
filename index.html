@@ -399,6 +399,14 @@ loadImage('bg', ART.background.src, SCENE.worldW, H);
 loadImage('counter', ART.counterFront.src, SCENE.worldW, H, true);
 loadImage('front', ART.foreground.src, SCENE.worldW, H, false, 'Без слоя ящиков Андрей у двери рисуется поверх них.');
 if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
+const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
+if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
+  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.'); });
+function drawHd(im) {                                  // слой в высоком разрешении: плавно уменьшается под холст
+  if (!HD_ON || !im || !im.ok) return false;
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(im, 0, 0, SCENE.worldW, H); ctx.restore(); return true;
+}
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
@@ -984,8 +992,7 @@ function drawPassersby() {                             // слой 1а: в ко�
   walkers.list = walkers.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
   if (!walkers.list.length) return;
   if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
-  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.drawImage(gl, 0, 0);
-  gctx.globalCompositeOperation = 'source-atop'; gctx.fillStyle = P.color;
+  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.fillStyle = P.color;
   walkers.list.forEach(w => {                          // силуэт: голова, плечи, длинная одежда до земли
     const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
     gctx.beginPath();
@@ -993,6 +1000,7 @@ function drawPassersby() {                             // слой 1а: в ко�
     gctx.beginPath(); gctx.arc(x, f - h * 0.89, h * (w.kind === 'dress' ? 0.1 : 0.085), 0, Math.PI * 2); gctx.fill();
     if (w.kind === 'coat') gctx.fillRect(x - h * 0.1, f - h * 0.99, h * 0.2, h * 0.05);   // шапка
   });
+  gctx.globalCompositeOperation = 'destination-in'; gctx.drawImage(gl, 0, 0);   // оставить силуэты только на стекле
   ctx.drawImage(glassCv, 0, 0);
 }
 
@@ -1050,6 +1058,12 @@ function drawLight() {                                 // вызывается �
     }
   });
   ctx.restore();
+  // 3) виньетка: края кадра темнее, взгляд собирается к середине (в координатах экрана)
+  if (L.vignette > 0) {
+    const vc = L.vignetteColor || '#000000', g = ctx.createRadialGradient(cam + W / 2, H * 0.45, H * 0.35, cam + W / 2, H * 0.45, W * 0.62);
+    g.addColorStop(0, rgba(vc, 0)); g.addColorStop(1, rgba(vc, L.vignette));
+    ctx.fillStyle = g; ctx.fillRect(cam, 0, W, H);
+  }
 }
 function drawDust(l, k, t) {                           // пылинки в луче окна: медленно плывут и мерцают
   const b = l.beam, xs = b.map(p => p[0]), ys = b.map(p => p[1]);
@@ -1069,6 +1083,7 @@ function drawDust(l, k, t) {                           // пылинки в лу
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
 // 8) передний план, 9) интерфейс (HTML поверх сцены). Покупатель всегда перед прилавком, Андрей за ним — и никогда не наоборот.
 function drawBackdrop() {                              // слой 1
+  if (drawHd(spr.bgHd)) return;
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
   shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
@@ -1084,11 +1099,13 @@ function drawStock() {                                 // слой 2: одна �
   });
 }
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
+  if (drawHd(spr.counterHd)) return;
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
   else { const r = ART.counterFront.rect; rect('#3b2616', r.x, r.y, r.w, r.h); }
 }
 function drawFront() {                                 // слой 8
+  if (drawHd(spr.frontHd)) return;
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
   else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }
