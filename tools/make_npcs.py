@@ -140,6 +140,29 @@ def stretch(fig, d):
     if d > 0: return np.insert(fig, rows, fig[rows], axis=0)
     return np.delete(fig, rows, axis=0)
 
+# Кадры покоя (дыхание и разговор) правкой пикселей, без генераций. Лист 4 кадра в ряд (576×120):
+#   0 — как есть; 1 — вдох: всё выше пояса (BREATH доли роста) на 1 пиксель выше; 2 — рот приоткрыт; 3 — вдох и рот.
+# Рот: строка на MOUTH доли роста ниже кончика носа (самая правая точка кожи в верхней пятой части фигуры), два пикселя у переднего края
+# лица темнеют до цвета контура. У бородатых рот приходится на бороду — так и задумано (движется борода).
+BREATH, MOUTH = 0.42, 3
+
+def idle_frames(cell):
+    a = cell[..., 3] > 0; ys = np.where(a.any(1))[0]; top, bot = ys[0], ys[-1]; H = bot - top + 1
+    lab = palette_lib.rgb_to_lab(cell[..., :3].reshape(-1, 3)).reshape(cell.shape[0], cell.shape[1], 3)
+    skin = skin_mask(lab, a); skin[top + H // 5:] = False; skin[:top] = False
+    breath = cell.copy(); waist = top + int(H * BREATH)
+    breath[top - 1: waist] = cell[top: waist + 1]
+    def mouth(c, dy):                                   # dy — на сколько поднята голова в этом кадре
+        c = c.copy()
+        if not skin.any(): return c
+        yy, xx = np.where(skin); i = xx.argmax(); row = yy[i] + MOUTH - dy
+        xs = np.where(c[row, :, 3] > 0)[0]
+        if not len(xs): return c
+        dark = cell[a][lab[a][:, 0].argmin(), :3]
+        for x in (xs[-1] - 1, xs[-1] - 2): c[row, x, :3] = dark
+        return c
+    return np.concatenate([cell, breath, mouth(cell, 0), mouth(breath, 1)], axis=1)
+
 def figure_cells(sheet):
     for f in FIG:
         y0 = f['row'] * 128; x0, x1 = f['x']
@@ -185,7 +208,7 @@ def build(debug=False):
             cx = (xs[0] + xs[-1]) // 2                        # середина фигуры — на опору, стопы — на FLOOR_Y
             dx, top = ANCHOR_X - cx, FLOOR_Y + 1 - fh
             img[max(0, top): FLOOR_Y + 1, dx: dx + w] = fig[max(0, -top):]
-            im = Image.fromarray(img, 'RGBA')
+            im = Image.fromarray(idle_frames(img), 'RGBA')
             if SNAP: im = palette_lib.apply(im, pal)
             path = '%s/%s_%d.png' % (OUT, f['id'], vi + 1)
             im.save(path); made.append(path); dbg.append(im)
@@ -200,7 +223,7 @@ def build(debug=False):
     if debug:
         cols = 10; rows = (len(dbg) + cols - 1) // cols
         sh = Image.new('RGBA', (cols * 72, rows * 112), (200, 200, 200, 255))
-        for i, im in enumerate(dbg): sh.alpha_composite(im.crop((36, 4, 108, 116)), ((i % cols) * 72, (i // cols) * 112))
+        for i, im in enumerate(dbg): sh.alpha_composite(im.crop((36, 0, 108, 112)), ((i % cols) * 72, (i // cols) * 112))
         sh.resize((sh.width * 2, sh.height * 2), Image.NEAREST).save('tools/out/npc_variants.png')
     return made
 

@@ -223,25 +223,30 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                              types: ['woman', 'girl_young', 'old_man', 'old_woman', 'merchant', 'peasant', 'soldier', 'boy', 'girl_child', 'priest'], tint: 0.55 },
                 // Типовые NPC в лавке (стоят, не разговаривают с Андреем): type и v — тип и вариант (NPC_TYPES), x, y — где стоят ноги
                 // (y глубже линии пола — дальше), dir — 1 лицом вправо, -1 влево; phases — в какие части дня видны;
-                // look — раз в столько секунд человек ненадолго оборачивается (треть времени смотрит в другую сторону), чтобы не стоял столбом.
+                // look — раз в столько секунд человек ненадолго оборачивается (треть времени смотрит в другую сторону), чтобы не стоял столбом;
+                // talk — участник беседы: 0 или 1, чья очередь говорить (шевелит губами), пока говорит — не оборачивается.
                 // Рисуются перед прилавком, позади Андрея.
                 extras: [
-                  { type: 'woman', v: 1, x: 238, y: 207, dir: 1, phases: ['day'], look: 11 },          // две соседки разговорились
-                  { type: 'girl_young', v: 2, x: 264, y: 209, dir: -1, phases: ['day'], look: 14 },
+                  { type: 'woman', v: 1, x: 238, y: 207, dir: 1, phases: ['day'], look: 11, talk: 0 },          // две соседки разговорились
+                  { type: 'girl_young', v: 2, x: 264, y: 209, dir: -1, phases: ['day'], look: 14, talk: 1 },
                   { type: 'old_man', v: 2, x: 322, y: 213, dir: -1, phases: ['day'], look: 7 }           // разглядывает бочонки и полки
                 ] };
 
 // Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
 // Фигура — один кадр покоя 144×120, опора (72, 114), лицом вправо; у каждого типа несколько вариантов цвета одежды, волос и кожи:
 // файл assets/characters/npc/<тип>_<вариант>.png, вариант 1 — как нарисовано. Рост взрослых ≈ 90 (Андрей 104), детей 59–73.
-// Ходьбы у них нет: стоят на месте (extras у сцен) или проходят за окном лавки (passersby, ног не видно).
+// Ходьбы у них нет (дышат и в беседе шевелят губами): стоят на месте (extras у сцен) или проходят за окном лавки (passersby, ног не видно).
 const NPC_TYPES = {
   girl_young: { name: 'девушка', variants: 5 }, woman: { name: 'женщина', variants: 5 }, boy: { name: 'мальчик', variants: 4 },
   girl_child: { name: 'девочка', variants: 4 }, old_woman: { name: 'старуха', variants: 4 }, old_man: { name: 'старик', variants: 4 },
   soldier: { name: 'солдат', variants: 4 }, merchant: { name: 'купец', variants: 5 }, peasant: { name: 'мужик', variants: 5 },
   priest: { name: 'священник', variants: 3 }
 };
-const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' });
+// Файл — 4 кадра покоя в ряд (576×120): 0 как есть, 1 вдох, 2 рот приоткрыт, 3 вдох и рот (idle: кадр выбирает игра, см. NPC_IDLE).
+const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true });
+// Покой NPC: breath — длина цикла дыхания (с), inhale — доля цикла на вдохе; разговор: turn — сколько секунд говорит один, потом другой
+// (у extras talk: 0 или 1 — чья очередь), mouth — как часто шевелятся губы (с), open — доля времени, когда рот приоткрыт.
+const NPC_IDLE = { breath: 3.6, inhale: 0.4, turn: 3.5, mouth: 0.14, open: 0.45 };
 
 // Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
 // portrait — крупный портрет для диалога (180×204); sprite — фигура в сцене (отдельный файл, один кадр покоя):
@@ -315,9 +320,9 @@ const SCENES = {
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
     // типовые NPC лабаза: только люди Сорокина (работники) и пара купцов, как Андрей, — группками по бокам, беседуют
     extras: [
-      { type: 'peasant', v: 1, x: 128, y: 214, dir: 1, look: 12 }, { type: 'peasant', v: 3, x: 160, y: 212, dir: -1, look: 15 },   // работники у ворот
+      { type: 'peasant', v: 1, x: 128, y: 214, dir: 1, look: 12, talk: 0 }, { type: 'peasant', v: 3, x: 160, y: 212, dir: -1, look: 15, talk: 1 },   // работники у ворот
       { type: 'peasant', v: 5, x: 344, y: 200, dir: 1, look: 9 },                                                                  // работник у мешков
-      { type: 'merchant', v: 4, x: 492, y: 206, dir: 1, look: 13 }, { type: 'merchant', v: 2, x: 522, y: 208, dir: -1, look: 10 }  // купцы у конторки
+      { type: 'merchant', v: 4, x: 492, y: 206, dir: 1, look: 13, talk: 1 }, { type: 'merchant', v: 2, x: 522, y: 208, dir: -1, look: 10, talk: 0 }  // купцы у конторки
     ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }

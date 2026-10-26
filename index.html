@@ -429,7 +429,16 @@ speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.s
 const npcKey = (t, v) => 'npc_' + t + '_' + v;
 const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
 ((SCENE.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
-npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); loadImage(npcKey(t, v), npcSprite(t, +v).src, 144, 120, true); });
+npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); const sp = npcSprite(t, +v); loadImage(npcKey(t, v), sp.src, sp.cellW * sp.frames, sp.cellH, true); });
+// Кадр покоя NPC (лист из 4: как есть, вдох, рот, вдох и рот): дыхание по времени со сдвигом seed (у каждого своё);
+// talk (0/1) — участник беседы: в свою очередь шевелит губами. Возвращает [кадр, говорит ли сейчас].
+function npcIdle(seed, talk) {
+  const I = NPC_IDLE, t = performance.now() / 1000 + seed;
+  const inhale = (t % I.breath) / I.breath < I.inhale;
+  const speaking = talk != null && Math.floor((performance.now() / 1000) / I.turn) % 2 === talk;
+  const h = Math.sin(Math.floor(t / I.mouth) * 12.9898 + seed) * 43758.5453, open = speaking && h - Math.floor(h) < I.open;
+  return [(inhale ? 1 : 0) + (open ? 2 : 0), speaking];
+}
 const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
   if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
@@ -972,7 +981,8 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
   const sp = spOver || who.sprite, im = imOver || (sp && spr['s_' + who.id]);
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
-  const f = sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
+  const f = sp.frame != null ? sp.frame : sp.idle ? npcIdle(x * 0.37)[0]   // кадр задан снаружи; NPC — кадр покоя (дыхание)
+    : sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
   drawLit(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip);
@@ -982,8 +992,9 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 function drawExtras(list, lane) {
   (list || []).filter(e => !e.phases || e.phases.includes(state.phase)).sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
     const im = spr[npcKey(e.type, e.v)];
-    const t = performance.now() / 1000, turned = e.look && (t + e.x * 0.37) % e.look > e.look * 2 / 3;   // оборачивается на треть времени
-    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, (e.dir || 1) * (turned ? -1 : 1), npcSprite(e.type, e.v), im);
+    const t = performance.now() / 1000, [frame, speaking] = npcIdle(e.x * 0.37, e.talk);
+    const turned = !speaking && e.look && (t + e.x * 0.37) % e.look > e.look * 2 / 3;   // оборачивается на треть времени, но не посреди своей речи
+    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, (e.dir || 1) * (turned ? -1 : 1), Object.assign(npcSprite(e.type, e.v), { frame }), im);
   });
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
@@ -1122,7 +1133,7 @@ function drawPassersby() {                             // слой 1а: в ко�
   walkers.list.filter(asNpc).forEach(w => {
     const k = w.h / 90;
     gctx.save(); gctx.translate(Math.round(w.x), 0); if (w.dir < 0) gctx.scale(-1, 1);
-    gctx.drawImage(spr[w.npc], -72 * k, P.feetY - 114 * k, 144 * k, 120 * k);
+    gctx.drawImage(spr[w.npc], 0, 0, 144, 120, -72 * k, P.feetY - 114 * k, 144 * k, 120 * k);   // первый кадр листа
     gctx.restore();
   });
   if (P.tint) { gctx.globalCompositeOperation = 'source-atop'; gctx.globalAlpha = P.tint; gctx.fillRect(0, 0, glassCv.width, glassCv.height); gctx.globalAlpha = 1; gctx.globalCompositeOperation = 'source-over'; }

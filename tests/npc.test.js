@@ -38,6 +38,12 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   await page.screenshot({ path: path.join(OUT, 'npc_labaz.png') });
   await page.evaluate(() => { player.x = 470; }); await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, 'npc_labaz_right.png') });
+  // покой: дыхание и разговор — кадры листа меняются со временем, у участника беседы бывает открыт рот
+  const frames = await page.evaluate(async () => { const seen = new Set(), talk = new Set();
+    for (let i = 0; i < 80; i++) { const [f0] = npcIdle(1.3); const [f1] = npcIdle(2.1, 0); seen.add(f0); talk.add(f1); await new Promise(r => setTimeout(r, 100)); }
+    return [[...seen].sort(), [...talk].sort()]; });
+  check(frames[0].includes(0) && frames[0].includes(1) && !frames[0].some(f => f > 1), `молчащий дышит, рот закрыт (кадры ${frames[0]})`);
+  check(frames[1].some(f => f >= 2), `участник беседы шевелит губами (кадры ${frames[1]})`);
   check(errors.length === 0, 'ошибок страницы нет' + (errors.length ? ': ' + errors.join('; ') : ''));
   await browser.close();
   process.exit(failed ? 1 : 0);
