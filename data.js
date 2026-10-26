@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 21;
+const DATA_VERSION = 22;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -218,7 +218,27 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // Прохожие за окном: тёмные силуэты в длинной одежде видны только на стекле (позади рамы и кувшинов).
                 // x0..x1 — где идут (за окном), feetY — линия ног (ниже подоконника), height — рост, speed — скорость,
                 // every — через сколько секунд появляется следующий, phases — в какие части дня ходят.
-                passersby: { x0: 40, x1: 118, feetY: 122, height: [30, 36], speed: [7, 12], every: [5, 13], color: '#2a3a66', phases: ['morning', 'day'] } };
+                passersby: { x0: 40, x1: 118, feetY: 122, height: [30, 36], speed: [7, 12], every: [5, 13], color: '#2a3a66', phases: ['morning', 'day'],
+                             // типовые NPC за стеклом (уменьшены до height взрослого, дети ниже), тонированы color на долю tint; без файлов — прежние силуэты
+                             types: ['woman', 'girl_young', 'old_man', 'old_woman', 'merchant', 'peasant', 'soldier', 'boy', 'girl_child', 'priest'], tint: 0.55 },
+                // Типовые NPC в лавке (стоят, не разговаривают): type и v — тип и вариант (NPC_TYPES), x, y — где стоят ноги (y глубже линии пола — дальше),
+                // dir — 1 лицом вправо, -1 влево; phases — в какие части дня видны. Рисуются перед прилавком, позади Андрея.
+                extras: [
+                  { type: 'old_woman', v: 2, x: 318, y: 214, dir: 1, phases: ['day'] },      // ждёт в очереди за покупателем
+                  { type: 'girl_child', v: 2, x: 296, y: 208, dir: 1, phases: ['day'] }      // с ней внучка
+                ] };
+
+// Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
+// Фигура — один кадр покоя 144×120, опора (72, 114), лицом вправо; у каждого типа несколько вариантов цвета одежды, волос и кожи:
+// файл assets/characters/npc/<тип>_<вариант>.png, вариант 1 — как нарисовано. Рост взрослых ≈ 90 (Андрей 104), детей 59–73.
+// Ходьбы у них нет: стоят на месте (extras у сцен) или проходят за окном лавки (passersby, ног не видно).
+const NPC_TYPES = {
+  girl_young: { name: 'девушка', variants: 5 }, woman: { name: 'женщина', variants: 5 }, boy: { name: 'мальчик', variants: 4 },
+  girl_child: { name: 'девочка', variants: 4 }, old_woman: { name: 'старуха', variants: 4 }, old_man: { name: 'старик', variants: 4 },
+  soldier: { name: 'солдат', variants: 4 }, merchant: { name: 'купец', variants: 5 }, peasant: { name: 'мужик', variants: 5 },
+  priest: { name: 'священник', variants: 3 }
+};
+const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' });
 
 // Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
 // portrait — крупный портрет для диалога (180×204); sprite — фигура в сцене (отдельный файл, один кадр покоя):
@@ -228,11 +248,11 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 const CUSTOMERS = [
   { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/characters/pavel/pavel_portrait.png', color: '#4a5a3a',
-    sprite: { src: 'assets/characters/pavel/pavel_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+    sprite: npcSprite('merchant', 2) },   // пока свой спрайт не нарисован — типовой NPC (свой: assets/characters/pavel/pavel_idle.png)
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/characters/darya/darya_portrait.png', color: '#7a4a6b',
-    sprite: { src: 'assets/characters/darya/darya_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+    sprite: npcSprite('woman', 3) },
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
-    sprite: { src: 'assets/characters/fedor/fedor_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }
+    sprite: npcSprite('peasant', 4) }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -290,6 +310,12 @@ const SCENES = {
   // персонажи проходят за ними; Сорокин у своей конторки справа
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
+    // типовые NPC лабаза (как SCENE.extras): работники у ларей и мешков, покупательница, мальчишка у ворот
+    extras: [
+      { type: 'peasant', v: 1, x: 232, y: 204, dir: 1 }, { type: 'peasant', v: 3, x: 352, y: 200, dir: -1 },
+      { type: 'woman', v: 4, x: 288, y: 212, dir: 1 }, { type: 'boy', v: 2, x: 128, y: 218, dir: 1 },
+      { type: 'merchant', v: 4, x: 512, y: 208, dir: -1 }
+    ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
 };

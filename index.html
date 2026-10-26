@@ -134,7 +134,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 21) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 22) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -425,6 +425,11 @@ if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => { loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H); if (SCENES[id].front) loadImage('fr_' + id, SCENES[id].front, SCENES[id].worldW, H, true); });
 (MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+// типовые NPC: фигуры для extras всех сцен и для прохожих за окном (все варианты перечисленных типов); необязательны
+const npcKey = (t, v) => 'npc_' + t + '_' + v;
+const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
+((SCENE.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
+npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); loadImage(npcKey(t, v), npcSprite(t, +v).src, 144, 120, true); });
 const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
   if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
@@ -973,6 +978,13 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
   drawLit(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip);
   ctx.restore();
 }
+// Типовые NPC сцены (extras): стоят на месте, дальние (меньше y) рисуются раньше; без файла не рисуются.
+function drawExtras(list, lane) {
+  (list || []).filter(e => !e.phases || e.phases.includes(state.phase)).sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
+    const im = spr[npcKey(e.type, e.v)];
+    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, e.dir || 1, npcSprite(e.type, e.v), im);
+  });
+}
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
 // при движении показывается статичный кадр покоя — это НЕ анимация.
 // За прилавком (atCounter = true): передача товара после продажи, иначе ожидание; без этих файлов — кадр покоя.
@@ -1093,7 +1105,9 @@ function drawPassersby() {                             // слой 1а: в ко�
     walkers.next -= dt;
     if (walkers.next <= 0) {
       const dir = Math.random() < 0.5 ? 1 : -1, h = rnd(P.height[0], P.height[1]);
-      walkers.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress' });
+      const t = (P.types || [])[Math.floor(Math.random() * (P.types || []).length)], nv = t ? NPC_TYPES[t].variants : 0;
+      walkers.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress',
+                          npc: t ? npcKey(t, 1 + Math.floor(Math.random() * nv)) : null });
       walkers.next = rnd(P.every[0], P.every[1]);
     }
   }
@@ -1102,7 +1116,16 @@ function drawPassersby() {                             // слой 1а: в ко�
   if (!walkers.list.length) return;
   if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
   gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.fillStyle = P.color;
-  walkers.list.forEach(w => {                          // силуэт: голова, плечи, длинная одежда до земли
+  const asNpc = w => w.npc && spr[w.npc] && spr[w.npc].ok;
+  gctx.imageSmoothingEnabled = true;                   // типовой NPC, уменьшенный до роста h (взрослый ≈ 90 в файле), лицом по ходу
+  walkers.list.filter(asNpc).forEach(w => {
+    const k = w.h / 90;
+    gctx.save(); gctx.translate(Math.round(w.x), 0); if (w.dir < 0) gctx.scale(-1, 1);
+    gctx.drawImage(spr[w.npc], -72 * k, P.feetY - 114 * k, 144 * k, 120 * k);
+    gctx.restore();
+  });
+  if (P.tint) { gctx.globalCompositeOperation = 'source-atop'; gctx.globalAlpha = P.tint; gctx.fillRect(0, 0, glassCv.width, glassCv.height); gctx.globalAlpha = 1; gctx.globalCompositeOperation = 'source-over'; }
+  walkers.list.filter(w => !asNpc(w)).forEach(w => {   // без файла — силуэт: голова, плечи, длинная одежда до земли
     const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
     gctx.beginPath();
     gctx.moveTo(x - sh, f - h * 0.8); gctx.lineTo(x + sh, f - h * 0.8); gctx.lineTo(x + hw, f); gctx.lineTo(x - hw, f); gctx.closePath(); gctx.fill();
@@ -1250,6 +1273,7 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
+  drawExtras(c.extras, c.lane);
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
@@ -1272,6 +1296,7 @@ function draw() {
   else drawPerson(MOTHER, mp.x, mp.y, mp.dir);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
+  drawExtras(SCENE.extras, LANE);
   drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
