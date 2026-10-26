@@ -46,8 +46,9 @@ const phase = async (page, ph) => { await page.evaluate(ph => { state.phase = ph
   const far = await page.evaluate(() => charLights(SCENE.motherX, SCENE.lane).filter(o => o.color === scn().lights.find(l => l.kind === 'flame').color).length);
   check(far === 0, 'далеко от свечи (у матери) свет свечи на фигуру не падает');
   await phase(page, 'day');
-  const win = await page.evaluate(() => charLights(SCENE.motherX, SCENE.lane).find(o => o.color === scn().lights.find(l => l.kind === 'window').color));
-  check(win && win.k > 0.2 && win.s === -1, 'днём у окна на фигуру падает свет окна слева' + (win ? ` (сила ${win.k.toFixed(2)})` : ''));
+  const win = await page.evaluate(() => { const w = scn().lights.find(l => l.kind === 'window'), x = (w.beam[2][0] + w.beam[3][0]) / 2 + 40;   // правее пятна луча
+    return charLights(x, SCENE.lane).find(o => o.color === w.color); });
+  check(win && win.k > 0.2 && win.s === -1, 'днём правее окна на фигуру падает свет окна слева' + (win ? ` (сила ${win.k.toFixed(2)})` : ''));
   await phase(page, 'morning');                        // как игрок: утром открыть лавку, днём встать за прилавок (HD-прилавок поверх Андрея)
   await page.evaluate(() => { player.x = SCENE.workX; }); await page.waitForTimeout(100);
   await page.keyboard.press('e');
