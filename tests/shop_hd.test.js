@@ -1,7 +1,7 @@
 // Проверки фона лавки в высоком разрешении (HD) и ночного фона.
 // Запуск из папки проекта: node tests/shop_hd.test.js   (нужен Playwright: npm i playwright && npx playwright install chromium)
 // Что проверяется: игра открывается без ошибок; HD-слои дня и ночи загружены и нужного размера; утром и днём рисуется дневной фон,
-// вечером — ночной (окно на кадре темнее); свет на персонажах (тон и ближние источники); с ?hd=0 — прежние пиксельные слои и вечерний сумрак darkNoNight; Андрей за прилавком.
+// вечером — ночной (окно на кадре темнее); плавная смена части дня; свет на персонажах (тон и ближние источники); с ?hd=0 — прежние пиксельные слои и вечерний сумрак darkNoNight; Андрей за прилавком.
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
@@ -22,7 +22,8 @@ const windowLight = page => page.evaluate(() => {
   const d = ctx.getImageData(Math.round((62 - cameraX()) * px), 60 * px, 30 * px, 40 * px).data;
   let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4) / 3;
 });
-const phase = async (page, ph) => { await page.evaluate(ph => { state.phase = ph; }, ph); await page.waitForTimeout(300); };
+const TIME_FADE_MS = 3000;                               // дольше TIME.lightFade: переход части дня закончен
+const phase = async (page, ph) => { await page.evaluate(ph => { state.phase = ph; }, ph); await page.waitForTimeout(TIME_FADE_MS); };
 
 (async () => {
   const browser = await chromium.launch({ args: ['--allow-file-access-from-files'] });   // иначе холст с картинками из файлов не читается
@@ -39,6 +40,12 @@ const phase = async (page, ph) => { await page.evaluate(ph => { state.phase = ph
   check(await page.evaluate(() => nightBg()), 'вечером рисуется ночной фон');
   check(evening < day * 0.6 && evening < morning * 0.6, `вечером окно заметно темнее (утро ${morning | 0}, день ${day | 0}, вечер ${evening | 0})`);
   check(await page.evaluate(() => TIME.light.evening.dark < TIME.light.evening.darkNoNight), 'с ночным фоном вечерний сумрак слабее, чем без него');
+  // плавная смена части дня: сразу после закрытия лавки ночной фон проявляется постепенно
+  await phase(page, 'day'); await page.waitForTimeout(TIME_FADE_MS);
+  const mid = await page.evaluate(async () => { state.phase = 'evening'; await new Promise(r => setTimeout(r, TIME.lightFade * 400)); return nightK(); });
+  await page.waitForTimeout(TIME_FADE_MS);
+  const end = await page.evaluate(() => nightK());
+  check(mid > 0.05 && mid < 0.95 && end === 1, `день сменяется вечером плавно (на середине ночного фона ${(mid * 100) | 0}%, в конце ${(end * 100) | 0}%)`);
   // свет на персонажах: общий тон по времени суток + свет ближних источников с их стороны
   check(await page.evaluate(() => ['morning', 'day', 'evening'].every(ph => TIME.light[ph].ambient)), 'у каждого времени суток есть общий тон для персонажей (ambient)');
   const candle = await page.evaluate(() => { const c = scn().lights.find(l => l.kind === 'flame'); return charLights(c.x - 20, SCENE.lane).find(o => o.color === c.color); });

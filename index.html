@@ -403,12 +403,14 @@ const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лав�
 if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
   if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
   if (a.hdNight) loadImage(k + 'Night', a.hdNight, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется дневной слой.'); });
-const nightBg = () => LIGHT_ON && HD_ON && inShop() && !!(TIME.light[state.phase] || {}).night && !!(spr.bgHdNight && spr.bgHdNight.ok);
-function drawHd(key) {                                 // слой в высоком разрешении: плавно уменьшается под холст; в части дня night — ночная версия
-  const im = nightBg() && spr[key + 'Night'] && spr[key + 'Night'].ok ? spr[key + 'Night'] : spr[key];
-  if (!HD_ON || !im || !im.ok) return false;
+const nightBg = () => !!(TIME.light[state.phase] || {}).night && nightAvail();   // в эту часть дня рисуется ночной фон (с переходом — см. nightK)
+function drawHd(key) {                                 // слой в высоком разрешении: плавно уменьшается под холст; ночью — ночная версия (при смене части дня — наплыв)
+  const day = spr[key], night = spr[key + 'Night'], k = night && night.ok ? nightK() : 0;
+  if (!HD_ON || !day || !day.ok) return false;
   ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(im, 0, 0, SCENE.worldW, H); ctx.restore(); return true;
+  if (k < 1) ctx.drawImage(day, 0, 0, SCENE.worldW, H);
+  if (k > 0) { ctx.globalAlpha = k; ctx.drawImage(night, 0, 0, SCENE.worldW, H); }
+  ctx.restore(); return true;
 }
 Object.keys(SCENES).forEach(id => loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW, x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
@@ -863,7 +865,7 @@ function person(x, y, color, dir) {
 // Только наложением (без чтения пикселей): при открытии игры файлом пиксели картинок читать нельзя.
 let litB = null, litF = null;
 function charLights(wx, wy) {                          // источники, которые светят на фигуру в точке (wx, wy) мира: [{ s, k, color }]
-  const C = SCENE.charLight, L = TIME.light[state.phase] || TIME.light.day, t = performance.now() / 1000;
+  const C = SCENE.charLight, L = lightNow(), t = performance.now() / 1000;
   return (scn().lights || []).map((l, i) => {
     const win = l.kind === 'window', lx = win ? (l.beam[2][0] + l.beam[3][0]) / 2 : l.x, ly = win ? wy : l.y;
     const p = win ? L.window : L.warm * flick(t, i * 1.7, l.flicker || 0), r = (win ? C.windowR : l.r) * C.reach;
@@ -872,8 +874,8 @@ function charLights(wx, wy) {                          // источники, к
   }).filter(o => o.k > 0.02);
 }
 function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped) {
-  const C = SCENE.charLight, L = TIME.light[state.phase] || {};
-  if (!LIGHT_ON || !C || !L.ambient) { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  const C = SCENE.charLight, L = lightNow();
+  if (!LIGHT_ON || !C || L.ambient === '#ffffff') { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
   if (!litB) { litB = mkCv(sw, sh); litF = mkCv(sw, sh); }
   if (litB.width !== sw || litB.height !== sh) { litB.width = litF.width = sw; litB.height = litF.height = sh; }
   const b = litB.getContext('2d'), f = litF.getContext('2d');
@@ -1055,6 +1057,28 @@ const LIGHT_ON = !/[?&]light=0\b/.test(location.search);
 const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + Math.max(0, Math.min(1, a)) + ')'; };
 const flick = (t, seed, amp) => 1 + amp * (0.6 * Math.sin(t * 7.1 + seed) + 0.3 * Math.sin(t * 13.7 + seed * 2.3) + 0.1 * Math.sin(t * 31 + seed * 5.1));
+// Плавная смена части дня: свет, ночной фон и тон персонажей переходят за TIME.lightFade секунд.
+// lightNow() — настройки света на этот кадр (смесь прежней и новой части дня), nightK() — доля ночного фона (0 — день, 1 — ночь).
+const mixHex = (a, b, k) => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), m = s => Math.round((x >> s & 255) * (1 - k) + (y >> s & 255) * k);
+  return '#' + ((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0'); };
+const nightAvail = () => LIGHT_ON && HD_ON && inShop() && !!(spr.bgHdNight && spr.bgHdNight.ok);
+function lightOf(L) {                                  // часть дня → числа для смешивания (сумрак уже с учётом ночного фона)
+  const n = !!L.night && nightAvail();
+  return { dark: L.night && !n && L.darkNoNight != null ? L.darkNoNight : L.dark, darkColor: L.darkColor || '#000000', window: L.window, warm: L.warm,
+    vignette: L.vignette || 0, vignetteColor: L.vignetteColor || '#000000', ambient: L.ambient || '#ffffff', night: n ? 1 : 0 };
+}
+let phaseFx = { ph: null, from: null, t0: 0 }, lightLast = null;
+function lightNow() {
+  const to = lightOf(TIME.light[state.phase] || TIME.light.day), now = performance.now();
+  if (phaseFx.ph !== state.phase) { phaseFx = { ph: state.phase, from: phaseFx.ph ? lightLast : null, t0: now }; }
+  let k = phaseFx.from ? (now - phaseFx.t0) / 1000 / (TIME.lightFade || 0.001) : 1;
+  if (k >= 1) { phaseFx.from = null; return lightLast = to; }
+  k = k * k * (3 - 2 * k);                             // мягкое начало и конец
+  const f = phaseFx.from, o = {};
+  Object.keys(to).forEach(key => { o[key] = typeof to[key] === 'string' ? mixHex(f[key], to[key], k) : f[key] + (to[key] - f[key]) * k; });
+  return lightLast = o;
+}
+const nightK = () => lightNow().night;
 let dust = { scene: '', list: [], last: 0 };
 function shadow(x, y) {                                // тень под ногами (в координатах мира)
   const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
@@ -1063,10 +1087,10 @@ function shadow(x, y) {                                // тень под ног
 }
 function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
   if (!LIGHT_ON) return;
-  const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
+  const L = lightNow(), lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
   const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
   // 1) сумрак: заливка цветом, в местах света — просветы
-  const dark = L.night && !nightBg() && L.darkNoNight != null ? L.darkNoNight : L.dark;   // нет ночного фона — сумрак сильнее
+  const dark = L.dark;                                  // нет ночного фона — сумрак сильнее (darkNoNight, см. lightOf)
   if (dark > 0) {
     const w = canvas.width, h = canvas.height;
     if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
