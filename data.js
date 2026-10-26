@@ -221,11 +221,14 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 passersby: { x0: 40, x1: 118, feetY: 122, height: [30, 36], speed: [7, 12], every: [5, 13], color: '#2a3a66', phases: ['morning', 'day'],
                              // типовые NPC за стеклом (уменьшены до height взрослого, дети ниже), тонированы color на долю tint; без файлов — прежние силуэты
                              types: ['woman', 'girl_young', 'old_man', 'old_woman', 'merchant', 'peasant', 'soldier', 'boy', 'girl_child', 'priest'], tint: 0.55 },
-                // Типовые NPC в лавке (стоят, не разговаривают): type и v — тип и вариант (NPC_TYPES), x, y — где стоят ноги (y глубже линии пола — дальше),
-                // dir — 1 лицом вправо, -1 влево; phases — в какие части дня видны. Рисуются перед прилавком, позади Андрея.
+                // Типовые NPC в лавке (стоят, не разговаривают с Андреем): type и v — тип и вариант (NPC_TYPES), x, y — где стоят ноги
+                // (y глубже линии пола — дальше), dir — 1 лицом вправо, -1 влево; phases — в какие части дня видны;
+                // look — раз в столько секунд человек ненадолго оборачивается (треть времени смотрит в другую сторону), чтобы не стоял столбом.
+                // Рисуются перед прилавком, позади Андрея.
                 extras: [
-                  { type: 'old_woman', v: 2, x: 318, y: 214, dir: 1, phases: ['day'] },      // ждёт в очереди за покупателем
-                  { type: 'girl_child', v: 2, x: 296, y: 208, dir: 1, phases: ['day'] }      // с ней внучка
+                  { type: 'woman', v: 1, x: 238, y: 207, dir: 1, phases: ['day'], look: 11 },          // две соседки разговорились
+                  { type: 'girl_young', v: 2, x: 264, y: 209, dir: -1, phases: ['day'], look: 14 },
+                  { type: 'old_man', v: 2, x: 322, y: 213, dir: -1, phases: ['day'], look: 7 }           // разглядывает бочонки и полки
                 ] };
 
 // Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
@@ -310,11 +313,11 @@ const SCENES = {
   // персонажи проходят за ними; Сорокин у своей конторки справа
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
-    // типовые NPC лабаза (как SCENE.extras): работники у ларей и мешков, покупательница, мальчишка у ворот
+    // типовые NPC лабаза: только люди Сорокина (работники) и пара купцов, как Андрей, — группками по бокам, беседуют
     extras: [
-      { type: 'peasant', v: 1, x: 232, y: 204, dir: 1 }, { type: 'peasant', v: 3, x: 352, y: 200, dir: -1 },
-      { type: 'woman', v: 4, x: 288, y: 212, dir: 1 }, { type: 'boy', v: 2, x: 128, y: 218, dir: 1 },
-      { type: 'merchant', v: 4, x: 512, y: 208, dir: -1 }
+      { type: 'peasant', v: 1, x: 128, y: 214, dir: 1, look: 12 }, { type: 'peasant', v: 3, x: 160, y: 212, dir: -1, look: 15 },   // работники у ворот
+      { type: 'peasant', v: 5, x: 344, y: 200, dir: 1, look: 9 },                                                                  // работник у мешков
+      { type: 'merchant', v: 4, x: 492, y: 206, dir: 1, look: 13 }, { type: 'merchant', v: 2, x: 522, y: 208, dir: -1, look: 10 }  // купцы у конторки
     ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }

@@ -982,7 +982,8 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 function drawExtras(list, lane) {
   (list || []).filter(e => !e.phases || e.phases.includes(state.phase)).sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
     const im = spr[npcKey(e.type, e.v)];
-    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, e.dir || 1, npcSprite(e.type, e.v), im);
+    const t = performance.now() / 1000, turned = e.look && (t + e.x * 0.37) % e.look > e.look * 2 / 3;   // оборачивается на треть времени
+    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, (e.dir || 1) * (turned ? -1 : 1), npcSprite(e.type, e.v), im);
   });
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
