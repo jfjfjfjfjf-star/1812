@@ -232,7 +232,7 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                   { type: 's_talk', v: 2, x: 236, y: 210, dir: 1, phases: ['day'], talk: 0 },                 // разговорились две соседки
                   { type: 's_listen', v: 1, x: 268, y: 212, dir: -1, phases: ['day'], look: 12, talk: 1 },
                   { type: 'woman', v: 4, x: 512, y: 216, dir: -1, phases: ['day'], look: 8 },                 // ждёт у двери
-                  { type: 'm_listen', v: 3, x: 586, y: 264, dir: -1, phases: ['day'] }                        // передний план: силуэт в углу
+                  { type: 'm_listen', v: 3, x: 580, y: 250, dir: -1, phases: ['day'], behind: true }          // передний план: за ящиками в углу, ящики закрывают ему ноги
                 ],
                 // Глубина для extras: far — самый дальний ряд (y, масштаб, сила дымки, её цвет), near — самый ближний (y, масштаб,
                 // сила затемнения почти до силуэта, цвет, fadeR — ближе этого к Андрею по x фигура полупрозрачна).
@@ -335,15 +335,17 @@ const SCENES = {
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
     // NPC лабаза: только люди Сорокина (работники) и купцы, как Андрей, — группками, отдыхают, работают, беседуют
     extras: [
-      { type: 'w_sack', v: 2, x: 70, y: 170, dir: 1 },                                                                                       // дальний план: заносит мешок с пристани
       { type: 'w_hips', v: 1, x: 236, y: 178, dir: 1, talk: 0, look: 13 }, { type: 'w_shovel', v: 2, x: 268, y: 180, dir: -1, talk: 1 },     // дальний план: работники у ларей
       { type: 'm_coins', v: 2, x: 474, y: 182, dir: -1 },                                                                                    // дальний план: купец на бочке у конторки
       { type: 'w_sit_talk', v: 1, x: 112, y: 216, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 174, y: 214, dir: -1, talk: 1, look: 14 },   // отдыхают у ворот
       { type: 'm_talk', v: 1, x: 300, y: 212, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 332, y: 212, dir: -1, talk: 1, look: 12 },     // купцы торгуются
       { type: 'w_sack', v: 1, x: 382, y: 210, dir: 1 },                                                                                      // несёт мешок к конторке
-      { type: 'w_hips', v: 3, x: 26, y: 264, dir: 1 }, { type: 'm_listen', v: 1, x: 566, y: 266, dir: -1 }                                   // передний план: силуэты по краям
+      { type: 'w_hips', v: 3, x: 34, y: 248, dir: 1, behind: true }, { type: 'm_listen', v: 1, x: 566, y: 250, dir: -1, behind: true }     // передний план: за бочками и мешками по краям
     ],
     depth: { far: { y: 170, scale: 0.8, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },
+    // прохожие на пристани за воротами (как SCENE.passersby, но вместо стекла — проём ворот clip [x0, y0, x1, y1])
+    passersby: { x0: 20, x1: 112, feetY: 152, height: [44, 52], speed: [9, 15], every: [4, 10], color: '#8fa6c8', tint: 0.22, phases: ['morning', 'day'],
+                 clip: [32, 20, 104, 164], types: ['peasant', 'merchant', 'woman', 'girl_young', 'old_man', 'boy', 'soldier', 'old_woman'] },
     darkK: 0.7,   // вечерний сумрак в лабазе на 30% слабее, чем в лавке (своих свечей нет — иначе слишком темно)
     // свет лабаза (как SCENE.lights): ворота слева — дневной свет с лучом на пол, окошко над мешками, тёплое свечение в глубине и у конторки
     lights: [

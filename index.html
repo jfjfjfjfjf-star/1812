@@ -428,7 +428,7 @@ speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.s
 // типовые NPC: фигуры для extras всех сцен и для прохожих за окном (все варианты перечисленных типов); необязательны
 const npcKey = (t, v) => 'npc_' + t + '_' + v;
 const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
-((SCENE.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
+[SCENE, ...Object.values(SCENES)].flatMap(c => (c.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
 npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); const sp = npcSprite(t, +v); loadImage(npcKey(t, v), sp.src, sp.cellW * sp.frames, sp.cellH, true); });
 // Кадр покоя NPC (лист из 4: как есть, вдох, рот, вдох и рот): дыхание по времени со сдвигом seed (у каждого своё);
 // talk (0/1) — участник беседы: в свою очередь шевелит губами и меняет жест. Возвращает [кадр, говорит ли сейчас].
@@ -996,9 +996,10 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 // Типовые NPC сцены (extras): стоят на месте, дальние (меньше y) рисуются раньше; без файла не рисуются.
 // Глубина (depth у сцены): дальше линии пола — мельче и в дымке, до far.scale и far.haze на far.y; ближе — крупнее и темнее
 // (почти силуэт) до near.scale и near.dark на near.y. front = true — только передний план (рисуется поверх Андрея; если Андрей
-// за фигурой, она становится полупрозрачной), иначе — всё, что не ближе линии пола.
+// за фигурой, она становится полупрозрачной), иначе — всё остальное, в том числе ближние с behind: они стоят за ящиками
+// и бочками переднего плана (слой front места), и те закрывают им ноги.
 function drawExtras(list, lane, D, front) {
-  (list || []).filter(e => (!e.phases || e.phases.includes(state.phase)) && ((e.y || lane) > lane) === !!front)
+  (list || []).filter(e => (!e.phases || e.phases.includes(state.phase)) && ((e.y || lane) > lane && !e.behind) === !!front)
     .sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
     const im = spr[npcKey(e.type, e.v)], y = e.y || lane;
     const t = performance.now() / 1000, [f, speaking] = npcIdle(e.x * 0.37, e.talk), frame = f % npcSprite(e.type, e.v).frames;
@@ -1119,48 +1120,52 @@ const sfx = (() => {
 })();
 sfx.label();
 
-// ================= ПРОХОЖИЕ ЗА ОКНОМ =================
-// Тёмные силуэты в длинной одежде (кафтан, платье) проходят за стеклом. Рисуются только на стекле (слой shop_glass.png),
-// поэтому идут позади рамы и кувшинов на подоконнике. Ног не видно — шагов не изображаем.
-const walkers = { list: [], next: 2, last: 0 };
+// ================= ПРОХОЖИЕ ЗА ОКНОМ И В ВОРОТАХ =================
+// Типовые NPC (или тёмные силуэты, если файлов нет) проходят снаружи: в лавке — только по стеклу окна (слой shop_glass.png,
+// поэтому позади рамы и кувшинов), в лабазе — в проёме ворот (clip — прямоугольник проёма). Уменьшены до роста h, тонированы.
+// Ходьбы нет: в окне ног не видно, в воротах люди далеко.
+const walkersBy = {};                                  // по местам: { list, next, last }
 const glassCv = document.createElement('canvas'), gctx = glassCv.getContext('2d');
 const rnd = (a, b) => a + Math.random() * (b - a);
 function drawPassersby() {                             // слой 1а: в координатах мира, сразу после фона
-  const P = SCENE.passersby, gl = spr.glass;
-  if (!P || !gl || !gl.ok) return;
-  const t = performance.now() / 1000, dt = Math.min(0.1, t - (walkers.last || t)); walkers.last = t;
+  const P = scn().passersby, gl = P && P.clip ? null : spr.glass;
+  if (!P || (!P.clip && (!gl || !gl.ok))) return;
+  const W_ = walkersBy[state.scene] || (walkersBy[state.scene] = { list: [], next: 2, last: 0 });
+  const t = performance.now() / 1000, dt = Math.min(0.1, t - (W_.last || t)); W_.last = t;
   if (P.phases.includes(state.phase)) {
-    walkers.next -= dt;
-    if (walkers.next <= 0) {
+    W_.next -= dt;
+    if (W_.next <= 0) {
       const dir = Math.random() < 0.5 ? 1 : -1, h = rnd(P.height[0], P.height[1]);
       const t = (P.types || [])[Math.floor(Math.random() * (P.types || []).length)], nv = t ? NPC_TYPES[t].variants : 0;
-      walkers.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress',
-                          npc: t ? npcKey(t, 1 + Math.floor(Math.random() * nv)) : null });
-      walkers.next = rnd(P.every[0], P.every[1]);
+      W_.list.push({ x: dir > 0 ? P.x0 : P.x1, dir, h, v: rnd(P.speed[0], P.speed[1]), kind: Math.random() < 0.5 ? 'coat' : 'dress',
+                     npc: t ? npcKey(t, 1 + Math.floor(Math.random() * nv)) : null });
+      W_.next = rnd(P.every[0], P.every[1]);
     }
   }
-  walkers.list.forEach(w => { w.x += w.dir * w.v * dt; });
-  walkers.list = walkers.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
-  if (!walkers.list.length) return;
-  if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
+  W_.list.forEach(w => { w.x += w.dir * w.v * dt; });
+  W_.list = W_.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
+  if (!W_.list.length) return;
+  const cw = scn().worldW || SCENE.worldW;
+  if (glassCv.width !== cw || glassCv.height !== H) { glassCv.width = cw; glassCv.height = H; }
   gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.fillStyle = P.color;
   const asNpc = w => w.npc && spr[w.npc] && spr[w.npc].ok;
   gctx.imageSmoothingEnabled = true;                   // типовой NPC, уменьшенный до роста h (взрослый ≈ 90 в файле), лицом по ходу
-  walkers.list.filter(asNpc).forEach(w => {
+  W_.list.filter(asNpc).forEach(w => {
     const k = w.h / 90;
     gctx.save(); gctx.translate(Math.round(w.x), 0); if (w.dir < 0) gctx.scale(-1, 1);
     gctx.drawImage(spr[w.npc], 0, 0, 144, 120, -72 * k, P.feetY - 114 * k, 144 * k, 120 * k);   // первый кадр листа
     gctx.restore();
   });
   if (P.tint) { gctx.globalCompositeOperation = 'source-atop'; gctx.globalAlpha = P.tint; gctx.fillRect(0, 0, glassCv.width, glassCv.height); gctx.globalAlpha = 1; gctx.globalCompositeOperation = 'source-over'; }
-  walkers.list.filter(w => !asNpc(w)).forEach(w => {   // без файла — силуэт: голова, плечи, длинная одежда до земли
+  W_.list.filter(w => !asNpc(w)).forEach(w => {   // без файла — силуэт: голова, плечи, длинная одежда до земли
     const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
     gctx.beginPath();
     gctx.moveTo(x - sh, f - h * 0.8); gctx.lineTo(x + sh, f - h * 0.8); gctx.lineTo(x + hw, f); gctx.lineTo(x - hw, f); gctx.closePath(); gctx.fill();
     gctx.beginPath(); gctx.arc(x, f - h * 0.89, h * (w.kind === 'dress' ? 0.1 : 0.085), 0, Math.PI * 2); gctx.fill();
     if (w.kind === 'coat') gctx.fillRect(x - h * 0.1, f - h * 0.99, h * 0.2, h * 0.05);   // шапка
   });
-  gctx.globalCompositeOperation = 'destination-in'; gctx.drawImage(gl, 0, 0);   // оставить силуэты только на стекле
+  gctx.globalCompositeOperation = 'destination-in';   // оставить только на стекле или в проёме ворот
+  if (P.clip) { gctx.fillStyle = '#000'; gctx.fillRect(P.clip[0], P.clip[1], P.clip[2] - P.clip[0], P.clip[3] - P.clip[1]); } else gctx.drawImage(gl, 0, 0);
   ctx.drawImage(glassCv, 0, 0);
 }
 
@@ -1296,7 +1301,7 @@ function drawFront() {                                 // слой 8
 function drawPlace() {
   const c = scn(), bg = spr['bg_' + state.scene];
   ctx.save(); ctx.translate(-cameraX(), 0);
-  if (bg && bg.ok) ctx.drawImage(bg, 0, 0);
+  if (bg && bg.ok) { ctx.drawImage(bg, 0, 0); drawPassersby(); }
   else {                                               // заглушка: стена, пол, мешки у стены
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }

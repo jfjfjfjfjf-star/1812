@@ -26,9 +26,9 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   check(shopExtras === shopAll, `в лавке днём видны extras (${shopExtras} из ${shopAll})`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_day.png') });
   // за окном: прохожие из типовых NPC
-  await page.evaluate(() => { player.x = 140; walkers.list = []; walkers.next = 0; });
+  await page.evaluate(() => { player.x = 140; walkersBy.shop = { list: [], next: 0, last: 0 }; });
   await page.waitForTimeout(4000);
-  const pass = await page.evaluate(() => walkers.list.filter(w => w.npc && spr[w.npc].ok).length);
+  const pass = await page.evaluate(() => walkersBy.shop.list.filter(w => w.npc && spr[w.npc].ok).length);
   check(pass > 0, `за окном проходит типовой NPC (${pass})`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_window.png') });
   // лабаз
@@ -36,6 +36,10 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   const [lab, labAll] = await page.evaluate(() => [SCENES.labaz.extras.filter(e => spr[npcKey(e.type, e.v)].ok).length, SCENES.labaz.extras.length]);
   check(lab === labAll, `в лабазе стоят extras (${lab} из ${labAll})`);
   await page.screenshot({ path: path.join(OUT, 'npc_labaz.png') });
+  await page.evaluate(() => { player.x = 60; walkersBy.labaz = { list: [], next: 0, last: 0 }; }); await page.waitForTimeout(3000);
+  const gate = await page.evaluate(() => walkersBy.labaz.list.filter(w => w.npc && spr[w.npc].ok).length);
+  check(gate > 0, `в воротах лабаза проходят люди (${gate})`);
+  await page.screenshot({ path: path.join(OUT, 'npc_labaz_gate.png') });
   await page.evaluate(() => { player.x = 470; }); await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, 'npc_labaz_right.png') });
   // покой: дыхание и разговор — кадры листа меняются со временем, у участника беседы бывает открыт рот
