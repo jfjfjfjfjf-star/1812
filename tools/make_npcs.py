@@ -126,6 +126,20 @@ def recolor(lab, sel, hue, chroma, dl=0.0):
     out[sel, 0] = np.clip(L + dl, 2, 98); out[sel, 1] = k * np.cos(t); out[sel, 2] = k * np.sin(t)
     return out
 
+# Разный рост: у каждого варианта своя прибавка (пиксели, + выше, − ниже). Строки добавляются (повтором) или убираются
+# равномерно в полосе ног и подола (BAND — доля роста сверху), лицо, руки и подол с узором не трогаются — пиксели остаются чёткими.
+HEIGHT = {'adult': [0, 5, -5, 9, -8], 'child': [0, 4, -5, 7], 'old': [0, -4, 4, -7]}
+KIND = {'boy': 'child', 'girl_child': 'child', 'old_woman': 'old', 'old_man': 'old'}
+BAND = (0.6, 0.86)
+
+def stretch(fig, d):
+    """fig — фигура (строки сверху вниз, обрезана по росту); d — на сколько строк выше (<0 — ниже)."""
+    if not d: return fig
+    h = fig.shape[0]; a, b = int(h * BAND[0]), int(h * BAND[1])
+    rows = np.round(np.linspace(a, b, abs(d) + 2)[1:-1]).astype(int)
+    if d > 0: return np.insert(fig, rows, fig[rows], axis=0)
+    return np.delete(fig, rows, axis=0)
+
 def figure_cells(sheet):
     for f in FIG:
         y0 = f['row'] * 128; x0, x1 = f['x']
@@ -164,11 +178,13 @@ def build(debug=False):
             rgb = crop[..., :3].copy()
             if var: rgb[m] = lab_to_rgb(v[m])
             img = np.zeros((CELL_H, CELL_W, 4), np.uint8)
-            fig = np.dstack([rgb, crop[..., 3]])
-            cx = (xs[0] + xs[-1]) // 2                        # середина фигуры — на опору
-            dx, dy = ANCHOR_X - cx, FLOOR_Y - feet
-            y_from = max(0, -dy)
-            img[y_from + dy: h + dy if h + dy <= CELL_H else CELL_H, dx: dx + w] = fig[y_from: min(h, CELL_H - dy)]
+            fig = np.dstack([rgb, crop[..., 3]])[ys[0]: feet + 1]
+            hs = HEIGHT[KIND.get(f['id'], 'adult')]
+            fig = stretch(fig, hs[vi % len(hs)])
+            fh = fig.shape[0]
+            cx = (xs[0] + xs[-1]) // 2                        # середина фигуры — на опору, стопы — на FLOOR_Y
+            dx, top = ANCHOR_X - cx, FLOOR_Y + 1 - fh
+            img[max(0, top): FLOOR_Y + 1, dx: dx + w] = fig[max(0, -top):]
             im = Image.fromarray(img, 'RGBA')
             if SNAP: im = palette_lib.apply(im, pal)
             path = '%s/%s_%d.png' % (OUT, f['id'], vi + 1)
