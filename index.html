@@ -951,16 +951,19 @@ function charLights(wx, wy) {                          // источники, к
     return { s: Math.sign(lx - wx) || 1, k: Math.max(0, p * (1 - d / r)), color: l.color };
   }).filter(o => o.k > 0.02);
 }
-function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped) {
+function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped, haze) {   // haze — { color, a }: дымка дальнего плана поверх фигуры
   const C = SCENE.charLight, L = lightNow();
-  if (!LIGHT_ON || !C || L.ambient === '#ffffff') { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  const lit = LIGHT_ON && C && L.ambient !== '#ffffff';
+  if (!lit && !haze) { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
   if (!litB) { litB = mkCv(sw, sh); litF = mkCv(sw, sh); }
   if (litB.width !== sw || litB.height !== sh) { litB.width = litF.width = sw; litB.height = litF.height = sh; }
   const b = litB.getContext('2d'), f = litF.getContext('2d');
   b.globalCompositeOperation = 'source-over'; b.clearRect(0, 0, sw, sh); b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-  b.globalCompositeOperation = 'multiply'; b.fillStyle = L.ambient; b.fillRect(0, 0, sw, sh);
-  b.globalCompositeOperation = 'destination-in'; b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);   // умножение залило и пустоту — вернуть силуэт
-  charLights(wx, wy).forEach(o => {
+  if (lit) {
+    b.globalCompositeOperation = 'multiply'; b.fillStyle = L.ambient; b.fillRect(0, 0, sw, sh);
+    b.globalCompositeOperation = 'destination-in'; b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);   // умножение залило и пустоту — вернуть силуэт
+  }
+  (lit ? charLights(wx, wy) : []).forEach(o => {
     const s = flipped ? -o.s : o.s, near = s > 0 ? sw : 0;   // в зеркальном кадре «справа» — это слева
     f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, sw, sh); f.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
     const g = f.createLinearGradient(near, 0, sw / 2 - s * sw * 0.05, 0);
@@ -974,28 +977,40 @@ function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped) {
     f.globalCompositeOperation = 'destination-in'; f.fillStyle = v; f.fillRect(0, 0, sw, sh);   // свет сверху: кайма гаснет к ногам
     b.globalCompositeOperation = 'lighter'; b.drawImage(litF, 0, 0);
   });
+  if (haze && haze.a > 0) { b.globalCompositeOperation = 'source-atop'; b.globalAlpha = haze.a; b.fillStyle = haze.color; b.fillRect(0, 0, sw, sh); b.globalAlpha = 1; }
   ctx.drawImage(litB, 0, 0, sw, sh, dx, dy, dw, dh);
 }
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
 function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — другой лист кадров (например, дело матери)
-  shadow(x, y);
+  shadow(x, y, (spOver || who.sprite || {}).scale || 1);
   const sp = spOver || who.sprite, im = imOver || (sp && spr['s_' + who.id]);
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
-  const k = SCENE.charScale, flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало
+  const k = SCENE.charScale * (sp.scale || 1), flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало; scale — глубина
   const f = sp.frame != null ? sp.frame : sp.idle ? npcIdle(x * 0.37)[0]   // кадр задан снаружи; NPC — кадр покоя (дыхание)
     : sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
-  drawLit(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip);
+  drawLit(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip, sp.haze);
   ctx.restore();
 }
 // Типовые NPC сцены (extras): стоят на месте, дальние (меньше y) рисуются раньше; без файла не рисуются.
-function drawExtras(list, lane) {
-  (list || []).filter(e => !e.phases || e.phases.includes(state.phase)).sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
-    const im = spr[npcKey(e.type, e.v)];
+// Глубина (depth у сцены): дальше линии пола — мельче и в дымке, до far.scale и far.haze на far.y; ближе — крупнее и темнее
+// (почти силуэт) до near.scale и near.dark на near.y. front = true — только передний план (рисуется поверх Андрея; если Андрей
+// за фигурой, она становится полупрозрачной), иначе — всё, что не ближе линии пола.
+function drawExtras(list, lane, D, front) {
+  (list || []).filter(e => (!e.phases || e.phases.includes(state.phase)) && ((e.y || lane) > lane) === !!front)
+    .sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
+    const im = spr[npcKey(e.type, e.v)], y = e.y || lane;
     const t = performance.now() / 1000, [f, speaking] = npcIdle(e.x * 0.37, e.talk), frame = f % npcSprite(e.type, e.v).frames;
     const turned = !speaking && e.look && (t + e.x * 0.37) % e.look > e.look * 2 / 3;   // оборачивается на треть времени, но не посреди своей речи
-    if (im && im.ok) drawPerson({ id: npcKey(e.type, e.v) }, e.x, e.y || lane, (e.dir || 1) * (turned ? -1 : 1), Object.assign(npcSprite(e.type, e.v), { frame }), im);
+    const sp = Object.assign(npcSprite(e.type, e.v), { frame });
+    if (D && y < lane) { const d = Math.min(1, (lane - y) / (lane - D.far.y)); sp.scale = 1 - d * (1 - D.far.scale); sp.haze = { color: D.far.color, a: d * D.far.haze }; }
+    if (D && y > lane) { const d = Math.min(1, (y - lane) / (D.near.y - lane)); sp.scale = 1 + d * (D.near.scale - 1); sp.haze = { color: D.near.color, a: d * D.near.dark }; }
+    if (!im || !im.ok) return;
+    const fade = front && Math.abs(player.x - e.x) < (D ? D.near.fadeR : 30);
+    if (fade) ctx.globalAlpha = 0.45;
+    drawPerson({ id: npcKey(e.type, e.v) }, e.x, y, (e.dir || 1) * (turned ? -1 : 1), sp, im);
+    ctx.globalAlpha = 1;
   });
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
@@ -1180,17 +1195,17 @@ function lightNow() {
 }
 const nightK = () => lightNow().night;
 let dust = { scene: '', list: [], last: 0 };
-function shadow(x, y) {                                // тень под ногами (в координатах мира)
+function shadow(x, y, k = 1) {                         // тень под ногами (в координатах мира); k — масштаб фигуры (глубина)
   const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
   ctx.fillStyle = 'rgba(0,0,0,' + sh.alpha + ')';
-  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w / 2, sh.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w / 2 * k, sh.h / 2 * k, 0, 0, Math.PI * 2); ctx.fill();
 }
 function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
   if (!LIGHT_ON) return;
   const L = lightNow(), lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
   const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
   // 1) сумрак: заливка цветом, в местах света — просветы
-  const dark = L.dark;                                  // нет ночного фона — сумрак сильнее (darkNoNight, см. lightOf)
+  const dark = L.dark * (scn().darkK != null ? scn().darkK : 1);   // нет ночного фона — сумрак сильнее (darkNoNight, см. lightOf); darkK — поправка места
   if (dark > 0) {
     const w = canvas.width, h = canvas.height;
     if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
@@ -1286,10 +1301,11 @@ function drawPlace() {
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
     for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
-  drawExtras(c.extras, c.lane);
+  drawExtras(c.extras, c.lane, c.depth);
   (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
+  drawExtras(c.extras, c.lane, c.depth, true);
   drawLight();
   ctx.restore();
 }
@@ -1309,10 +1325,11 @@ function draw() {
   else drawPerson(MOTHER, mp.x, mp.y, mp.dir);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
-  drawExtras(SCENE.extras, LANE);
+  drawExtras(SCENE.extras, LANE, SCENE.depth);
   drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
+  drawExtras(SCENE.extras, LANE, SCENE.depth, true);   // передний план: ближе ящиков и табурета
   drawLight();
   ctx.restore();
   drawHud();

@@ -227,11 +227,16 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // talk — участник беседы: 0 или 1, чья очередь говорить (шевелит губами), пока говорит — не оборачивается.
                 // Рисуются перед прилавком, позади Андрея.
                 extras: [
-                  { type: 's_point', v: 2, x: 214, y: 210, dir: 1, phases: ['day'], look: 13 },               // показывает на полку
-                  { type: 's_talk', v: 2, x: 280, y: 208, dir: 1, phases: ['day'], talk: 0 },                 // разговорились две соседки
-                  { type: 's_listen', v: 1, x: 316, y: 210, dir: -1, phases: ['day'], look: 12, talk: 1 },
-                  { type: 's_look', v: 1, x: 506, y: 214, dir: -1, phases: ['day'], look: 9 }                 // старик разглядывает товар у прилавка
-                ] };
+                  { type: 's_look', v: 2, x: 186, y: 198, dir: -1, phases: ['day'], look: 10 },               // дальний план: старик у бочонков
+                  { type: 's_point', v: 2, x: 304, y: 197, dir: 1, phases: ['day'], look: 13 },               // дальний план: показывает на полку
+                  { type: 's_talk', v: 2, x: 236, y: 210, dir: 1, phases: ['day'], talk: 0 },                 // разговорились две соседки
+                  { type: 's_listen', v: 1, x: 268, y: 212, dir: -1, phases: ['day'], look: 12, talk: 1 },
+                  { type: 'woman', v: 4, x: 512, y: 216, dir: -1, phases: ['day'], look: 8 },                 // ждёт у двери
+                  { type: 'm_listen', v: 3, x: 586, y: 264, dir: -1, phases: ['day'] }                        // передний план: силуэт в углу
+                ],
+                // Глубина для extras: far — самый дальний ряд (y, масштаб, сила дымки, её цвет), near — самый ближний (y, масштаб,
+                // сила затемнения почти до силуэта, цвет, fadeR — ближе этого к Андрею по x фигура полупрозрачна).
+                depth: { far: { y: 194, scale: 0.84, haze: 0.32, color: '#22160e' }, near: { y: 264, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } } };
 
 // Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
 // Фигура — один кадр покоя 144×120, опора (72, 114), лицом вправо; у каждого типа несколько вариантов цвета одежды, волос и кожи:
@@ -330,11 +335,22 @@ const SCENES = {
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
     // NPC лабаза: только люди Сорокина (работники) и купцы, как Андрей, — группками, отдыхают, работают, беседуют
     extras: [
-      { type: 'w_sit_talk', v: 1, x: 102, y: 216, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 168, y: 214, dir: -1, talk: 1, look: 14 },   // работники отдыхают у ворот
-      { type: 'w_sack', v: 1, x: 236, y: 212, dir: 1 },                                                                                      // несёт мешок к ларям
-      { type: 'm_talk', v: 1, x: 298, y: 208, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 330, y: 208, dir: -1, talk: 1, look: 12 },     // купцы торгуются у ларей
-      { type: 'w_shovel', v: 2, x: 384, y: 206, dir: -1, look: 11 },                                                                         // у мешков с лопатой
-      { type: 'm_coins', v: 1, x: 522, y: 212, dir: -1 }                                                                                     // купец на бочке у конторки считает деньги
+      { type: 'w_sack', v: 2, x: 70, y: 170, dir: 1 },                                                                                       // дальний план: заносит мешок с пристани
+      { type: 'w_hips', v: 1, x: 236, y: 178, dir: 1, talk: 0, look: 13 }, { type: 'w_shovel', v: 2, x: 268, y: 180, dir: -1, talk: 1 },     // дальний план: работники у ларей
+      { type: 'm_coins', v: 2, x: 474, y: 182, dir: -1 },                                                                                    // дальний план: купец на бочке у конторки
+      { type: 'w_sit_talk', v: 1, x: 112, y: 216, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 174, y: 214, dir: -1, talk: 1, look: 14 },   // отдыхают у ворот
+      { type: 'm_talk', v: 1, x: 300, y: 212, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 332, y: 212, dir: -1, talk: 1, look: 12 },     // купцы торгуются
+      { type: 'w_sack', v: 1, x: 382, y: 210, dir: 1 },                                                                                      // несёт мешок к конторке
+      { type: 'w_hips', v: 3, x: 26, y: 264, dir: 1 }, { type: 'm_listen', v: 1, x: 566, y: 266, dir: -1 }                                   // передний план: силуэты по краям
+    ],
+    depth: { far: { y: 170, scale: 0.8, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },
+    darkK: 0.7,   // вечерний сумрак в лабазе на 30% слабее, чем в лавке (своих свечей нет — иначе слишком темно)
+    // свет лабаза (как SCENE.lights): ворота слева — дневной свет с лучом на пол, окошко над мешками, тёплое свечение в глубине и у конторки
+    lights: [
+      { kind: 'window', x0: 30, y0: 20, x1: 105, y1: 160, beam: [[40, 150], [105, 150], [260, 228], [70, 228]], color: '#a9c8ff' },
+      { kind: 'window', x0: 190, y0: 50, x1: 230, y1: 72, beam: [[195, 72], [228, 72], [262, 190], [222, 190]], color: '#8fb8ff' },
+      { kind: 'glow', x: 372, y: 160, r: 110, color: '#ff9c44', flicker: 0.03 },
+      { kind: 'glow', x: 510, y: 135, r: 80, color: '#ffb35a', flicker: 0.05 }
     ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
