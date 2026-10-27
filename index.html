@@ -428,6 +428,7 @@ speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.s
 // типовые NPC: фигуры для extras всех сцен и для прохожих за окном (все варианты перечисленных типов); необязательны
 const npcKey = (t, v) => 'npc_' + t + '_' + v;
 const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
+(SCENE.spots || []).flatMap(p => p.who || p.pair.flat()).forEach(t => { for (let v = 1; v <= NPC_TYPES[t].variants; v++) npcNeed.add(t + '_' + v); });
 [SCENE, ...Object.values(SCENES)].flatMap(c => (c.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
 npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); const sp = npcSprite(t, +v); loadImage(npcKey(t, v), sp.src, sp.cellW * sp.frames, sp.cellH, true); });
 // Кадр покоя NPC (лист из 4: как есть, вдох, рот, вдох и рот): дыхание по времени со сдвигом seed (у каждого своё);
@@ -998,6 +999,31 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 // (почти силуэт) до near.scale и near.dark на near.y. front = true — только передний план (рисуется поверх Андрея; если Андрей
 // за фигурой, она становится полупрозрачной), иначе — всё остальное, в том числе ближние с behind: они стоят за ящиками
 // и бочками переднего плана (слой front места), и те закрывают им ноги.
+// Люди в лавке на сегодня: из мест SCENE.spots занято crowd[часть дня] (от–до), кто и в каком цвете — случайно, но по дню
+// одинаково (зерно — номер дня и часть дня), одинаковых (тип и цвет) нет. Без мест — SCENE.extras как есть.
+let shopCrowd = { key: '', list: [] };
+function shopExtras() {
+  if (!SCENE.spots) return SCENE.extras;
+  const key = state.day + '/' + state.phase;
+  if (shopCrowd.key === key) return shopCrowd.list;
+  let h = 2166136261;
+  for (const ch of 'shop' + key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const [lo, hi] = (SCENE.crowd || {})[state.phase] || [0, 0];
+  const free = SCENE.spots.filter(p => (p.phases || ['day']).includes(state.phase)), list = [], used = new Set();
+  const person = (type, o) => {
+    let v = 1 + Math.floor(rnd() * NPC_TYPES[type].variants);
+    for (let i = 0; i < NPC_TYPES[type].variants && used.has(type + '_' + v); i++) v = v % NPC_TYPES[type].variants + 1;
+    used.add(type + '_' + v); list.push(Object.assign({ type, v }, o));
+  };
+  for (let n = Math.min(free.length, lo + Math.floor(rnd() * (hi - lo + 1))); n > 0; n--) {
+    const p = free.splice(Math.floor(rnd() * free.length), 1)[0];
+    if (p.pair) { const [a, b] = pick(p.pair); person(a, { x: p.x, y: p.y, dir: p.dir, talk: 0 }); person(b, { x: p.x2, y: p.y2, dir: p.dir2, talk: 1, look: 12 }); }
+    else person(pick(p.who), { x: p.x, y: p.y, dir: p.dir, look: p.look, behind: p.behind });
+  }
+  return (shopCrowd = { key, list }).list;
+}
 function drawExtras(list, lane, D, front) {
   (list || []).filter(e => (!e.phases || e.phases.includes(state.phase)) && ((e.y || lane) > lane && !e.behind) === !!front)
     .sort((a, b) => (a.y || lane) - (b.y || lane)).forEach(e => {
@@ -1330,11 +1356,11 @@ function draw() {
   else drawPerson(MOTHER, mp.x, mp.y, mp.dir);
   if (serving) drawAndrey(SCENE.workX, SCENE.serviceY, player.dir, false, true);
   drawCounterFront();
-  drawExtras(SCENE.extras, LANE, SCENE.depth);
+  drawExtras(shopExtras(), LANE, SCENE.depth);
   drawVisitors();
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
-  drawExtras(SCENE.extras, LANE, SCENE.depth, true);   // передний план: ближе ящиков и табурета
+  drawExtras(shopExtras(), LANE, SCENE.depth, true);   // передний план: ближе ящиков и табурета
   drawLight();
   ctx.restore();
   drawHud();

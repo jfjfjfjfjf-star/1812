@@ -1,5 +1,5 @@
 // Проверки типовых NPC (tools/make_npcs.py): файлы загружены и нужного размера, покупатели лавки нарисованы типовыми фигурами,
-// в лавке днём стоят extras, в лабазе — свои extras, за окном проходят уменьшенные NPC. Снимки — в tools/out/npc_*.png (для глаз).
+// в лавке днём стоят люди на случайных местах (свои на каждый день), в лабазе — свои extras, за окном проходят уменьшенные NPC. Снимки — в tools/out/npc_*.png (для глаз).
 // Запуск из папки проекта: node tests/npc.test.js   (нужен Playwright)
 const { chromium } = require('playwright');
 const path = require('path'), fs = require('fs');
@@ -22,8 +22,25 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   check(await page.evaluate(() => CUSTOMERS.every(c => spr['s_' + c.id] && spr['s_' + c.id].ok)), 'у Павла, Дарьи и Фёдора есть фигуры (типовые NPC), не заглушки');
   // лавка днём: очередь у прилавка, покупатель
   await page.evaluate(() => { state.phase = 'day'; player.x = 420; }); await page.waitForTimeout(3500);
-  const [shopExtras, shopAll] = await page.evaluate(() => [SCENE.extras.filter(e => e.phases.includes('day') && spr[npcKey(e.type, e.v)].ok).length, SCENE.extras.length]);
-  check(shopExtras === shopAll, `в лавке днём видны extras (${shopExtras} из ${shopAll})`);
+  const [shopExtras, shopAll] = await page.evaluate(() => [shopExtras().filter(e => spr[npcKey(e.type, e.v)].ok).length, shopExtras().length]);
+  check(shopExtras === shopAll && shopAll >= 3, `в лавке днём видны люди на местах (${shopExtras} из ${shopAll})`);
+  // случайная расстановка по дням: в один день одна и та же, по дням разная, без повторов, полоса у прилавка свободна, утром не больше crowd.morning, вечером пусто
+  const crowd = await page.evaluate(() => {
+    const saved = [state.day, state.phase], sig = () => shopExtras().map(e => e.type + e.v + '@' + e.x).join(' '), out = { days: new Set(), bad: [] };
+    for (let d = 0; d < DAYS.length; d++) for (const ph of ['morning', 'day', 'evening']) {
+      state.day = d; state.phase = ph; const l = shopExtras(), s1 = sig(); shopCrowd.key = ''; const s2 = sig();
+      const [lo, hi] = SCENE.crowd[ph] || [0, 0], spots = new Set(l.map(e => e.x)).size - l.filter(e => e.talk === 1).length;
+      if (s1 !== s2) out.bad.push(d + ph + ': не повторяется');
+      if (spots < lo || spots > hi) out.bad.push(d + ph + ': мест ' + spots);
+      if (new Set(l.map(e => e.type + e.v)).size !== l.length) out.bad.push(d + ph + ': повтор');
+      if (l.some(e => e.x > 360 && e.x < 470)) out.bad.push(d + ph + ': у прилавка');
+      if (ph === 'day') out.days.add(s1);
+    }
+    [state.day, state.phase] = saved; shopCrowd.key = '';
+    return { days: out.days.size, bad: out.bad.slice(0, 5) };
+  });
+  check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, у прилавка свободно'));
+  check(crowd.days > 30, `по дням люди в лавке разные (${crowd.days} разных расстановок из ${await page.evaluate(() => DAYS.length)} дней)`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_day.png') });
   // за окном: прохожие из типовых NPC
   await page.evaluate(() => { player.x = 140; walkersBy.shop = { list: [], next: 0, last: 0 }; });
