@@ -1237,6 +1237,7 @@ function shadow(x, y, k = 1) {                         // тень под ног
   const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
   ctx.fillStyle = 'rgba(0,0,0,' + sh.alpha + ')';
   ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w / 2 * k, sh.h / 2 * k, 0, 0, Math.PI * 2); ctx.fill();
+  if (sh.core) { ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 1, sh.w * sh.core / 2 * k, sh.h * sh.core / 2 * k, 0, 0, Math.PI * 2); ctx.fill(); }   // плотнее под самыми ступнями
 }
 function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
   if (!LIGHT_ON) return;

@@ -210,7 +210,7 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                   { kind: 'flame', x: 531, y: 52, r: 55, color: '#ffc46e', flicker: 0.16 },
                   { kind: 'glow', x: 357, y: 122, r: 90, color: '#ff9c44', flicker: 0.03 }
                 ],
-                shadow: { w: 26, h: 6, alpha: 0.35 },   // тень под ногами персонажей (ширина, высота, плотность)
+                shadow: { w: 30, h: 7, alpha: 0.32, core: 0.55 },   // тень под ногами персонажей (ширина, высота, плотность; core — доля второго, плотного пятна под ступнями)
                 // Свет на персонажах: side — сила мягкой заливки со стороны источника, rim — сила блика по краю силуэта,
                 // rimWidth — толщина блика (пиксели), rimFade — на какой доле роста (сверху) блик гаснет, reach — во сколько раз дальше радиуса r источник ещё светит на фигуру,
                 // windowR — радиус света окна для фигур (окно светит от пятна луча на полу).
@@ -355,7 +355,7 @@ const SCENES = {
       { type: 'w_sack', v: 1, x: 382, y: 210, dir: 1 },                                                                                      // несёт мешок к конторке
       { type: 'w_hips', v: 3, x: 34, y: 248, dir: 1, behind: true }, { type: 'm_listen', v: 1, x: 566, y: 250, dir: -1, behind: true }     // передний план: за бочками и мешками по краям
     ],
-    depth: { far: { y: 170, scale: 0.8, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },
+    depth: { far: { y: 170, scale: 0.7, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },
     // прохожие на пристани за воротами (как SCENE.passersby, но вместо стекла — проём ворот clip [x0, y0, x1, y1])
     passersby: { x0: 20, x1: 112, feetY: 152, height: [44, 52], speed: [9, 15], every: [4, 10], color: '#8fa6c8', tint: 0.22, phases: ['morning', 'day'],
                  clip: [32, 20, 104, 164], types: ['peasant', 'merchant', 'woman', 'girl_young', 'old_man', 'boy', 'soldier', 'old_woman'] },
