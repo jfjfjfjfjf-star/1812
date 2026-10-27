@@ -29,7 +29,7 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
     const saved = [state.day, state.phase], sig = () => shopExtras().map(e => e.type + e.v + '@' + e.x).join(' '), out = { days: new Set(), bad: [] };
     for (let d = 0; d < DAYS.length; d++) for (const ph of ['morning', 'day', 'evening']) {
       state.day = d; state.phase = ph; const l = shopExtras(), s1 = sig(); shopCrowd.key = ''; const s2 = sig();
-      const [lo, hi] = SCENE.crowd[ph] || [0, 0], spots = new Set(l.map(e => e.x)).size - l.filter(e => e.talk === 1).length;
+      const cr = SCENE.crowd[ph] || [0, 0], [lo, hi] = Array.isArray(cr[0]) ? cr[Math.min(chapterOf(d), cr.length - 1)] : cr, spots = new Set(l.map(e => e.x)).size - l.filter(e => e.talk === 1).length;
       if (s1 !== s2) out.bad.push(d + ph + ': не повторяется');
       if (spots < lo || spots > hi) out.bad.push(d + ph + ': мест ' + spots);
       if (new Set(l.map(e => e.type + e.v)).size !== l.length) out.bad.push(d + ph + ': повтор');
@@ -40,6 +40,17 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
     return { days: out.days.size, bad: out.bad.slice(0, 5) };
   });
   check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, у прилавка свободно'));
+  // по сюжету: в главах дальше людей меньше, мужиков (ополчение) к концу нет; молва о лавке добавляет или убирает людей
+  const story = await page.evaluate(() => {
+    const saved = [state.day, state.phase, state.fame], ch = [], at = (d, fame) => { state.day = d; state.phase = 'day'; state.fame = fame; shopCrowd.key = ''; return shopExtras(); };
+    for (let d = 0; d < DAYS.length; d++) { const c = chapterOf(d), l = at(d, 0); ch[c] = ch[c] || { n: 0, men: 0, days: 0 }; ch[c].days++; ch[c].n += l.length; ch[c].men += l.filter(e => SCENE.crowd.draft.types.includes(e.type)).length; }
+    let up = 0, down = 0; for (let d = 0; d < 7; d++) { up += at(d, 50).length - at(d, 0).length; down += at(d, 0).length - at(d, -50).length; }
+    [state.day, state.phase, state.fame] = saved; shopCrowd.key = '';
+    return { avg: ch.map(c => +(c.n / c.days).toFixed(1)), men: ch.map(c => c.men), up, down };
+  });
+  check(story.avg[0] > story.avg[3] && story.avg[3] > story.avg[5] && story.avg[6] <= 1, `к войне в лавке людей меньше (в среднем по главам: ${story.avg.join(', ')})`);
+  check(story.men[5] === 0 && story.men[6] === 0 && story.men[0] > 0, `мужики уходят в ополчение (мужиков по главам: ${story.men.join(', ')})`);
+  check(story.up > 0 && story.down > 0, `молва о лавке: +50 — больше людей (+${story.up} за неделю), −50 — меньше (−${story.down})`);
   check(crowd.days > 30, `по дням люди в лавке разные (${crowd.days} разных расстановок из ${await page.evaluate(() => DAYS.length)} дней)`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_day.png') });
   // за окном: прохожие из типовых NPC

@@ -1001,16 +1001,22 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 // и бочками переднего плана (слой front места), и те закрывают им ноги.
 // Люди в лавке на сегодня: из мест SCENE.spots занято crowd[часть дня] (от–до), кто и в каком цвете — случайно, но по дню
 // одинаково (зерно — номер дня и часть дня), одинаковых (тип и цвет) нет. Без мест — SCENE.extras как есть.
+// Сколько людей — по главе сюжета (crowd.day по главам), мужчин меньше по мере ухода в ополчение (crowd.draft), ± молва о лавке (crowd.fame).
 let shopCrowd = { key: '', list: [] };
+const chapterOf = day => DAYS.slice(1, day + 1).filter(d => d.chapter).length;   // 0 — первая глава
 function shopExtras() {
   if (!SCENE.spots) return SCENE.extras;
-  const key = state.day + '/' + state.phase;
+  const key = state.day + '/' + state.phase + '/' + (state.fame || 0);
   if (shopCrowd.key === key) return shopCrowd.list;
   let h = 2166136261;
   for (const ch of 'shop' + key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
   const pick = a => a[Math.floor(rnd() * a.length)];
-  const [lo, hi] = (SCENE.crowd || {})[state.phase] || [0, 0];
+  const C = SCENE.crowd || {}, ch = chapterOf(state.day), cr = C[state.phase] || [0, 0], r = Array.isArray(cr[0]) ? cr[Math.min(ch, cr.length - 1)] : cr;
+  const F = C.fame, f = F && state.phase === 'day' ? Math.max(-F.max, Math.min(F.max, Math.trunc((state.fame || 0) / F.step))) : 0;
+  const [lo, hi] = [Math.max(0, r[0] + f), Math.max(0, r[1] + f)];
+  const D = C.draft, stay = D ? D.stay[Math.min(ch, D.stay.length - 1)] : 1;
+  const here = t => !D || !D.types.includes(t) || rnd() < stay;   // мужчина ещё не ушёл в ополчение
   const free = SCENE.spots.filter(p => (p.phases || ['day']).includes(state.phase)), list = [], used = new Set();
   const person = (type, o) => {
     let v = 1 + Math.floor(rnd() * NPC_TYPES[type].variants);
@@ -1019,8 +1025,9 @@ function shopExtras() {
   };
   for (let n = Math.min(free.length, lo + Math.floor(rnd() * (hi - lo + 1))); n > 0; n--) {
     const p = free.splice(Math.floor(rnd() * free.length), 1)[0];
-    if (p.pair) { const [a, b] = pick(p.pair); person(a, { x: p.x, y: p.y, dir: p.dir, talk: 0 }); person(b, { x: p.x2, y: p.y2, dir: p.dir2, talk: 1, look: 12 }); }
-    else person(pick(p.who), { x: p.x, y: p.y, dir: p.dir, look: p.look, behind: p.behind });
+    const pairs = p.pair && p.pair.filter(q => q.every(here)), who = p.who && p.who.filter(here);
+    if (pairs && pairs.length) { const [a, b] = pick(pairs); person(a, { x: p.x, y: p.y, dir: p.dir, talk: 0 }); person(b, { x: p.x2, y: p.y2, dir: p.dir2, talk: 1, look: 12 }); }
+    else if (who && who.length) person(pick(who), { x: p.x, y: p.y, dir: p.dir, look: p.look, behind: p.behind });
   }
   return (shopCrowd = { key, list }).list;
 }
