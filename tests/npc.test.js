@@ -34,12 +34,14 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
       if (spots < lo || spots > hi) out.bad.push(d + ph + ': мест ' + spots);
       if (new Set(l.map(e => e.type + e.v)).size !== l.length) out.bad.push(d + ph + ': повтор');
       if (l.some(e => e.x > 360 && e.x < 470)) out.bad.push(d + ph + ': у прилавка');
+      if (l.some(e => MOTHER.activities.some(a => Math.abs(a.x - e.x) < 25))) out.bad.push(d + ph + ': стоит на месте матери');
+      if (l.some(e => e.x > SCENE.counter.l && e.x < SCENE.counter.r && e.y < 206)) out.bad.push(d + ph + ': стоит в прилавке или на сундуке');
       if (ph === 'day') out.days.add(s1);
     }
     [state.day, state.phase] = saved; shopCrowd.key = '';
     return { days: out.days.size, bad: out.bad.slice(0, 5) };
   });
-  check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, у прилавка свободно'));
+  check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, у прилавка свободно, никто не стоит на сундуках и на месте матери'));
   // по сюжету: в главах дальше людей меньше, мужиков (ополчение) к концу нет; молва о лавке добавляет или убирает людей
   const story = await page.evaluate(() => {
     const saved = [state.day, state.phase, state.fame], ch = [], at = (d, fame) => { state.day = d; state.phase = 'day'; state.fame = fame; shopCrowd.key = ''; return shopExtras(); };
