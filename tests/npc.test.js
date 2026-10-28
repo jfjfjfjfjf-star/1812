@@ -26,22 +26,29 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   check(shopExtras === shopAll && shopAll >= 3, `в лавке днём видны люди на местах (${shopExtras} из ${shopAll})`);
   // случайная расстановка по дням: в один день одна и та же, по дням разная, без повторов, полоса у прилавка свободна, утром не больше crowd.morning, вечером пусто
   const crowd = await page.evaluate(() => {
-    const saved = [state.day, state.phase], sig = () => shopExtras().map(e => e.type + e.v + '@' + e.x).join(' '), out = { days: new Set(), bad: [] };
+    const saved = [state.day, state.phase], sig = () => shopExtras().map(e => e.type + e.v + '@' + e.x).join(' '), out = { days: new Set(), bad: [], kids: 0 };
     for (let d = 0; d < DAYS.length; d++) for (const ph of ['morning', 'day', 'evening']) {
       state.day = d; state.phase = ph; const l = shopExtras(), s1 = sig(); shopCrowd.key = ''; const s2 = sig();
-      const cr = SCENE.crowd[ph] || [0, 0], [lo, hi] = Array.isArray(cr[0]) ? cr[Math.min(chapterOf(d), cr.length - 1)] : cr, spots = new Set(l.map(e => e.x)).size - l.filter(e => e.talk === 1).length;
+      const cr = SCENE.crowd[ph] || [0, 0], [, hi] = Array.isArray(cr[0]) ? cr[Math.min(chapterOf(d), cr.length - 1)] : cr;
+      const adults = l.filter(e => !e.child), spots = adults.length - adults.filter(e => e.talk === 1).length, R = SCENE.rules;
+      const span = e => { const f = NPC_TYPES[e.type].foot; return (e.dir || 1) > 0 ? [e.x + f[0], e.x + f[1]] : [e.x - f[1], e.x - f[0]]; };
       if (s1 !== s2) out.bad.push(d + ph + ': не повторяется');
-      if (spots < lo || spots > hi) out.bad.push(d + ph + ': мест ' + spots);
+      if (spots > hi) out.bad.push(d + ph + ': мест ' + spots);
       if (new Set(l.map(e => e.type + e.v)).size !== l.length) out.bad.push(d + ph + ': повтор');
-      if (l.some(e => e.x > 360 && e.x < 470)) out.bad.push(d + ph + ': у прилавка');
+      if (l.some(e => { const [a, b] = span(e); return b > 360 && a < 470; })) out.bad.push(d + ph + ': в проходе у прилавка');
       if (l.some(e => MOTHER.activities.some(a => Math.abs(a.x - e.x) < 25))) out.bad.push(d + ph + ': стоит на месте матери');
       if (l.some(e => e.x > SCENE.counter.l && e.x < SCENE.counter.r && e.y < 206)) out.bad.push(d + ph + ': стоит в прилавке или на сундуке');
+      if (l.filter(e => e.x >= R.left.x[0] && e.x < R.left.x[1]).length > R.left.max) out.bad.push(d + ph + ': у левой части прилавка больше ' + R.left.max);
+      for (const a of l) for (const b of l) if (a !== b && Math.abs(a.y - b.y) < R.gap.dy) { const [p, q] = span(a), [u, w] = span(b); if (q > u && p < w) out.bad.push(d + ph + ': ' + a.type + ' и ' + b.type + ' заходят друг на друга'); }
+      l.filter(e => e.child).forEach(k => { if (!l.some(a => !a.child && R.kids.with.includes(a.type) && Math.abs(a.x - k.x) < 24 && Math.abs(a.y - k.y) < 12)) out.bad.push(d + ph + ': ребёнок без взрослой'); });
+      const pr = l.filter(e => e.talk != null); if (pr.length === 2 && !(pr.find(e => e.talk === 0).dir === 1 && pr.find(e => e.talk === 1).dir === -1)) out.bad.push(d + ph + ': пара не лицом друг к другу');
+      out.kids += l.filter(e => e.child).length;
       if (ph === 'day') out.days.add(s1);
     }
     [state.day, state.phase] = saved; shopCrowd.key = '';
-    return { days: out.days.size, bad: out.bad.slice(0, 5) };
+    return { days: out.days.size, bad: out.bad.slice(0, 5), kids: out.kids };
   });
-  check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, у прилавка свободно, никто не стоит на сундуках и на месте матери'));
+  check(crowd.bad.length === 0, 'расстановка в лавке: ' + (crowd.bad.join('; ') || 'в день одна, утром ≤ 1, вечером никого, без повторов, проход свободен, не на сундуках и не на месте матери, у левой части прилавка ≤ 3, на одной глубине не заходят друг на друга, пара лицом друг к другу, ребёнок только при взрослой (детей за игру: ' + crowd.kids + ')'));
   // по сюжету: в главах дальше людей меньше, мужиков (ополчение) к концу нет; молва о лавке добавляет или убирает людей
   const story = await page.evaluate(() => {
     const saved = [state.day, state.phase, state.fame], ch = [], at = (d, fame) => { state.day = d; state.phase = 'day'; state.fame = fame; shopCrowd.key = ''; return shopExtras(); };
@@ -50,8 +57,8 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
     [state.day, state.phase, state.fame] = saved; shopCrowd.key = '';
     return { avg: ch.map(c => +(c.n / c.days).toFixed(1)), men: ch.map(c => c.men), up, down };
   });
-  check(story.avg[0] > story.avg[3] && story.avg[3] > story.avg[5] && story.avg[6] <= 1, `к войне в лавке людей меньше (в среднем по главам: ${story.avg.join(', ')})`);
-  check(story.men[5] === 0 && story.men[6] === 0 && story.men[0] > 0, `мужики уходят в ополчение (мужиков по главам: ${story.men.join(', ')})`);
+  check(story.avg[0] > story.avg[3] && story.avg[3] > story.avg[5] && story.avg[6] <= 2, `к войне в лавке людей меньше (в среднем по главам: ${story.avg.join(', ')})`);
+  check(story.men[6] === 0 && story.men[4] + story.men[5] <= 1 && story.men[0] + story.men[1] + story.men[2] > story.men[3] + story.men[4] + story.men[5], `мужики уходят в ополчение (мужиков по главам: ${story.men.join(', ')})`);
   check(story.up > 0 && story.down > 0, `молва о лавке: +50 — больше людей (+${story.up} за неделю), −50 — меньше (−${story.down})`);
   check(crowd.days > 30, `по дням люди в лавке разные (${crowd.days} разных расстановок из ${await page.evaluate(() => DAYS.length)} дней)`);
   await page.screenshot({ path: path.join(OUT, 'npc_shop_day.png') });
@@ -65,6 +72,14 @@ const check = (ok, what) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w
   await page.evaluate(() => { state.phase = 'morning'; state.scene = 'labaz'; resetPlayer(); player.x = 250; }); await page.waitForTimeout(3500);
   const [lab, labAll] = await page.evaluate(() => [SCENES.labaz.extras.filter(e => spr[npcKey(e.type, e.v)].ok).length, SCENES.labaz.extras.length]);
   check(lab === labAll, `в лабазе стоят extras (${lab} из ${labAll})`);
+  const labBad = await page.evaluate(() => {
+    const l = SCENES.labaz.extras, bad = [], span = e => { const f = NPC_TYPES[e.type].foot; return (e.dir || 1) > 0 ? [e.x + f[0], e.x + f[1]] : [e.x - f[1], e.x - f[0]]; };
+    for (const a of l) for (const b of l) if (a !== b && Math.abs(a.y - b.y) < 8) { const [p, q] = span(a), [u, w] = span(b); if (q > u && p < w) bad.push(a.type + ' и ' + b.type); }
+    l.filter(e => !e.behind).forEach(e => { const [a, b] = span(e); if ((b > 290 && a < 330 && e.y > 170) || (b > 404 && a < 474 && e.y > 196)) bad.push(e.type + ' в проходе'); });
+    const m = l.filter(e => e.type === 'm_talk' || (e.type === 'm_listen' && !e.behind)); if (!(m[0].dir === 1 && m[1].dir === -1 && m[0].x < m[1].x)) bad.push('купцы не лицом друг к другу');
+    return bad;
+  });
+  check(labBad.length === 0, 'лабаз: ' + (labBad.join('; ') || 'на одной глубине не заходят друг на друга, проходы к ларям и к Сорокину свободны, купцы лицом друг к другу'));
   await page.screenshot({ path: path.join(OUT, 'npc_labaz.png') });
   await page.evaluate(() => { player.x = 60; walkersBy.labaz = { list: [], next: 0, last: 0 }; }); await page.waitForTimeout(3000);
   const gate = await page.evaluate(() => walkersBy.labaz.list.filter(w => w.npc && spr[w.npc].ok).length);

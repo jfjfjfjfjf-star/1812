@@ -226,21 +226,29 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // вправо, -1 влево; who — кто может тут стоять (типы NPC_TYPES, вариант цвета случайный); pair — беседа двоих: вторая точка
                 // (x2, y2, dir2) и пары [говорит, слушает]; look — раз в столько секунд оборачивается; behind — за ящиками переднего плана;
                 // phases — в какие части дня место бывает занято (без phases — только днём). crowd — сколько мест занято: [от, до] на часть дня (нет — никого).
-                // Левее 207 — место матери (сортирует, метёт, протирает бочонки: x 112–182), туда никого не ставим.
+                // Левее 207 — место матери (сортирует, метёт, протирает бочонки: x 112–182), туда никого не ставим. Ребёнок своего места не имеет (см. rules.kids).
                 // Перед прилавком (x 202–530) ноги не дальше y 206: там основание прилавка и сундуки, дальше человек «стоит в прилавке».
                 // Утром лавка ещё закрыта (кто-то может ждать у двери), вечером закрыта — никого. Свободная полоса у прилавка
                 // (x 360–470, там покупатель и Андрей) не занята.
                 spots: [
-                  { id: 'shelf',  x: 214, y: 206, dir: -1, look: 10, who: ['s_look', 'old_man', 'old_woman', 'peasant'] },          // у края прилавка, смотрит на левые полки
-                  { id: 'grain',  x: 306, y: 208, dir: 1, look: 13, who: ['s_point', 'woman', 'girl_young', 'old_woman'] },        // у ящиков с крупой
-                  { id: 'grain2', x: 334, y: 210, dir: -1, look: 9, who: ['girl_young', 'woman', 'boy', 'girl_child'] },           // рядом, смотрит на крупу
-                  { id: 'talk',   x: 244, y: 210, dir: 1, pair: [['s_talk', 's_listen'], ['m_talk', 'm_listen'], ['s_talk', 'woman'], ['m_talk', 'peasant']],
-                    x2: 274, y2: 212, dir2: -1 },                                                                                  // беседа двоих посреди лавки
-                  { id: 'child',  x: 352, y: 222, dir: 1, look: 7, who: ['boy', 'girl_child'] },                                   // ребёнок ближе к проходу, глазеет
-                  { id: 'door',   x: 512, y: 216, dir: -1, look: 8, phases: ['morning', 'day'],
-                    who: ['woman', 'old_woman', 'merchant', 'soldier', 'priest', 'girl_young'] },                                  // ждёт у двери (утром — открытия)
-                  { id: 'corner', x: 580, y: 250, dir: -1, behind: true, who: ['m_listen', 'peasant', 'soldier', 'merchant'] }   // передний план: за ящиками, ящики закрывают ноги
+                  { id: 'shelf',  x: 218, y: 207, dir: -1, look: 10, who: ['s_look', 'old_man', 'old_woman', 'peasant'] },          // дальний ряд у края прилавка, смотрит на левые полки
+                  { id: 'talk',   x: 256, y: 216, dir: 1, pair: [['s_talk', 's_listen'], ['m_talk', 'm_listen'], ['s_talk', 'woman'], ['m_talk', 'peasant']],
+                    x2: 300, y2: 220, dir2: -1 },                                                                                  // беседа двоих чуть ближе дальнего ряда, лицом друг к другу
+                  { id: 'grain',  x: 332, y: 207, dir: 1, look: 13, who: ['s_point', 'woman', 'girl_young', 'old_woman'], child: [16, 8] },  // дальний ряд у ящиков с крупой
+                  { id: 'grain2', x: 494, y: 208, dir: -1, look: 9, who: ['girl_young', 'woman', 'old_woman'], child: [16, 8] },  // правая часть прилавка, у весов (проход 360–470 свободен)
+                  { id: 'door',   x: 538, y: 216, dir: -1, leave: 0.5, look: 8, phases: ['morning', 'day'],
+                    who: ['woman', 'old_woman', 'merchant', 'soldier', 'priest', 'girl_young'], child: [-18, 8] },            // у двери: ждёт (лицом в лавку) или уходит (лицом к двери)
+                  { id: 'corner', x: 580, y: 250, dir: -1, behind: true, chance: 0.2, chapters: 3, minCrowd: 4,
+                    who: ['m_listen', 'peasant', 'soldier', 'merchant'] }                                                           // передний план за ящиками: редко
                 ],
+                // Правила расстановки (shopExtras в index.html): left — у левой части прилавка (x от..до) не больше max человек;
+                // gap — фигуры почти на одной глубине (разница y меньше dy) не заходят друг на друга (ширина по полу — NPC_TYPES[..].foot),
+                // на разной глубине перекрываться можно; keepOut — куда не заходит ни одна фигура (проход для торговли); mother — полуширина матери:
+                // её места за день (MOTHER.activities) — тоже препятствия, как фигуры;
+                // kids — ребёнок только рядом со взрослой этих типов, на её месте (child: [dx, dy] у места), с вероятностью chance[глава].
+                // Место: chance — в какой доле дней бывает, chapters — только в первых N главах, minCrowd — только если занято не меньше мест.
+                rules: { left: { x: [207, 360], max: 3 }, gap: { dy: 8, px: 2 }, keepOut: [[360, 470]], mother: 16,
+                         kids: { types: ['boy', 'girl_child'], with: ['woman', 's_point', 'old_woman'], chance: [0.5, 0.5, 0.5, 0.25, 0.25, 0, 0] } },
                 // crowd по сюжету: day — [от, до] на каждую главу по порядку DAYS (1 Мирная Москва … 6 Последняя неделя, 7 Финал): в мирном июне
                 // людно, к войне всё меньше. draft — ополчение: мужики (types) остаются в городе с вероятностью stay[глава], иначе место берёт
                 // другой из who (женщина, старик, ребёнок) или оно пустует. fame — молва о лавке (state.fame, пока её нет — 0): каждые step
@@ -255,18 +263,19 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
 // Фигура — один кадр покоя 144×120, опора (72, 114), лицом вправо; у каждого типа несколько вариантов цвета одежды, волос и кожи:
 // файл assets/characters/npc/<тип>_<вариант>.png, вариант 1 — как нарисовано. Рост взрослых ≈ 90 (Андрей 104), детей 59–73.
 // Ходьбы у них нет (дышат и в беседе шевелят губами): стоят на месте (extras у сцен) или проходят за окном лавки (passersby, ног не видно).
+// foot — ширина фигуры по полу в пикселях от точки опоры [влево, вправо] (по файлу, вариант 1): по ней проверяется, не заходят ли люди друг на друга.
 const NPC_TYPES = {
-  girl_young: { name: 'девушка', variants: 5 }, woman: { name: 'женщина', variants: 5 }, boy: { name: 'мальчик', variants: 4 },
-  girl_child: { name: 'девочка', variants: 4 }, old_woman: { name: 'старуха', variants: 4 }, old_man: { name: 'старик', variants: 4 },
-  soldier: { name: 'солдат', variants: 4 }, merchant: { name: 'купец', variants: 5 }, peasant: { name: 'мужик', variants: 5 },
-  priest: { name: 'священник', variants: 3 },
+  girl_young: { name: 'девушка', variants: 5, foot: [-13, 14] }, woman: { name: 'женщина', variants: 5, foot: [-14, 15] }, boy: { name: 'мальчик', variants: 4, foot: [-9, 10] },
+  girl_child: { name: 'девочка', variants: 4, foot: [-9, 11] }, old_woman: { name: 'старуха', variants: 4, foot: [-20, 21] }, old_man: { name: 'старик', variants: 4, foot: [-16, 18] },
+  soldier: { name: 'солдат', variants: 4, foot: [-11, 13] }, merchant: { name: 'купец', variants: 5, foot: [-12, 14] }, peasant: { name: 'мужик', variants: 5, foot: [-9, 10] },
+  priest: { name: 'священник', variants: 3, foot: [-14, 16] },
   // позы из листов ChatGPT (tools/make_npc_poses.py); gesture — у позы два жеста рукой (лист 8 кадров: покой и тот же покой со вторым жестом)
-  w_sit_talk: { name: 'работник сидит на мешке, рассказывает', variants: 3, gesture: true }, w_sit_mug: { name: 'работник сидит на ящике с кружкой', variants: 3 },
-  w_shovel: { name: 'работник опирается на лопату', variants: 3 }, w_sack: { name: 'работник несёт мешок', variants: 3 },
-  w_hips: { name: 'работник руки в боки', variants: 3 }, m_talk: { name: 'купец говорит', variants: 3, gesture: true },
-  m_listen: { name: 'купец слушает', variants: 3 }, m_coins: { name: 'купец на бочке считает монеты', variants: 3 },
-  s_point: { name: 'женщина показывает на полку', variants: 3 }, s_talk: { name: 'девушка с корзиной разговаривает', variants: 3, gesture: true },
-  s_listen: { name: 'пожилая женщина слушает', variants: 3 }, s_look: { name: 'старик разглядывает товар', variants: 3 }
+  w_sit_talk: { name: 'работник сидит на мешке, рассказывает', variants: 3, foot: [-29, 31], gesture: true }, w_sit_mug: { name: 'работник сидит на ящике с кружкой', variants: 3, foot: [-27, 29] },
+  w_shovel: { name: 'работник опирается на лопату', variants: 3, foot: [-23, 24] }, w_sack: { name: 'работник несёт мешок', variants: 3, foot: [-22, 24] },
+  w_hips: { name: 'работник руки в боки', variants: 3, foot: [-20, 22] }, m_talk: { name: 'купец говорит', variants: 3, foot: [-23, 25], gesture: true },
+  m_listen: { name: 'купец слушает', variants: 3, foot: [-16, 17] }, m_coins: { name: 'купец на бочке считает монеты', variants: 3, foot: [-26, 27] },
+  s_point: { name: 'женщина показывает на полку', variants: 3, foot: [-26, 27] }, s_talk: { name: 'девушка с корзиной разговаривает', variants: 3, foot: [-23, 24], gesture: true },
+  s_listen: { name: 'пожилая женщина слушает', variants: 3, foot: [-17, 19] }, s_look: { name: 'старик разглядывает товар', variants: 3, foot: [-21, 23] }
 };
 // Файл — 4 кадра покоя в ряд (576×120): 0 как есть, 1 вдох, 2 рот приоткрыт, 3 вдох и рот (idle: кадр выбирает игра, см. NPC_IDLE);
 // у поз с жестом ещё 4 таких же со вторым жестом (1152×120).
@@ -347,12 +356,13 @@ const SCENES = {
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
     // NPC лабаза: только люди Сорокина (работники) и купцы, как Андрей, — группками, отдыхают, работают, беседуют
+    // три группы: А — работа у ларей, Б — торг у конторки, В — отдых у ворот и грузчик; свободны проходы к ларям (x 290–330) и к Сорокину (404–474)
     extras: [
-      { type: 'w_hips', v: 1, x: 236, y: 178, dir: 1, talk: 0, look: 13 }, { type: 'w_shovel', v: 2, x: 268, y: 180, dir: -1, talk: 1 },     // дальний план: работники у ларей
-      { type: 'm_coins', v: 2, x: 474, y: 182, dir: -1 },                                                                                    // дальний план: купец на бочке у конторки
-      { type: 'w_sit_talk', v: 1, x: 112, y: 216, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 174, y: 214, dir: -1, talk: 1, look: 14 },   // отдыхают у ворот
-      { type: 'm_talk', v: 1, x: 300, y: 212, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 332, y: 212, dir: -1, talk: 1, look: 12 },     // купцы торгуются
-      { type: 'w_sack', v: 1, x: 382, y: 210, dir: 1 },                                                                                      // несёт мешок к конторке
+      { type: 'w_hips', v: 1, x: 214, y: 176, dir: 1, talk: 0 }, { type: 'w_shovel', v: 2, x: 262, y: 188, dir: -1, talk: 1 },             // А: у ларей, лесенкой по глубине, лицом друг к другу
+      { type: 'm_talk', v: 1, x: 353, y: 200, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 386, y: 210, dir: -1, talk: 1 },             // Б: купцы торгуются, лицом друг к другу
+      { type: 'm_coins', v: 2, x: 486, y: 182, dir: -1 },                                                                                    // Б: купец на бочке у конторки
+      { type: 'w_sit_talk', v: 1, x: 96, y: 222, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 150, y: 208, dir: -1, talk: 1 },          // В: отдыхают у ворот
+      { type: 'w_sack', v: 1, x: 198, y: 196, dir: 1, route: [[198, 196], [300, 190]] },   // В: несёт мешок от ворот к ларям; route — маршрут на будущее (пока стоит, движения нет)
       { type: 'w_hips', v: 3, x: 34, y: 248, dir: 1, behind: true }, { type: 'm_listen', v: 1, x: 566, y: 250, dir: -1, behind: true }     // передний план: за бочками и мешками по краям
     ],
     depth: { far: { y: 170, scale: 0.7, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },

@@ -428,7 +428,7 @@ speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.s
 // типовые NPC: фигуры для extras всех сцен и для прохожих за окном (все варианты перечисленных типов); необязательны
 const npcKey = (t, v) => 'npc_' + t + '_' + v;
 const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
-(SCENE.spots || []).flatMap(p => p.who || p.pair.flat()).forEach(t => { for (let v = 1; v <= NPC_TYPES[t].variants; v++) npcNeed.add(t + '_' + v); });
+(SCENE.spots || []).flatMap(p => p.who || p.pair.flat()).concat(((SCENE.rules || {}).kids || {}).types || []).forEach(t => { for (let v = 1; v <= NPC_TYPES[t].variants; v++) npcNeed.add(t + '_' + v); });
 [SCENE, ...Object.values(SCENES)].flatMap(c => (c.passersby || {}).types || []).forEach(t => { for (let v = 1; v <= ((NPC_TYPES[t] || {}).variants || 0); v++) npcNeed.add(t + '_' + v); });
 npcNeed.forEach(k => { const [, t, v] = k.match(/^(.+)_(\d+)$/); const sp = npcSprite(t, +v); loadImage(npcKey(t, v), sp.src, sp.cellW * sp.frames, sp.cellH, true); });
 // Кадр покоя NPC (лист из 4: как есть, вдох, рот, вдох и рот): дыхание по времени со сдвигом seed (у каждого своё);
@@ -1001,7 +1001,8 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
 // и бочками переднего плана (слой front места), и те закрывают им ноги.
 // Люди в лавке на сегодня: из мест SCENE.spots занято crowd[часть дня] (от–до), кто и в каком цвете — случайно, но по дню
 // одинаково (зерно — номер дня и часть дня), одинаковых (тип и цвет) нет. Без мест — SCENE.extras как есть.
-// Сколько людей — по главе сюжета (crowd.day по главам), мужчин меньше по мере ухода в ополчение (crowd.draft), ± молва о лавке (crowd.fame).
+// Сколько людей — по главе сюжета (crowd.day по главам), мужчин меньше по мере ухода в ополчение (crowd.draft), ± молва о лавке (crowd.fame);
+// кто где встанет — по правилам SCENE.rules (ширина фигур, проход, место матери, не больше max у левой части прилавка, ребёнок при взрослой).
 let shopCrowd = { key: '', list: [] };
 const chapterOf = day => DAYS.slice(1, day + 1).filter(d => d.chapter).length;   // 0 — первая глава
 function shopExtras() {
@@ -1017,17 +1018,38 @@ function shopExtras() {
   const [lo, hi] = [Math.max(0, r[0] + f), Math.max(0, r[1] + f)];
   const D = C.draft, stay = D ? D.stay[Math.min(ch, D.stay.length - 1)] : 1;
   const here = t => !D || !D.types.includes(t) || rnd() < stay;   // мужчина ещё не ушёл в ополчение
-  const free = SCENE.spots.filter(p => (p.phases || ['day']).includes(state.phase)), list = [], used = new Set();
-  const person = (type, o) => {
-    let v = 1 + Math.floor(rnd() * NPC_TYPES[type].variants);
-    for (let i = 0; i < NPC_TYPES[type].variants && used.has(type + '_' + v); i++) v = v % NPC_TYPES[type].variants + 1;
-    used.add(type + '_' + v); list.push(Object.assign({ type, v }, o));
-  };
-  for (let n = Math.min(free.length, lo + Math.floor(rnd() * (hi - lo + 1))); n > 0; n--) {
-    const p = free.splice(Math.floor(rnd() * free.length), 1)[0];
-    const pairs = p.pair && p.pair.filter(q => q.every(here)), who = p.who && p.who.filter(here);
-    if (pairs && pairs.length) { const [a, b] = pick(pairs); person(a, { x: p.x, y: p.y, dir: p.dir, talk: 0 }); person(b, { x: p.x2, y: p.y2, dir: p.dir2, talk: 1, look: 12 }); }
-    else if (who && who.length) person(pick(who), { x: p.x, y: p.y, dir: p.dir, look: p.look, behind: p.behind });
+  const R = SCENE.rules || {}, G = R.gap || { dy: 0, px: 0 }, list = [], used = new Set();
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const span = e => { const f = NPC_TYPES[e.type].foot || [-14, 14]; return (e.dir || 1) > 0 ? [e.x + f[0], e.x + f[1]] : [e.x - f[1], e.x - f[0]]; };
+  const mom = R.mother ? MOTHER.activities.map(a => ({ x: a.x, y: a.y, s: [a.x - R.mother, a.x + R.mother] })) : [];
+  const fits = (ps, placed) => ps.every(e => {                    // ширина по полу: на одной глубине не заходят друг на друга, проход свободен
+    const [l, r] = span(e);
+    if ((R.keepOut || []).some(([a, b]) => r > a && l < b)) return false;
+    return placed.map(o => ({ y: o.y, s: o.s || span(o) })).concat(mom).every(o => Math.abs(o.y - e.y) >= G.dy || r + G.px <= o.s[0] || l - G.px >= o.s[1]);
+  });
+  const leftOk = ps => !R.left || list.concat(ps).filter(e => e.x >= R.left.x[0] && e.x < R.left.x[1]).length <= R.left.max;
+  const variant = type => { let v = 1 + Math.floor(rnd() * NPC_TYPES[type].variants);
+    for (let i = 0; i < NPC_TYPES[type].variants && used.has(type + '_' + v); i++) v = v % NPC_TYPES[type].variants + 1; return v; };
+  const commit = ps => ps.forEach(e => { e.v = variant(e.type); used.add(e.type + '_' + e.v); list.push(e); });
+  const open = SCENE.spots.filter(p => (p.phases || ['day']).includes(state.phase) && (!p.chapters || ch < p.chapters));
+  const order = shuffle(open.filter(p => !p.minCrowd)).concat(open.filter(p => p.minCrowd));   // редкие (передний план) — в конце
+  const want = lo + Math.floor(rnd() * (hi - lo + 1)), K = R.kids;
+  let n = 0;
+  for (const p of order) {
+    if (n >= want) break;
+    if (p.chance != null && rnd() >= p.chance) continue;
+    if (p.minCrowd && n < p.minCrowd) continue;
+    const dir = p.leave && state.phase !== 'morning' && rnd() < p.leave ? -p.dir : p.dir;   // у двери: лицом к двери — уходит
+    const tries = p.pair ? shuffle(p.pair.filter(q => q.every(here))).map(([a, b]) => [{ type: a, x: p.x, y: p.y, dir: p.dir, talk: 0 }, { type: b, x: p.x2, y: p.y2, dir: p.dir2, talk: 1 }])
+                         : shuffle((p.who || []).filter(here)).map(t => [{ type: t, x: p.x, y: p.y, dir, look: dir === p.dir ? p.look : undefined, behind: p.behind }]);
+    const ps = tries.find(ps => fits(ps, list) && leftOk(ps));
+    if (!ps) continue;
+    commit(ps); n++;
+    const ad = ps[0];                                               // ребёнок — только рядом с подходящей взрослой, на её месте
+    if (K && p.child && K.with.includes(ad.type) && rnd() < (K.chance[Math.min(ch, K.chance.length - 1)] || 0)) {
+      const kid = [{ type: pick(K.types), x: ad.x + p.child[0], y: ad.y + p.child[1], dir: p.child[0] > 0 ? -1 : 1, look: 7, child: true }];
+      if (fits(kid, list.filter(e => e !== ad)) && leftOk(kid)) commit(kid);
+    }
   }
   return (shopCrowd = { key, list }).list;
 }

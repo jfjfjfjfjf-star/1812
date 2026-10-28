@@ -15,10 +15,10 @@ const OUT = path.resolve(process.argv[2] || path.join(__dirname, 'out', 'layout'
   await page.addStyleTag({ content: '#stage > *:not(canvas) { visibility: hidden !important; }' });   // только картинка игры, без кнопок и подписей
   const meta = {};
   // одна панорама: Андрей в x = 240 (камера 0) и 354 (камера у правого края), куски склеивает annotate
-  // в лавке Андрей стоит за прилавком (serving), в лабазе — между отдыхающими и дальними работниками, чтобы не закрывать места
+  // в лавке Андрей стоит за прилавком (serving), в лабазе — на линии ходьбы перед работниками у ларей (они дальше, видны над ним)
   async function pano(name, setup) {
     const parts = [], lab = setup.includes('labaz');
-    for (const ax of [lab ? 200 : 240, 354]) {
+    for (const ax of [240, 354]) {
       await page.evaluate(([setup, ax, lab]) => { eval(setup); serving = !lab; player.x = ax; player.y = laneAt(ax); player.dir = lab ? 1 : -1; shopCrowd.key = ''; }, [setup, ax, lab]);
       await page.waitForTimeout(1700);
       const f = path.join(OUT, 'raw', `${name}_${ax}.png`); await page.screenshot({ path: f });
