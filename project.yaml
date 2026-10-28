@@ -33,5 +33,6 @@ platform:
   touch_support: "None"
   cert_tier: none
 
-# commands.* не задан: сборки и тестов нет, игра открывается файлом index.html.
-# Как запускать и проверять — раздел «Запуск и проверка» в CLAUDE.md.
+# Сборки нет: игра открывается файлом index.html. Проверки — tests/README.md.
+commands:
+  test: "node tests/shop_hd.test.js && python3 tests/check_night_alignment.py"
