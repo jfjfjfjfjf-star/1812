@@ -796,7 +796,7 @@ const shopOpenBlocks = () => !TIME.travelWhenOpen && state.phase === 'day';   //
 const closedNow = scene => { const o = SCENES[scene] && SCENES[scene].open; return !!o && !o.includes(state.phase); };   // место сейчас закрыто
 const eveningTaken = () => !inShop() && !!scn().endsEvening && state.day + 1 < DAYS.length;   // в последний день уйти можно как обычно
 function goHome() {                                    // из места, которое занимает вечер, — домой спать; иначе просто в лавку
-  if (eveningTaken()) return endDay();
+  if (eveningTaken()) return finishDay();               // сначала итоги, если после закрытия была закупка
   travel('shop', 'Лавка Андрея');
 }
 function passage(e) {                                  // проход без карты (трактир ↔ переулок): вечер не кончается
