@@ -174,7 +174,7 @@ Object.keys(VIS).forEach(v => { if (!CUSTOMERS.some(p => p.id === VISITS[v].who)
 DAYS.forEach((d, i) => d.visits.forEach(v => { if (!VIS[v]) console.error('[данные] день ' + (i + 1) + ': нет прихода ' + v); }));
 Object.keys(SUPPLY).forEach(s => { if (!speakers().some(p => p.id === s)) console.error('[данные] SUPPLY: нет персонажа ' + s);
   Object.keys(SUPPLY[s].goods).forEach(k => { if (!GOODS[k]) console.error('[данные] SUPPLY.' + s + ': нет товара ' + k); }); });
-// spent — сколько заплачено продавцам (SUPPLY) за день: { seller: монеты }; seen — сколько из этого уже показано в итогах дня
+// spent — сколько заплачено продавцам (SUPPLY) за день: { seller: копейки }; seen — сколько из этого уже показано в итогах дня
 const newToday = () => ({ revenue: 0, profit: 0, sold: {}, spent: {}, seen: 0 });   // итоги текущего дня
 const spentToday = () => Object.values(state.today.spent).reduce((n, v) => n + v, 0);
 // Текущий покупатель: только пока лавка открыта; undefined — лавка закрыта или очередь дня кончилась.
@@ -182,6 +182,7 @@ const C = () => state.phase === 'day' ? VIS[todayQueue()[state.visit]] : undefin
 const deal = () => state.deals[C().visit];
 const G = () => GOODS[C().want];
 const total = d => C().qty * d.price;
+const kop = n => n + ' коп.';                          // деньги — медные копейки
 const profit = d => C().qty * (d.price - G().cost);
 const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
 const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
@@ -534,20 +535,20 @@ function renderDlg() {
     list = dlg.sleep ? [{ text: 'Закончить день', do: 'sleep' }, { text: 'Не сейчас', do: 'end' }] : [{ text: 'Хорошо', do: 'end' }];
     t.seen = paid; save();
     pn.style.display = 'flex'; pn.className = 'full';
-    pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + t.revenue + '</b></div><div class="row">Прибыль: <b>' + t.profit + '</b></div>' +
+    pn.innerHTML = '<b>Итоги дня</b><div class="row">Выручка: <b>' + kop(t.revenue) + '</b></div><div class="row">Прибыль: <b>' + kop(t.profit) + '</b></div>' +
       '<i>выручка минус закупка проданного</i>' +
-      (paid ? '<div style="margin-top:4px"><b>Закупка</b><br>' + Object.keys(t.spent).map(id => npcName(id) + ': ' + t.spent[id]).join('<br>') + '</div>' +
-        '<div class="row">Монет за день: <b>' + (net > 0 ? '+' : net < 0 ? '−' : '') + Math.abs(net) + '</b></div><i>выручка минус закупка</i>' : '') +
+      (paid ? '<div style="margin-top:4px"><b>Закупка</b><br>' + Object.keys(t.spent).map(id => npcName(id) + ': ' + kop(t.spent[id])).join('<br>') + '</div>' +
+        '<div class="row">За день: <b>' + (net > 0 ? '+' : net < 0 ? '−' : '') + kop(Math.abs(net)) + '</b></div><i>выручка минус закупка</i>' : '') +
       '<div style="margin-top:4px"><b>Продано</b><br>' + sold + '</div><div style="margin-top:4px"><b>Осталось</b><br>' + stockList() + '</div>';
-  } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, монеты
+  } else if (dlg.order) {                            // заказ у оптовика: количество по товарам, всего, деньги
     const s = SUPPLY[dlg.order], sum = orderSum();
     sp = speakers().find(x => x.id === dlg.order); who = sp.name; text = dlg.msg;
-    list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + sum : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
+    list = (lastDay() ? [] : [{ text: sum ? 'Заказать за ' + kop(sum) : 'Заказать', do: 'buy', off: !sum }]).concat([{ text: 'Назад', goto: s.backNode }]);
     pn.style.display = 'flex'; pn.className = 'full wide';                 // шире обычной: товаров у продавца несколько
     pn.innerHTML = Object.keys(s.goods).map(k => { const g = s.goods[k], u = GOODS[k];
-      return '<div class="oline"><div class="gi">' + goodsIcon(k) + '</div><div class="on">' + u.name + '<i>' + g.cost + ' за ' + u.unit + ' · есть ' + state.stock[k] + (ordered(dlg.order, k) ? ' · +' + ordered(dlg.order, k) : '') + '</i></div>' +
+      return '<div class="oline"><div class="gi">' + goodsIcon(k) + '</div><div class="on">' + u.name + '<i>' + kop(g.cost) + ' за ' + u.unit + '<br>есть ' + state.stock[k] + (ordered(dlg.order, k) ? ' · +' + ordered(dlg.order, k) : '') + '</i></div>' +
         '<button data-k="' + k + '" data-n="-1">−</button><b>' + (dlg.qty[k] || 0) + '</b><button data-k="' + k + '" data-n="1">+</button></div>'; }).join('') +
-      '<div class="row" style="margin-top:2px">Всего: <b>' + sum + '</b></div><div class="row">Монет: <b>' + state.money + '</b></div>' +
+      '<div class="row" style="margin-top:2px">Всего: <b>' + kop(sum) + '</b></div><div class="row">Денег: <b>' + kop(state.money) + '</b></div>' +
       '<i>есть — в лавке; +N — уже заказано. Платим сразу, привезут в лавку завтра утром</i><div id="pact"></div>';
     pn.querySelectorAll('.oline button').forEach(b => { b.disabled = lastDay(); b.onclick = () => orderStep(b.dataset.k, +b.dataset.n); });
     target = $('pact');
@@ -557,10 +558,10 @@ function renderDlg() {
     pn.style.display = 'flex'; pn.className = 'full';
     pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>' + G().name + ' × ' + c.qty + '</b></div></div>' +
       '<div class="row">Остаток: <b>' + state.stock[c.want] + '</b></div><i>столько есть в лавке</i>' +
-      '<div style="margin-top:' + 1 + 'px">Цена за ' + G().unit + '</div><div class="step"><button id="pm">−</button><b>' + d.price + '</b><button id="pp">+</button></div>' +
-      '<div class="row">Всего: <b>' + total(d) + '</b></div>' +
-      '<div class="row">Закупка: <b>' + (c.qty * G().cost) + '</b></div><i>за сколько купили</i>' +
-      '<div class="row">' + (pf < 0 ? 'Убыток' : 'Прибыль') + ': <b>' + Math.abs(pf) + '</b></div><i>выручка минус закупка проданного</i><div id="pact"></div>';
+      '<div style="margin-top:' + 1 + 'px">Цена за ' + G().unit + ', коп.</div><div class="step"><button id="pm">−</button><b>' + d.price + '</b><button id="pp">+</button></div>' +
+      '<div class="row">Всего: <b>' + kop(total(d)) + '</b></div>' +
+      '<div class="row">Закупка: <b>' + kop(c.qty * G().cost) + '</b></div><i>за сколько купили</i>' +
+      '<div class="row">' + (pf < 0 ? 'Убыток' : 'Прибыль') + ': <b>' + kop(Math.abs(pf)) + '</b></div><i>выручка минус закупка проданного</i><div id="pact"></div>';
     $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
   } else {
     who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
@@ -568,13 +569,13 @@ function renderDlg() {
     if (c && who === c.name && d.stage === 'after' && d.sold) {          // итог продажи — в интерфейсе, а не в речи покупателя
       pn.style.display = 'flex';
       pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>Продано</b><br>' + G().name + ' × ' + c.qty + '</div></div>' +
-        '<div class="row">Выручка: <b>' + total(d) + '</b></div><i>получили от покупателя</i>' +
-        '<div class="row">Прибыль: <b>' + profit(d) + '</b></div><i>выручка минус закупка проданного</i>' +
+        '<div class="row">Выручка: <b>' + kop(total(d)) + '</b></div><i>получили от покупателя</i>' +
+        '<div class="row">Прибыль: <b>' + kop(profit(d)) + '</b></div><i>выручка минус закупка проданного</i>' +
         '<div class="row">Остаток: <b>' + state.stock[c.want] + '</b></div><i>столько осталось в лавке</i>';
     } else if (c && who === c.name && d.stage !== 'after') {            // условия остаются видны во время разговора
       pn.style.display = 'flex';
       pn.innerHTML = '<div class="head"><div class="gi">' + goodsIcon(c.want) + '</div><div><b>' + G().name + ' × ' + c.qty + '</b></div></div>' +
-        '<div class="row">Цена: <b>' + d.price + '</b></div><div class="row">Всего: <b>' + total(d) + '</b></div>';
+        '<div class="row">Цена: <b>' + kop(d.price) + '</b></div><div class="row">Всего: <b>' + kop(total(d)) + '</b></div>';
     }
   }
   setPortrait(sp);
@@ -1282,7 +1283,7 @@ function draw() {
 function drawHud() {
   const grade = LIGHT_ON ? (TIME.light[state.phase] || {}).grade || '' : '';   // цветокоррекция части дня
   if (canvas.style.filter !== grade) canvas.style.filter = grade;
-  $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Монет: ' + state.money;
+  $('hud').innerHTML = dateOf(state.day) + ', ' + TIME.phases[state.phase] + '<br>Денег: ' + kop(state.money);
   $('dbg').textContent = problems.length ? 'Временная графика' : '';
   const h = $('hint');
   const msg = serving || sleeping ? '' : nearMom() || nearNpc() ? 'E — Поговорить' :
