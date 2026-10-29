@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 23;
+const DATA_VERSION = 24;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -66,6 +66,8 @@ const TIME = {
   year: 1812,
   phases: { morning: 'утро', day: 'день', evening: 'вечер' },
   travelWhenOpen: false,
+  shopOpenMsg: 'Лавка открыта: уйти можно, когда закроете её.',   // попытка выйти из открытой лавки
+  closedMsg: 'Сейчас там закрыто.',                                  // место закрыто, а своего closedMsg у него нет
   lightFade: 2.5,
   // Свет и цвет в разное время суток (как свет рисуется — см. lights у сцены):
   //   dark — насколько темнеет сцена (0 — нисколько, 1 — полностью), darkColor — цвет сумрака;
@@ -202,6 +204,7 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 floorPath: [[146, 212], [172, 225]],
                 workX: 448, serviceY: 200, customerX: 387, motherX: 112, motherY: 212, motherDir: -1, motherTalk: 55, counter: { l: 202, r: 530 },
                 doorX: 558, customerSpeed: 60, arrivalDelay: 1.5,
+                exits: [{ x: 552, to: 'street', label: 'Выйти на улицу' }],   // дверь лавки справа (там же входят покупатели)
                 // Свет лавки (координаты мира, по фону): window — окно (стекло x0..x1, y0..y1) и косой луч beam на пол с пылинками;
                 // flame — пламя (мерцает, flicker — насколько); glow — ровное тёплое свечение. r — радиус света, color — цвет.
                 lights: [
@@ -384,12 +387,17 @@ const SCENES = {
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] },
   // ТЕСТОВОЕ: название, реплики, цены. Фона и фигуры трактирщика пока нет — заглушки.
+  // ЗАГЛУШКА: улица Ильинка без фона (фон собирается из картинок ChatGPT, prompts/ilyinka_*). Реальные места улицы 1812 года —
+  // docs/HISTORY_ILYINKA.md. На карте улицы нет: выход из лавки (дверь справа), вход в лавку и в трактир. props: false — без мешков заглушки.
+  street: { name: 'Ильинка', worldW: 1440, lane: 225, startX: 330, walkMin: 30, walkMax: 1410, talkRange: 35, talkGap: 40,
+    wall: '#4a3a2a', floor: '#6e6252', props: false,
+    exits: [{ x: 330, to: 'shop', label: 'Войти в лавку' }, { x: 900, to: 'traktir', label: 'Войти в трактир' }] },
   traktir: { name: 'Ильинский трактир', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
     background: 'assets/places/traktir/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
     open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
     npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/characters/traktirshchik/traktirshchik_portrait.png', node: 'traktir_hub',
              sprite: { src: 'assets/characters/traktirshchik/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }],
-    exits: [{ x: 440, to: 'pereulok', label: 'Выйти чёрным ходом в переулок' }] },
+    exits: [{ x: 440, to: 'pereulok', label: 'Выйти чёрным ходом в переулок' }, { x: 40, to: 'street', label: 'Выйти на улицу' }] },
   // ТЕСТОВОЕ: тёмный переулок за трактиром — место для сомнительных сделок и встреч. На карте его нет: попасть можно только из трактира.
   pereulok: { name: 'Переулок за трактиром', worldW: 480, lane: 225, startX: 40, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
     background: 'assets/places/pereulok/pereulok.png', wall: '#1c1814', floor: '#2e2620',
