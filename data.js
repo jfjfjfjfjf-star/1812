@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 22;
+const DATA_VERSION = 23;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -210,7 +210,7 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                   { kind: 'flame', x: 531, y: 52, r: 55, color: '#ffc46e', flicker: 0.16 },
                   { kind: 'glow', x: 357, y: 122, r: 90, color: '#ff9c44', flicker: 0.03 }
                 ],
-                shadow: { w: 26, h: 6, alpha: 0.35 },   // тень под ногами персонажей (ширина, высота, плотность)
+                shadow: { w: 30, h: 7, alpha: 0.32, core: 0.55 },   // тень под ногами персонажей (ширина, высота, плотность; core — доля второго, плотного пятна под ступнями)
                 // Свет на персонажах: side — сила мягкой заливки со стороны источника, rim — сила блика по краю силуэта,
                 // rimWidth — толщина блика (пиксели), rimFade — на какой доле роста (сверху) блик гаснет, reach — во сколько раз дальше радиуса r источник ещё светит на фигуру,
                 // windowR — радиус света окна для фигур (окно светит от пятна луча на полу).
@@ -218,7 +218,72 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                 // Прохожие за окном: тёмные силуэты в длинной одежде видны только на стекле (позади рамы и кувшинов).
                 // x0..x1 — где идут (за окном), feetY — линия ног (ниже подоконника), height — рост, speed — скорость,
                 // every — через сколько секунд появляется следующий, phases — в какие части дня ходят.
-                passersby: { x0: 40, x1: 118, feetY: 122, height: [30, 36], speed: [7, 12], every: [5, 13], color: '#2a3a66', phases: ['morning', 'day'] } };
+                passersby: { x0: 40, x1: 118, feetY: 122, height: [30, 36], speed: [7, 12], every: [5, 13], color: '#2a3a66', phases: ['morning', 'day'],
+                             // типовые NPC за стеклом (уменьшены до height взрослого, дети ниже), тонированы color на долю tint; без файлов — прежние силуэты
+                             types: ['woman', 'girl_young', 'old_man', 'old_woman', 'merchant', 'peasant', 'soldier', 'boy', 'girl_child', 'priest'], tint: 0.55 },
+                // Типовые NPC в лавке (стоят, не разговаривают с Андреем): места spots, кто где стоит — случайно, свой набор на каждый день
+                // (тот же день — те же люди, в том числе после загрузки). Место: x, y — где ноги (y меньше линии пола — дальше), dir — 1 лицом
+                // вправо, -1 влево; who — кто может тут стоять (типы NPC_TYPES, вариант цвета случайный); pair — беседа двоих: вторая точка
+                // (x2, y2, dir2) и пары [говорит, слушает]; look — раз в столько секунд оборачивается; behind — за ящиками переднего плана;
+                // phases — в какие части дня место бывает занято (без phases — только днём). crowd — сколько мест занято: [от, до] на часть дня (нет — никого).
+                // Левее 207 — место матери (сортирует, метёт, протирает бочонки: x 112–182), туда никого не ставим. Ребёнок своего места не имеет (см. rules.kids).
+                // Перед прилавком (x 202–530) ноги не дальше y 206: там основание прилавка и сундуки, дальше человек «стоит в прилавке».
+                // Утром лавка ещё закрыта (кто-то может ждать у двери), вечером закрыта — никого. Свободная полоса у прилавка
+                // (x 360–470, там покупатель и Андрей) не занята.
+                spots: [
+                  { id: 'shelf',  x: 218, y: 207, dir: -1, look: 10, who: ['s_look', 'old_man', 'old_woman', 'peasant'] },          // дальний ряд у края прилавка, смотрит на левые полки
+                  { id: 'talk',   x: 256, y: 216, dir: 1, pair: [['s_talk', 's_listen'], ['m_talk', 'm_listen'], ['s_talk', 'woman'], ['m_talk', 'peasant']],
+                    x2: 300, y2: 220, dir2: -1 },                                                                                  // беседа двоих чуть ближе дальнего ряда, лицом друг к другу
+                  { id: 'grain',  x: 332, y: 207, dir: 1, look: 13, who: ['s_point', 'woman', 'girl_young', 'old_woman'], child: [16, 8] },  // дальний ряд у ящиков с крупой
+                  { id: 'grain2', x: 494, y: 208, dir: -1, look: 9, who: ['girl_young', 'woman', 'old_woman'], child: [16, 8] },  // правая часть прилавка, у весов (проход 360–470 свободен)
+                  { id: 'door',   x: 538, y: 216, dir: -1, leave: 0.5, look: 8, phases: ['morning', 'day'],
+                    who: ['woman', 'old_woman', 'merchant', 'soldier', 'priest', 'girl_young'], child: [-18, 8] },            // у двери: ждёт (лицом в лавку) или уходит (лицом к двери)
+                  { id: 'corner', x: 580, y: 250, dir: -1, behind: true, chance: 0.2, chapters: 3, minCrowd: 4,
+                    who: ['m_listen', 'peasant', 'soldier', 'merchant'] }                                                           // передний план за ящиками: редко
+                ],
+                // Правила расстановки (shopExtras в index.html): left — у левой части прилавка (x от..до) не больше max человек;
+                // gap — фигуры почти на одной глубине (разница y меньше dy) не заходят друг на друга (ширина по полу — NPC_TYPES[..].foot),
+                // на разной глубине перекрываться можно; keepOut — куда не заходит ни одна фигура (проход для торговли); mother — полуширина матери:
+                // её места за день (MOTHER.activities) — тоже препятствия, как фигуры;
+                // kids — ребёнок только рядом со взрослой этих типов, на её месте (child: [dx, dy] у места), с вероятностью chance[глава].
+                // Место: chance — в какой доле дней бывает, chapters — только в первых N главах, minCrowd — только если занято не меньше мест.
+                rules: { left: { x: [207, 360], max: 3 }, gap: { dy: 8, px: 2 }, keepOut: [[360, 470]], mother: 16,
+                         kids: { types: ['boy', 'girl_child'], with: ['woman', 's_point', 'old_woman'], chance: [0.5, 0.5, 0.5, 0.25, 0.25, 0, 0] } },
+                // crowd по сюжету: day — [от, до] на каждую главу по порядку DAYS (1 Мирная Москва … 6 Последняя неделя, 7 Финал): в мирном июне
+                // людно, к войне всё меньше. draft — ополчение: мужики (types) остаются в городе с вероятностью stay[глава], иначе место берёт
+                // другой из who (женщина, старик, ребёнок) или оно пустует. fame — молва о лавке (state.fame, пока её нет — 0): каждые step
+                // очков добавляют одного человека (минус — убирают), не больше max в любую сторону.
+                crowd: { morning: [0, 1], day: [[4, 6], [3, 5], [3, 5], [2, 4], [2, 3], [1, 2], [0, 1]],
+                         draft: { types: ['peasant'], stay: [1, 1, 0.7, 0.5, 0.3, 0.15, 0] }, fame: { step: 25, max: 2 } },
+                // Глубина для extras: far — самый дальний ряд (y, масштаб, сила дымки, её цвет), near — самый ближний (y, масштаб,
+                // сила затемнения почти до силуэта, цвет, fadeR — ближе этого к Андрею по x фигура полупрозрачна).
+                depth: { far: { y: 194, scale: 0.84, haze: 0.32, color: '#22160e' }, near: { y: 264, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } } };
+
+// Типовые NPC (26.10.2026): горожане Москвы 1812 из одного листа PixelLab в стиле Андрея (tools/make_npcs.py).
+// Фигура — один кадр покоя 144×120, опора (72, 114), лицом вправо; у каждого типа несколько вариантов цвета одежды, волос и кожи:
+// файл assets/characters/npc/<тип>_<вариант>.png, вариант 1 — как нарисовано. Рост взрослых ≈ 90 (Андрей 104), детей 59–73.
+// Ходьбы у них нет (дышат и в беседе шевелят губами): стоят на месте (extras у сцен) или проходят за окном лавки (passersby, ног не видно).
+// foot — ширина фигуры по полу в пикселях от точки опоры [влево, вправо] (по файлу, вариант 1): по ней проверяется, не заходят ли люди друг на друга.
+const NPC_TYPES = {
+  girl_young: { name: 'девушка', variants: 5, foot: [-13, 14] }, woman: { name: 'женщина', variants: 5, foot: [-14, 15] }, boy: { name: 'мальчик', variants: 4, foot: [-9, 10] },
+  girl_child: { name: 'девочка', variants: 4, foot: [-9, 11] }, old_woman: { name: 'старуха', variants: 4, foot: [-20, 21] }, old_man: { name: 'старик', variants: 4, foot: [-16, 18] },
+  soldier: { name: 'солдат', variants: 4, foot: [-11, 13] }, merchant: { name: 'купец', variants: 5, foot: [-12, 14] }, peasant: { name: 'мужик', variants: 5, foot: [-9, 10] },
+  priest: { name: 'священник', variants: 3, foot: [-14, 16] },
+  // позы из листов ChatGPT (tools/make_npc_poses.py); gesture — у позы два жеста рукой (лист 8 кадров: покой и тот же покой со вторым жестом)
+  w_sit_talk: { name: 'работник сидит на мешке, рассказывает', variants: 3, foot: [-29, 31], gesture: true }, w_sit_mug: { name: 'работник сидит на ящике с кружкой', variants: 3, foot: [-27, 29] },
+  w_shovel: { name: 'работник опирается на лопату', variants: 3, foot: [-23, 24] }, w_sack: { name: 'работник несёт мешок', variants: 3, foot: [-22, 24] },
+  w_hips: { name: 'работник руки в боки', variants: 3, foot: [-20, 22] }, m_talk: { name: 'купец говорит', variants: 3, foot: [-23, 25], gesture: true },
+  m_listen: { name: 'купец слушает', variants: 3, foot: [-16, 17] }, m_coins: { name: 'купец на бочке считает монеты', variants: 3, foot: [-26, 27] },
+  s_point: { name: 'женщина показывает на полку', variants: 3, foot: [-26, 27] }, s_talk: { name: 'девушка с корзиной разговаривает', variants: 3, foot: [-23, 24], gesture: true },
+  s_listen: { name: 'пожилая женщина слушает', variants: 3, foot: [-17, 19] }, s_look: { name: 'старик разглядывает товар', variants: 3, foot: [-21, 23] }
+};
+// Файл — 4 кадра покоя в ряд (576×120): 0 как есть, 1 вдох, 2 рот приоткрыт, 3 вдох и рот (idle: кадр выбирает игра, см. NPC_IDLE);
+// у поз с жестом ещё 4 таких же со вторым жестом (1152×120).
+const npcSprite = (type, v) => ({ src: 'assets/characters/npc/' + type + '_' + v + '.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right',
+                                   frames: NPC_TYPES[type].gesture ? 8 : 4, idle: true });
+// Покой NPC: breath — длина цикла дыхания (с), inhale — доля цикла на вдохе; разговор: turn — сколько секунд говорит один, потом другой
+// (у extras talk: 0 или 1 — чья очередь), mouth — как часто шевелятся губы (с), open — доля времени, когда рот приоткрыт;
+const NPC_IDLE = { breath: 3.6, inhale: 0.4, turn: 3.5, mouth: 0.14, open: 0.45, gesture: 1.1 };   // gesture — сколько секунд держится жест, пока говорит
 
 // Покупатели — люди: кто они (имя, портрет, цвет заглушки, kind). Что им нужно в конкретный день — в VISITS.
 // portrait — крупный портрет для диалога (180×204); sprite — фигура в сцене (отдельный файл, один кадр покоя):
@@ -228,11 +293,11 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 const CUSTOMERS = [
   { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/characters/pavel/pavel_portrait.png', color: '#4a5a3a',
-    sprite: { src: 'assets/characters/pavel/pavel_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+    sprite: npcSprite('merchant', 2) },   // пока свой спрайт не нарисован — типовой NPC (свой: assets/characters/pavel/pavel_idle.png)
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/characters/darya/darya_portrait.png', color: '#7a4a6b',
-    sprite: { src: 'assets/characters/darya/darya_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } },
+    sprite: npcSprite('woman', 3) },
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
-    sprite: { src: 'assets/characters/fedor/fedor_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }
+    sprite: npcSprite('peasant', 4) }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -294,6 +359,28 @@ const SCENES = {
   // персонажи проходят за ними; Сорокин у своей конторки справа
   labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
     background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
+    // NPC лабаза: только люди Сорокина (работники) и купцы, как Андрей, — группками, отдыхают, работают, беседуют
+    // три группы: А — работа у ларей, Б — торг у конторки, В — отдых у ворот и грузчик; свободны проходы к ларям (x 290–330) и к Сорокину (404–474)
+    extras: [
+      { type: 'w_hips', v: 1, x: 214, y: 176, dir: 1, talk: 0 }, { type: 'w_shovel', v: 2, x: 262, y: 188, dir: -1, talk: 1 },             // А: у ларей, лесенкой по глубине, лицом друг к другу
+      { type: 'm_talk', v: 1, x: 353, y: 200, dir: 1, talk: 0 }, { type: 'm_listen', v: 2, x: 386, y: 210, dir: -1, talk: 1 },             // Б: купцы торгуются, лицом друг к другу
+      { type: 'm_coins', v: 2, x: 486, y: 182, dir: -1 },                                                                                    // Б: купец на бочке у конторки
+      { type: 'w_sit_talk', v: 1, x: 96, y: 222, dir: 1, talk: 0 }, { type: 'w_sit_mug', v: 2, x: 150, y: 208, dir: -1, talk: 1 },          // В: отдыхают у ворот
+      { type: 'w_sack', v: 1, x: 198, y: 196, dir: 1, route: [[198, 196], [300, 190]] },   // В: несёт мешок от ворот к ларям; route — маршрут на будущее (пока стоит, движения нет)
+      { type: 'w_hips', v: 3, x: 34, y: 248, dir: 1, behind: true }, { type: 'm_listen', v: 1, x: 566, y: 250, dir: -1, behind: true }     // передний план: за бочками и мешками по краям
+    ],
+    depth: { far: { y: 170, scale: 0.7, haze: 0.34, color: '#1e150d' }, near: { y: 266, scale: 1.16, dark: 0.72, color: '#0d0806', fadeR: 34 } },
+    // прохожие на пристани за воротами (как SCENE.passersby, но вместо стекла — проём ворот clip [x0, y0, x1, y1])
+    passersby: { x0: 20, x1: 112, feetY: 152, height: [44, 52], speed: [9, 15], every: [4, 10], color: '#8fa6c8', tint: 0.22, phases: ['morning', 'day'],
+                 clip: [32, 20, 104, 164], types: ['peasant', 'merchant', 'woman', 'girl_young', 'old_man', 'boy', 'soldier', 'old_woman'] },
+    darkK: 0.7,   // вечерний сумрак в лабазе на 30% слабее, чем в лавке (своих свечей нет — иначе слишком темно)
+    // свет лабаза (как SCENE.lights): ворота слева — дневной свет с лучом на пол, окошко над мешками, тёплое свечение в глубине и у конторки
+    lights: [
+      { kind: 'window', x0: 30, y0: 20, x1: 105, y1: 160, beam: [[40, 150], [105, 150], [260, 228], [70, 228]], color: '#a9c8ff' },
+      { kind: 'window', x0: 190, y0: 50, x1: 230, y1: 72, beam: [[195, 72], [228, 72], [262, 190], [222, 190]], color: '#8fb8ff' },
+      { kind: 'glow', x: 372, y: 160, r: 110, color: '#ff9c44', flicker: 0.03 },
+      { kind: 'glow', x: 510, y: 135, r: 80, color: '#ffb35a', flicker: 0.05 }
+    ],
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] },
   // ТЕСТОВОЕ: название, реплики, цены. Фона и фигуры трактирщика пока нет — заглушки.

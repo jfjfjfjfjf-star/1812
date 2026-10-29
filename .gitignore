@@ -21,3 +21,4 @@ docs/consistency-failures.md
 *.key
 credentials.json
 secrets.json
+tools/out/
