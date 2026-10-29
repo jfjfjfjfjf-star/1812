@@ -1,0 +1,38 @@
+# CCGS project configuration — single source of truth for project settings.
+# See .claude/docs/effects-map.md for full schema.
+#
+# Летописи 1812: браузерная игра на чистом HTML5 Canvas + JavaScript,
+# без движка и без сборки (index.html — движок, data.js — содержимое).
+# CCGS знает только Godot / Unity / Unreal, поэтому engine.name не задан
+# намеренно: не запускайте /setup-engine с выбором движка — игру не переносим.
+
+schema_version: 1
+
+framework:
+  version: 1.2.0
+  last_upgraded: 2026-10-19
+
+project:
+  name: "Летописи 1812"
+  genre: "Историческая 2D-RPG"
+  kind: game
+
+# Только rigor и automation: шесть ручек, которые rigor раскрывает
+# (review_mode, workflow, docs.density, qa.level, story_granularity, team.size),
+# сюда не добавлять — они перекроют rigor.
+modes:
+  rigor: minimal
+  automation: collaborative
+
+platform:
+  multiplayer: false
+  online: false
+  targets: [Web]
+  primary_input: "Keyboard"
+  gamepad_support: "None"
+  touch_support: "None"
+  cert_tier: none
+
+# Сборки нет: игра открывается файлом index.html. Проверки — tests/README.md.
+commands:
+  test: "node tests/shop_hd.test.js && python3 tests/check_night_alignment.py"

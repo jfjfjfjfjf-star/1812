@@ -26,6 +26,21 @@
   #back { display: none; left: calc(var(--u) * 4px); top: calc(var(--u) * 3px); font-family: inherit; cursor: pointer; text-shadow: none;
           background: rgba(20,12,6,.92); border: calc(var(--u) * 1px) solid #8c7647; padding: calc(var(--u) * 1.5px) calc(var(--u) * 5px); }
   body.serving #newgame, body.serving #notesbtn { display: none; }
+  /* Сцена-ролик: подпись внизу (над чёрной полосой) и историческая справка карточкой на «бумаге» */
+  body.cine #stage > *:not(canvas):not(#cine) { display: none !important; }
+  #cine { position: absolute; inset: 0; z-index: 9; display: none; pointer-events: auto; cursor: pointer; }
+  #cine.on { display: block; }
+  #cine .cap { position: absolute; left: 12%; right: 12%; bottom: calc(var(--u) * 17px); text-align: center; color: #efdcba;
+               font-size: calc(var(--u) * 6.5px); line-height: 1.4; text-shadow: 0 0 calc(var(--u) * 2px) #000, 1px 1px #000; }
+  #cine .fact { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62%; box-sizing: border-box;
+                background: #efdcba; color: #261b15; border: calc(var(--u) * 1px) solid #4c1c0b; box-shadow: calc(var(--u) * 2px) calc(var(--u) * 2px) 0 #0a0b13;
+                padding: calc(var(--u) * 5px) calc(var(--u) * 8px); font-size: calc(var(--u) * 5.5px); line-height: 1.4; }
+  #cine .fact b { display: block; color: #911104; font-size: calc(var(--u) * 7px); margin-bottom: calc(var(--u) * 2px); letter-spacing: .04em; text-transform: uppercase; }
+  #cine .fact p { margin: 0; }
+  #cine small { position: absolute; right: calc(var(--u) * 4px); bottom: calc(var(--u) * 4px); color: #efdcba; opacity: .45; font-size: calc(var(--u) * 4.5px); }
+  #cine .cap, #cine .fact { opacity: 0; }
+  #cine.show .cap, #cine.show .fact { animation: cinein 1.2s .5s forwards; }
+  @keyframes cinein { to { opacity: 1; } }
   #toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--u) * 24px); display: none; z-index: 5;
            background: rgba(20,12,6,.92); border: 2px solid #e8c36a; color: #f0e2c0; padding: calc(var(--u) * 2px) calc(var(--u) * 6px);
            font-size: calc(var(--u) * 6px); }
@@ -113,7 +128,7 @@
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
-  <div id="toast"></div><div id="notes"></div><div id="night"></div>
+  <div id="toast"></div><div id="notes"></div><div id="night"></div><div id="cine"></div>
   <div id="map"><svg viewBox="0 0 1000 560" preserveAspectRatio="none"><g id="mapbase"></g><g id="mapmarks"></g></svg><button id="mapclose">← Вернуться (M)</button><button id="mapswitch"></button><div id="mapcard"></div></div>
 </div>
 <script src="data.js"></script>
@@ -412,6 +427,19 @@ if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => { loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H); if (SCENES[id].front) loadImage('fr_' + id, SCENES[id].front, SCENES[id].worldW, H, true); });
 (MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+const HD_ON = !/[?&]hd=0\b/.test(location.search);   // ?hd=0 — фон лавки обычными пиксельными слоями
+if (HD_ON) [['bgHd', ART.background], ['counterHd', ART.counterFront], ['frontHd', ART.foreground]].forEach(([k, a]) => {
+  if (a.hd) loadImage(k, a.hd, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется обычный слой.');
+  if (a.hdNight) loadImage(k + 'Night', a.hdNight, SCENE.worldW * ART.hdScale, H * ART.hdScale, true, 'Рисуется дневной слой.'); });
+const nightBg = () => !!(TIME.light[state.phase] || {}).night && nightAvail();   // в эту часть дня рисуется ночной фон (с переходом — см. nightK)
+function drawHd(key) {                                 // слой в высоком разрешении: плавно уменьшается под холст; ночью — ночная версия (при смене части дня — наплыв)
+  const day = spr[key], night = spr[key + 'Night'], k = night && night.ok ? nightK() : 0;
+  if (!HD_ON || !day || !day.ok) return false;
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  if (k < 1) ctx.drawImage(day, 0, 0, SCENE.worldW, H);
+  if (k > 0) { ctx.globalAlpha = k; ctx.drawImage(night, 0, 0, SCENE.worldW, H); }
+  ctx.restore(); return true;
+}
 speakers().forEach(x => loadImage('p_' + x.id, x.portrait, ART.portrait.w, ART.portrait.h, false, 'Показана временная заглушка портрета.'));
 Object.keys(GOODS).forEach(k => loadImage('g_' + k, GOODS[k].icon, ART.goodsIcon.w, ART.goodsIcon.h, true));
 Object.keys(MAP.maps).forEach(id => { const a = MAP.maps[id].art; if (a) loadImage('map_' + id, a.src, a.w, a.h, true); });
@@ -449,6 +477,7 @@ addEventListener('keydown', e => {
   sfx.unlock();                                        // звук можно включить только после действия игрока (правило браузеров)
   if (e.code === 'KeyF') { toggleScreen(); return; }   // режим экрана — в любой момент
   if (e.code === 'KeyS') { sfx.toggle(); return; }     // звук — в любой момент
+  if (cine) { if (e.code === 'Escape') endCine(); else if (['KeyE', 'Space', 'Enter'].includes(e.code)) cineNext(); return; }   // сцена-ролик
   if (sleeping) return;                                // ночью остальной ввод не действует
   if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; if (mapOpen) mapId = MAP.start; renderMap(); return; }
   if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
@@ -469,6 +498,7 @@ $('mapbtn').onclick = e => { mapOpen = true; mapId = MAP.start; renderMap(); e.t
 $('screenbtn').onclick = e => { toggleScreen(); e.target.blur(); };
 $('soundbtn').onclick = e => { sfx.unlock(); sfx.toggle(); e.target.blur(); };
 addEventListener('pointerdown', () => sfx.unlock());
+$('cine').onclick = () => cineNext();
 $('mapclose').onclick = e => { mapOpen = false; renderMap(); e.target.blur(); };
 $('mapswitch').onclick = e => { mapId = nextMap(); renderMap(); e.target.blur(); };
 $('map').querySelector('svg').onclick = e => { const g = e.target.closest('.loc'); if (g) { mapSel[mapId] = g.dataset.id; renderMap(); } };
@@ -807,8 +837,12 @@ function finishDay() {                                 // закупки пос�
 }
 async function endDay() {                              // ночь, затем следующий день из DAYS (с главой и перемоткой, если они есть)
   if (state.phase !== 'evening' || sleeping) return;
-  if (state.day + 1 >= DAYS.length) { toast('Это последний день в текущей версии игры. «Новая игра» — заново.'); return; }
+  const scene = DAYS[state.day].cutscene, lastOne = state.day + 1 >= DAYS.length;
+  const theEnd = () => toast('Это последний день в текущей версии игры. «Новая игра» — заново.');
+  if (lastOne && !scene) { theEnd(); return; }
   sleeping = true; dlg = null; renderDlg();
+  if (scene) await playCutscene(scene);                // сцена-ролик в конце дня (в финале — пожар Москвы)
+  if (lastOne) { sleeping = false; theEnd(); return; }
   await card('Ночь', 1300);
   Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
   const got = deliver();                               // заказ у оптовика привезли ночью
@@ -872,6 +906,7 @@ function faceSpeaker(tx) {
   else player.dir = -side;
 }
 function update(dt) {
+  if (cine) { updateCine(dt); return; }
   updateVisitors(dt);
   player.moving = false;
   if (player.auto) {                                   // отходит к собеседнику на удобное расстояние (идёт и во время разговора)
@@ -906,6 +941,46 @@ function person(x, y, color, dir) {
   R('#2a1a0e', dir > 0 ? 2 : -7, -60, 5, 3);
   R('#d8d0b0', -2, -48, 5, 20);
 }
+// Свет на персонажах (настройки — SCENE.charLight и TIME.light[…].ambient в data.js). Кадр собирается в отдельном холсте в пикселях спрайта:
+//   1) общий тон части дня (умножение на ambient: утром холоднее, вечером темнее);
+//   2) от каждого источника рядом (окно, свеча, лампада) — мягкая заливка с той стороны фигуры, откуда идёт свет,
+//   3) и контурный блик по краю силуэта с этой же стороны. Сила падает с расстоянием, пламя мерцает так же, как его свечение.
+// Только наложением (без чтения пикселей): при открытии игры файлом пиксели картинок читать нельзя.
+let litB = null, litF = null;
+function charLights(wx, wy) {                          // источники, которые светят на фигуру в точке (wx, wy) мира: [{ s, k, color }]
+  const C = SCENE.charLight, L = lightNow(), t = performance.now() / 1000;
+  return (scn().lights || []).map((l, i) => {
+    const win = l.kind === 'window', lx = win ? (l.beam[2][0] + l.beam[3][0]) / 2 : l.x, ly = win ? wy : l.y;
+    const p = win ? L.window : L.warm * flick(t, i * 1.7, l.flicker || 0), r = (win ? C.windowR : l.r) * C.reach;
+    const d = Math.hypot(lx - wx, (ly - (wy - 60)) * 0.6);
+    return { s: Math.sign(lx - wx) || 1, k: Math.max(0, p * (1 - d / r)), color: l.color };
+  }).filter(o => o.k > 0.02);
+}
+function drawLit(img, sx, sy, sw, sh, dx, dy, dw, dh, wx, wy, flipped) {
+  const C = SCENE.charLight, L = lightNow();
+  if (!LIGHT_ON || !C || L.ambient === '#ffffff') { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); return; }
+  if (!litB) { litB = mkCv(sw, sh); litF = mkCv(sw, sh); }
+  if (litB.width !== sw || litB.height !== sh) { litB.width = litF.width = sw; litB.height = litF.height = sh; }
+  const b = litB.getContext('2d'), f = litF.getContext('2d');
+  b.globalCompositeOperation = 'source-over'; b.clearRect(0, 0, sw, sh); b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  b.globalCompositeOperation = 'multiply'; b.fillStyle = L.ambient; b.fillRect(0, 0, sw, sh);
+  b.globalCompositeOperation = 'destination-in'; b.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);   // умножение залило и пустоту — вернуть силуэт
+  charLights(wx, wy).forEach(o => {
+    const s = flipped ? -o.s : o.s, near = s > 0 ? sw : 0;   // в зеркальном кадре «справа» — это слева
+    f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, sw, sh); f.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    const g = f.createLinearGradient(near, 0, sw / 2 - s * sw * 0.05, 0);
+    g.addColorStop(0, rgba(o.color, Math.min(1, C.side * o.k))); g.addColorStop(1, rgba(o.color, 0));
+    f.globalCompositeOperation = 'source-in'; f.fillStyle = g; f.fillRect(0, 0, sw, sh);
+    b.globalCompositeOperation = 'lighter'; b.drawImage(litF, 0, 0);
+    f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, sw, sh); f.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    f.globalCompositeOperation = 'source-in'; f.fillStyle = rgba(o.color, Math.min(1, C.rim * o.k)); f.fillRect(0, 0, sw, sh);
+    f.globalCompositeOperation = 'destination-out'; f.drawImage(img, sx, sy, sw, sh, -s * C.rimWidth, 0, sw, sh);   // остаётся край со стороны света
+    const v = f.createLinearGradient(0, 0, 0, sh); v.addColorStop(0, '#000'); v.addColorStop(C.rimFade, 'rgba(0,0,0,0)');
+    f.globalCompositeOperation = 'destination-in'; f.fillStyle = v; f.fillRect(0, 0, sw, sh);   // свет сверху: кайма гаснет к ногам
+    b.globalCompositeOperation = 'lighter'; b.drawImage(litF, 0, 0);
+  });
+  ctx.drawImage(litB, 0, 0, sw, sh, dx, dy, dw, dh);
+}
 // Человек в сцене (мать, покупатель, персонаж другого места): спрайт из data.js (sprite) или заглушка. dir: 1 — лицом вправо, -1 — влево.
 function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — другой лист кадров (например, дело матери)
   shadow(x, y);
@@ -915,7 +990,7 @@ function drawPerson(who, x, y, dir, spOver, imOver) {     // spOver/imOver — �
   const f = sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k));
+  drawLit(im, f * sp.cellW, 0, sp.cellW, sp.cellH, -Math.round(sp.anchorX * k), Math.round(y) - Math.round(sp.floorY * k), Math.round(sp.cellW * k), Math.round(sp.cellH * k), x, y, flip);
   ctx.restore();
 }
 // Андрей: кадр покоя нужен всегда (иначе заглушка целиком). Кадр ходьбы выбирается по пройденному пути; если файла ходьбы нет,
@@ -950,7 +1025,7 @@ function drawAndrey(x, y, dir, moving, atCounter) {
   ctx.translate(Math.round(x), 0);
   if (dir < 0) ctx.scale(-1, 1);                           // влево — зеркало (вправо рисуем как есть)
   const k = SCENE.charScale;                               // опора (48, 76) остаётся на месте, увеличивается всё вокруг неё
-  ctx.drawImage(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k));
+  drawLit(img, f * A.cellW, 0, A.cellW, A.cellH, -Math.round(A.anchorX * k), Math.round(y) - Math.round(A.floorY * k), Math.round(A.cellW * k), Math.round(A.cellH * k), x, y, dir < 0);
   ctx.restore();
 }
 // ================= ЗВУК =================
@@ -959,7 +1034,7 @@ function drawAndrey(x, y, dir, moving, atCounter) {
 // S или кнопка «Звук» — выключить и включить (запоминается).
 const SOUND_KEY = 'letopisi1812_sound';
 const sfx = (() => {
-  let ac = null, master = null, amb = null, on = (() => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch (e) { return true; } })();
+  let ac = null, master = null, amb = null, fireN = null, on = (() => { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch (e) { return true; } })();
   const label = () => { $('soundbtn').textContent = on ? 'Звук: вкл (S)' : 'Звук: выкл (S)'; };
   const noiseBuf = (sec, brown) => {
     const b = ac.createBuffer(1, ac.sampleRate * sec, ac.sampleRate), d = b.getChannelData(0); let last = 0;
@@ -998,6 +1073,21 @@ const sfx = (() => {
       if (!ready()) return; const t = ac.currentTime;
       for (let i = 0; i < 3; i++) [4200, 5600, 7100].forEach(f => tone(f * (0.95 + Math.random() * 0.1), t + i * 0.07 + Math.random() * 0.02, 0.09, 0.05));
     },
+    fire(h) {                                           // пожар: гул и треск, громкость по силе огня; h < 0 — стих
+      if (h < 0) { if (fireN) { const t = ac.currentTime; fireN.forEach(n => { n.g.gain.setTargetAtTime(0, t, 0.4); n.src.stop(t + 2); }); fireN = null; } return; }
+      if (!ready()) return;
+      if (!fireN) fireN = [[true, 'lowpass', 260], [false, 'highpass', 1800]].map(([brown, type, f]) => {
+        const src = ac.createBufferSource(); src.buffer = noiseBuf(4, brown); src.loop = true;
+        const fl = ac.createBiquadFilter(); fl.type = type; fl.frequency.value = f; const g = ac.createGain(); g.gain.value = 0;
+        src.connect(fl).connect(g).connect(master); src.start(); return { src, g, brown }; });
+      const t = ac.currentTime;
+      fireN[0].g.gain.setTargetAtTime(0.03 + h * 0.35, t, 0.3);                                  // гул
+      fireN[1].g.gain.setTargetAtTime(Math.random() < 0.3 ? h * 0.12 * Math.random() : 0.004, t, 0.02);   // треск: короткие всплески
+    },
+    nabat() {                                           // набат: низкий удар колокола
+      if (!ready()) return; const t = ac.currentTime;
+      [[147, 0.16], [294, 0.07], [352, 0.05], [441, 0.035], [588, 0.02]].forEach(([f, v]) => tone(f, t, 3.2, v));
+    },
     step() {                                            // шаг по доскам: короткий глухой удар
       if (!ready()) return; const t = ac.currentTime;
       const src = ac.createBufferSource(); src.buffer = noiseBuf(0.08, false);
@@ -1031,8 +1121,7 @@ function drawPassersby() {                             // слой 1а: в ко�
   walkers.list = walkers.list.filter(w => w.x > P.x0 - 20 && w.x < P.x1 + 20);
   if (!walkers.list.length) return;
   if (glassCv.width !== gl.width) { glassCv.width = gl.width; glassCv.height = gl.height; }
-  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.drawImage(gl, 0, 0);
-  gctx.globalCompositeOperation = 'source-atop'; gctx.fillStyle = P.color;
+  gctx.globalCompositeOperation = 'source-over'; gctx.clearRect(0, 0, glassCv.width, glassCv.height); gctx.fillStyle = P.color;
   walkers.list.forEach(w => {                          // силуэт: голова, плечи, длинная одежда до земли
     const x = Math.round(w.x), f = P.feetY, h = w.h, sh = h * 0.13, hw = w.kind === 'dress' ? h * 0.2 : h * 0.15;
     gctx.beginPath();
@@ -1040,6 +1129,7 @@ function drawPassersby() {                             // слой 1а: в ко�
     gctx.beginPath(); gctx.arc(x, f - h * 0.89, h * (w.kind === 'dress' ? 0.1 : 0.085), 0, Math.PI * 2); gctx.fill();
     if (w.kind === 'coat') gctx.fillRect(x - h * 0.1, f - h * 0.99, h * 0.2, h * 0.05);   // шапка
   });
+  gctx.globalCompositeOperation = 'destination-in'; gctx.drawImage(gl, 0, 0);   // оставить силуэты только на стекле
   ctx.drawImage(glassCv, 0, 0);
 }
 
@@ -1051,6 +1141,28 @@ const LIGHT_ON = !/[?&]light=0\b/.test(location.search);
 const lightCv = document.createElement('canvas'), lctx = lightCv.getContext('2d');
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + Math.max(0, Math.min(1, a)) + ')'; };
 const flick = (t, seed, amp) => 1 + amp * (0.6 * Math.sin(t * 7.1 + seed) + 0.3 * Math.sin(t * 13.7 + seed * 2.3) + 0.1 * Math.sin(t * 31 + seed * 5.1));
+// Плавная смена части дня: свет, ночной фон и тон персонажей переходят за TIME.lightFade секунд.
+// lightNow() — настройки света на этот кадр (смесь прежней и новой части дня), nightK() — доля ночного фона (0 — день, 1 — ночь).
+const mixHex = (a, b, k) => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), m = s => Math.round((x >> s & 255) * (1 - k) + (y >> s & 255) * k);
+  return '#' + ((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0'); };
+const nightAvail = () => LIGHT_ON && HD_ON && inShop() && !!(spr.bgHdNight && spr.bgHdNight.ok);
+function lightOf(L) {                                  // часть дня → числа для смешивания (сумрак уже с учётом ночного фона)
+  const n = !!L.night && nightAvail();
+  return { dark: L.night && !n && L.darkNoNight != null ? L.darkNoNight : L.dark, darkColor: L.darkColor || '#000000', window: L.window, warm: L.warm,
+    vignette: L.vignette || 0, vignetteColor: L.vignetteColor || '#000000', ambient: L.ambient || '#ffffff', night: n ? 1 : 0 };
+}
+let phaseFx = { ph: null, from: null, t0: 0 }, lightLast = null;
+function lightNow() {
+  const to = lightOf(TIME.light[state.phase] || TIME.light.day), now = performance.now();
+  if (phaseFx.ph !== state.phase) { phaseFx = { ph: state.phase, from: phaseFx.ph ? lightLast : null, t0: now }; }
+  let k = phaseFx.from ? (now - phaseFx.t0) / 1000 / (TIME.lightFade || 0.001) : 1;
+  if (k >= 1) { phaseFx.from = null; return lightLast = to; }
+  k = k * k * (3 - 2 * k);                             // мягкое начало и конец
+  const f = phaseFx.from, o = {};
+  Object.keys(to).forEach(key => { o[key] = typeof to[key] === 'string' ? mixHex(f[key], to[key], k) : f[key] + (to[key] - f[key]) * k; });
+  return lightLast = o;
+}
+const nightK = () => lightNow().night;
 let dust = { scene: '', list: [], last: 0 };
 function shadow(x, y) {                                // тень под ногами (в координатах мира)
   const sh = SCENE.shadow; if (!LIGHT_ON || !sh) return;
@@ -1059,14 +1171,15 @@ function shadow(x, y) {                                // тень под ног
 }
 function drawLight() {                                 // вызывается в координатах мира (холст уже сдвинут на камеру)
   if (!LIGHT_ON) return;
-  const L = TIME.light[state.phase] || TIME.light.day, lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
+  const L = lightNow(), lights = scn().lights || [], cam = cameraX(), t = performance.now() / 1000;
   const power = (l, i) => (l.kind === 'flame' ? flick(t, i * 1.7, l.flicker || 0) : l.kind === 'glow' ? flick(t, i * 1.7, l.flicker || 0) : 1) * (l.kind === 'window' ? L.window : L.warm);
   // 1) сумрак: заливка цветом, в местах света — просветы
-  if (L.dark > 0) {
+  const dark = L.dark;                                  // нет ночного фона — сумрак сильнее (darkNoNight, см. lightOf)
+  if (dark > 0) {
     const w = canvas.width, h = canvas.height;
     if (lightCv.width !== w || lightCv.height !== h) { lightCv.width = w; lightCv.height = h; }
     lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, w, h);
-    lctx.fillStyle = rgba(L.darkColor, L.dark); lctx.fillRect(0, 0, w, h);
+    lctx.fillStyle = rgba(L.darkColor, dark); lctx.fillRect(0, 0, w, h);
     lctx.setTransform(px, 0, 0, px, -cam * px, 0); lctx.globalCompositeOperation = 'destination-out';
     lights.forEach((l, i) => {
       const cx = l.kind === 'window' ? (l.x0 + l.x1) / 2 : l.x, cy = l.kind === 'window' ? (l.y0 + l.y1) / 2 : l.y, r = (l.r || 70) * 1.5;
@@ -1097,6 +1210,12 @@ function drawLight() {                                 // вызывается �
     }
   });
   ctx.restore();
+  // 3) виньетка: края кадра темнее, взгляд собирается к середине (в координатах экрана)
+  if (L.vignette > 0) {
+    const vc = L.vignetteColor || '#000000', g = ctx.createRadialGradient(cam + W / 2, H * 0.45, H * 0.35, cam + W / 2, H * 0.45, W * 0.62);
+    g.addColorStop(0, rgba(vc, 0)); g.addColorStop(1, rgba(vc, L.vignette));
+    ctx.fillStyle = g; ctx.fillRect(cam, 0, W, H);
+  }
 }
 function drawDust(l, k, t) {                           // пылинки в луче окна: медленно плывут и мерцают
   const b = l.beam, xs = b.map(p => p[0]), ys = b.map(p => p[1]);
@@ -1116,6 +1235,7 @@ function drawDust(l, k, t) {                           // пылинки в лу
 // 4) Андрей за прилавком (если стоит за ним), 5) передняя часть прилавка, 6) покупатель, 7) Андрей в свободной ходьбе,
 // 8) передний план, 9) интерфейс (HTML поверх сцены). Покупатель всегда перед прилавком, Андрей за ним — и никогда не наоборот.
 function drawBackdrop() {                              // слой 1
+  if (drawHd('bgHd')) return;
   if (spr.bg.ok) { ctx.drawImage(spr.bg, 0, 0); return; }          // настоящий фон: заглушки не рисуем
   rect('#1c3a5c', 27, 27, 33, 40); rect('#1c3a5c', 560, 27, 33, 40);                // окна: холодный синий свет
   shelf(73, 27, 6); shelf(167, 27, 11); shelf(330, 27, 13); shelf(520, 27, 5);
@@ -1131,11 +1251,13 @@ function drawStock() {                                 // слой 2: одна �
   });
 }
 function drawCounterFront() {                          // слой 5: закрывает нижнюю часть Андрея за прилавком
+  if (drawHd('counterHd')) return;
   if (spr.counter.ok) ctx.drawImage(spr.counter, 0, 0);
   else if (spr.bg.ok) { const r = ART.counterFront.rect; ctx.drawImage(spr.bg, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h); }   // тот же участок фона поверх Андрея
   else { const r = ART.counterFront.rect; rect('#3b2616', r.x, r.y, r.w, r.h); }
 }
 function drawFront() {                                 // слой 8
+  if (drawHd('frontHd')) return;
   if (spr.front.ok) ctx.drawImage(spr.front, 0, 0);
   else if (!spr.bg.ok) { rect('#17100a', 0, 159, 40, 21); rect('#17100a', SCENE.worldW - 47, 155, 47, 25); }   // заглушка только вместе с заглушкой фона
 }
@@ -1159,6 +1281,7 @@ function draw() {
   const cam = cameraX();
   ctx.setTransform(px, 0, 0, px, 0, 0);               // всё рисуется в пикселях сетки; холст может быть в px раз крупнее
   ctx.clearRect(0, 0, W, H);
+  if (cine) { drawCine(); return; }
   if (!inShop()) { drawPlace(); drawHud(); return; }
   if (!spr.bg.ok) { rect('#3a2819', 0, 0, W, 120); rect('#7a5836', 0, 120, W, H - 120); }   // заглушка: стена и пол
   ctx.save(); ctx.translate(-cam, 0);                  // дальше всё в координатах мира
@@ -1189,6 +1312,238 @@ function drawHud() {
   h.style.display = msg ? 'block' : 'none'; h.textContent = msg;
 }
 
+// ================= СЦЕНЫ-РОЛИКИ (CUTSCENES в data.js) =================
+// Плоские слои с параллаксом, силуэты с подсветкой краёв, огонь, дым и искры — в духе Valiant Hearts, но в пиксельной сетке 480×270.
+// Картинки слоёв необязательны: пока их нет, слой собирается кодом из простых силуэтов (Кремль, крыши, забор) в палитре игры.
+// Силуэты рисуются одним цветом, который меняется вместе с пожаром; огонь, дым, искры и зарево рисует игра поверх слоёв.
+const PAL = '0A0B13 19100D 0D1222 1D1821 33120A 29181A 261B15 121E3B 261E1A 351F15 3B1F0F 30222B 2D2521 382121 3C201C 262639 33251D 4C1C0B 3D2617 46231A 362C24 152C5B 3B2D24 402D22 4B2B19 522718 423329 5E2811 572D15 4F312E 453541 46372B 593228 4F3A28 6B2C0D 113C83 633216 3C3E5A 4E3F28 4D3F30 633719 6B3617 673824 284477 6F3817 911104 7A330D 5E4628 574932 6B4225 684638 774120 0D4AAF 634C52 8B3B0B 89441C 7A4F3B 9B4008 7C532C 765A3F 9C4D18 075EDF 8F5B3F B04D0D 73667C 916435 C15309 0E76EB A86C48 1A7EDA 94785E A97251 C56918 BC6F32 D95E07 F47106 BC8F6A E78022 33A7FC B79C7F D1A07C 45B6F7 FA9521 D4AD89 EEA676 F8A773 FBB956 EBBD94 DCC6A8 6FD7FB EFDCBA F0DDC0'
+  .split(' ').map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4), 16)]);   // общая палитра игры (assets/palette.txt)
+const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const palMemo = new Map();
+function mixPal(a, b, k) {                             // смесь двух цветов, приведённая к ближайшему цвету палитры
+  k = Math.round(Math.max(0, Math.min(1, k)) * 50) / 50; const key = a + b + k; if (palMemo.has(key)) return palMemo.get(key);
+  const A = hexRgb(a), B = hexRgb(b), c = A.map((v, i) => v + (B[i] - v) * Math.max(0, Math.min(1, k)));
+  let best = PAL[0], bd = Infinity;
+  PAL.forEach(p => { const d = (p[0] - c[0]) ** 2 * 0.3 + (p[1] - c[1]) ** 2 * 0.59 + (p[2] - c[2]) ** 2 * 0.11; if (d < bd) { bd = d; best = p; } });
+  const out = '#' + best.map(v => v.toString(16).padStart(2, '0')).join(''); palMemo.set(key, out); return out;
+}
+const CINE = {                                          // цвета: [спокойный вечер, пожар]
+  sky: [['#0A0B13', '#0D1222', '#121E3B', '#152C5B', '#284477', '#3C3E5A', '#634C52', '#8F5B3F', '#BC6F32'],
+        ['#19100D', '#33120A', '#4C1C0B', '#5E2811', '#911104', '#B04D0D', '#D95E07', '#F47106', '#FA9521']],
+  bands: [40, 34, 28, 24, 20, 18, 16, 14, 36],          // высота полос неба сверху вниз
+  far: ['#3C3E5A', '#6B3617'], farRim: ['#634C52', '#C15309'],
+  mid: ['#1D1821', '#29181A'], midRim: ['#3C3E5A', '#F47106'], win: ['#6B2C0D', '#E78022'],
+  near: ['#0A0B13', '#0A0B13'], nearRim: ['#1D1821', '#D95E07'],
+  smoke: ['#30222B', '#3D2617'], fig: '#0A0B13', figRim: ['#3C3E5A', '#FA9521'],
+  bar: 22                                               // высота чёрных полос сверху и снизу (как в кино)
+};
+const ease = k => k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+const mkCv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+function crisp(cv) {                                    // альфа только 0 или 255, как у всей графики игры
+  const g = cv.getContext('2d'), d = g.getImageData(0, 0, cv.width, cv.height);
+  for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > 110 ? 255 : 0;
+  g.putImageData(d, 0, 0); return cv;
+}
+function rimOf(cv, dirs) {                              // подсветка края силуэта: пиксели, у которых соседний (сверху, справа…) прозрачен
+  const out = mkCv(cv.width, cv.height), og = out.getContext('2d');   // только наложением: при открытии игры файлом пиксели картинок читать нельзя
+  dirs.forEach(([dx, dy]) => { const one = mkCv(cv.width, cv.height), g = one.getContext('2d');
+    g.drawImage(cv, 0, 0); g.globalCompositeOperation = 'destination-out'; g.drawImage(cv, -dx, -dy); og.drawImage(one, 0, 0); });
+  return out;
+}
+function roofline(cv, base) {                           // верхний непрозрачный пиксель в каждом столбце (там горит огонь)
+  const w = cv.width, h = cv.height, top = new Array(w).fill(base);
+  try { const s = cv.getContext('2d').getImageData(0, 0, w, h).data;
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (s[(y * w + x) * 4 + 3]) { top[x] = y; break; } }
+  catch (e) {}                                          // игра открыта файлом и слой — картинка: огонь стоит на условной линии крыш
+  return top;
+}
+const tintCache = new Map();
+function tinted(cv, color) {                            // силуэт, залитый одним цветом (кэш по цвету: цветов палитры немного)
+  const key = (cv.cid || (cv.cid = Math.random().toString(36).slice(2))) + color;
+  if (!tintCache.has(key)) { const t = mkCv(cv.width, cv.height), g = t.getContext('2d');
+    g.drawImage(cv, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = color; g.fillRect(0, 0, t.width, t.height); tintCache.set(key, t); }
+  return tintCache.get(key);
+}
+
+// ----- Временная графика слоёв: силуэты Москвы -----
+function onion(g, x, y, w) {                            // луковичная глава на барабане, с крестом; y — низ барабана
+  g.fillRect(x - w * 0.3, y - w * 0.9, w * 0.6, w * 0.9);
+  g.beginPath(); g.ellipse(x, y - w * 1.25, w * 0.5, w * 0.5, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(x - w * 0.42, y - w * 1.45); g.quadraticCurveTo(x, y - w * 1.7, x, y - w * 2.25); g.quadraticCurveTo(x, y - w * 1.7, x + w * 0.42, y - w * 1.45); g.fill();
+  g.fillRect(x - 0.5, y - w * 2.25 - 5, 1, 5); g.fillRect(x - 2, y - w * 2.25 - 3.5, 4, 1);
+}
+function tent(g, x, y, w, bodyH, roofH) {               // башня с шатром (как кремлёвские); y — низ башни
+  g.fillRect(x - w / 2, y - bodyH, w, bodyH);
+  g.fillRect(x - w * 0.35, y - bodyH - 6, w * 0.7, 6);
+  g.beginPath(); g.moveTo(x - w * 0.42, y - bodyH - 6); g.lineTo(x, y - bodyH - 6 - roofH); g.lineTo(x + w * 0.42, y - bodyH - 6); g.fill();
+  g.fillRect(x - 0.5, y - bodyH - 10 - roofH, 1, 5);
+}
+function house(g, x, base, w, h, roof) {                // дом с двускатной крышей и трубой
+  g.fillRect(x, base - h, w, h);
+  g.beginPath(); g.moveTo(x - 2, base - h); g.lineTo(x + w / 2, base - h - roof); g.lineTo(x + w + 2, base - h); g.fill();
+  g.fillRect(x + w * 0.7, base - h - roof * 0.8, 3, roof * 0.6);
+}
+const CINE_ART = {
+  far(w, r) {                                           // дальний город: Кремль с колокольней Ивана Великого, соборы, слободы
+    const cv = mkCv(w, H), g = cv.getContext('2d'); g.fillStyle = '#000'; const B = 206;
+    for (let x = -10; x < w; ) { const hw = 10 + r() * 22; house(g, x, B, hw, 6 + r() * 14, 4 + r() * 6); x += hw + r() * 4; }
+    for (let x = 30; x < w; x += 70 + r() * 60) if (x < 140 || x > 480) { g.fillRect(x - 9, B - 26, 18, 26); onion(g, x, B - 26, 9); if (r() < 0.6) { tent(g, x + 16, B, 7, 30, 16); } }
+    g.fillRect(150, B - 18, 330, 18);                   // кремлёвская стена с зубцами
+    for (let x = 150; x < 480; x += 6) g.fillRect(x, B - 22, 3, 4);
+    [[150, 12, 30, 18], [222, 11, 26, 16], [300, 14, 40, 26], [395, 11, 28, 16], [480, 12, 30, 18]].forEach(([x, tw, bh, rh]) => tent(g, x, B, tw, bh, rh));
+    g.fillRect(250, B - 58, 40, 40); onion(g, 262, B - 58, 10); onion(g, 280, B - 58, 10); onion(g, 271, B - 62, 13);   // соборы
+    const iv = 345; g.fillRect(iv - 9, B - 60, 18, 42); g.fillRect(iv - 8, B - 84, 16, 24); g.fillRect(iv - 7, B - 102, 14, 18);   // Иван Великий
+    g.fillRect(iv - 5, B - 112, 10, 10); onion(g, iv, B - 112, 9);
+    g.fillRect(360, B - 46, 34, 28); onion(g, 377, B - 46, 9);
+    return crisp(cv);
+  },
+  mid(w, r) {                                           // Китай-город: Гостиный двор с арками, крыши, колокольни
+    const cv = mkCv(w, H), win = mkCv(w, H), g = cv.getContext('2d'), gw = win.getContext('2d'); g.fillStyle = gw.fillStyle = '#000'; const B = 246;
+    for (let x = -10; x < w; ) { const hw = 22 + r() * 34, hh = 20 + r() * 34; house(g, x, B, hw, hh, 8 + r() * 12);
+      for (let wy = B - hh + 6; wy < B - 8; wy += 11) for (let wx = x + 4; wx < x + hw - 5; wx += 9) if (r() < 0.55) gw.fillRect(wx, wy, 3, 5);
+      x += hw + 3 + r() * 8; }
+    g.fillRect(200, B - 44, 230, 44); g.fillRect(196, B - 48, 238, 4);   // Гостиный двор: два яруса арок
+    for (let x = 206; x < 424; x += 14) { gw.fillRect(x, B - 38, 7, 10); gw.fillRect(x, B - 20, 7, 14); }
+    [[120, 13], [520, 15], [650, 12]].forEach(([x, s]) => { g.fillRect(x - 6, B - 70, 12, 70); g.fillRect(x - 5, B - 84, 10, 14); onion(g, x, B - 84, s * 0.6); });
+    crisp(cv); crisp(win);
+    const wctx = win.getContext('2d'); wctx.globalCompositeOperation = 'destination-in'; wctx.drawImage(cv, 0, 0);   // окна только внутри домов
+    return [cv, win];
+  },
+  near(w, r) {                                          // улица у лавки: земля, забор с воротами, фонарь, телега, бочка
+    const cv = mkCv(w, H), g = cv.getContext('2d'); g.fillStyle = '#000';
+    g.fillRect(0, 258, w, H - 258);
+    for (let x = 0; x < w; x += 2 + Math.floor(r() * 5)) g.fillRect(x, 256 + Math.floor(r() * 2), 2, 2);
+    for (let x = 0; x < w; x += 7) { if (x > 250 && x < 420) continue; const h = 16 + Math.floor(r() * 5); g.fillRect(x, 258 - h, 5, h); g.fillRect(x + 1, 258 - h - 2, 3, 2); }
+    g.fillRect(0, 246, 250, 2); g.fillRect(420, 246, w - 420, 2);
+    g.fillRect(246, 232, 5, 26); g.fillRect(420, 232, 5, 26);   // столбики ворот
+    g.fillRect(470, 178, 3, 80); g.fillRect(466, 170, 11, 9); g.fillRect(468, 166, 7, 4);   // фонарь
+    g.fillRect(560, 236, 64, 6); g.fillRect(552, 230, 4, 12); g.fillRect(622, 222, 34, 3);   // телега с оглоблей
+    g.beginPath(); g.arc(574, 248, 10, 0, Math.PI * 2); g.arc(612, 248, 10, 0, Math.PI * 2); g.fill();
+    g.fillRect(140, 240, 14, 18); g.fillRect(138, 244, 18, 2);   // бочка
+    return crisp(cv);
+  }
+};
+function silhouette(img, sx, sw, sh) {                  // силуэт персонажа из его спрайта (один кадр)
+  const cv = mkCv(sw, sh), g = cv.getContext('2d'); g.drawImage(img, sx, 0, sw, sh, 0, 0, sw, sh);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = '#000'; g.fillRect(0, 0, sw, sh); return cv;
+}
+
+Object.keys(CUTSCENES).forEach(id => { const d = CUTSCENES[id];
+  Object.keys(d.layers).forEach(k => { if (d.layers[k].src) loadImage('cine_' + id + '_' + k, d.layers[k].src, d.worldW, H, true); }); });
+DAYS.forEach((d, i) => { if (d.cutscene && !CUTSCENES[d.cutscene]) console.error('[данные] день ' + (i + 1) + ': нет сцены ' + d.cutscene); });
+const smokeCv = mkCv(W, H), sg = smokeCv.getContext('2d');
+const tintCv = mkCv(W, H), tg = tintCv.getContext('2d');
+function tinted0(cv, color) {                           // то же, что tinted, но без кэша (для дыма, он меняется каждый кадр)
+  tg.globalCompositeOperation = 'source-over'; tg.clearRect(0, 0, W, H); tg.drawImage(cv, 0, 0);
+  tg.globalCompositeOperation = 'source-in'; tg.fillStyle = color; tg.fillRect(0, 0, W, H); return tintCv;
+}
+let cine = null;                                        // идёт сцена: { def, n (кадр), t, parts, done }
+function buildCine(def) {                               // слои собираются один раз при первом показе
+  if (def.built) return def.built;
+  const r = rng(1812), w = def.worldW, b = {};
+  ['far', 'mid', 'near'].forEach(k => {
+    const L = def.layers[k], im = spr['cine_' + def.id + '_' + k];
+    if (im && im.ok) { b[k] = mkCv(w, H); b[k].getContext('2d').drawImage(im, 0, 0); }
+    else { const a = CINE_ART[k](w, r); if (Array.isArray(a)) { b[k] = a[0]; b[k + 'Win'] = a[1]; } else b[k] = a; }
+    b[k + 'Rim'] = rimOf(b[k], k === 'far' ? [[0, -1]] : [[0, -1], [1, 0]]);
+    b[k + 'Top'] = roofline(b[k], { far: 190, mid: 215, near: 250 }[k]); b[k + 'Par'] = L.par;
+  });
+  // очаги огня: в Китай-городе (mid) от Гостиного двора вширь, позже — по дальнему городу; th — с какой силы пожара горит очаг
+  b.fires = [];
+  for (let i = 0; i < 18; i++) { const x = 40 + r() * (w - 80); b.fires.push({ layer: 'mid', x, s: 12 + r() * 16, th: Math.min(0.95, 0.08 + Math.abs(x - 315) / 420 + r() * 0.15), seed: r() * 99 }); }
+  for (let i = 0; i < 14; i++) { const x = 20 + r() * 560; b.fires.push({ layer: 'far', x, s: 6 + r() * 7, th: 0.45 + r() * 0.5, seed: r() * 99 }); }
+  b.stars = Array.from({ length: 40 }, () => [Math.floor(r() * W), Math.floor(CINE.bar + r() * 110)]);
+  const sil = (key, sp) => sp && spr[key] && spr[key].ok ? silhouette(spr[key], 0, sp.cellW, sp.cellH) : null;
+  b.andrey = sil('idle', { cellW: ANDREY.cellW, cellH: ANDREY.cellH }); b.mother = sil('s_mother', MOTHER.sprite);
+  b.andreyRim = b.andrey && rimOf(b.andrey, [[1, 0], [0, -1]]); b.motherRim = b.mother && rimOf(b.mother, [[1, 0], [0, -1]]);
+  return def.built = b;
+}
+async function playCutscene(id) {
+  const def = CUTSCENES[id]; if (!def) { console.error('[данные] нет сцены ' + id); return; }
+  def.id = id;
+  const imgs = [spr.idle, spr.s_mother, ...Object.keys(def.layers).map(k => spr['cine_' + id + '_' + k])].filter(Boolean);   // ждём картинки (сразу после загрузки страницы)
+  await Promise.all(imgs.map(im => im.complete ? 0 : new Promise(r => { im.addEventListener('load', r); im.addEventListener('error', r); })));
+  buildCine(def);
+  return new Promise(done => {
+    cine = { def, n: 0, t: 0, smoke: [], embers: [], bellT: 1.5, done };
+    document.body.classList.add('cine'); showCineText();
+  });
+}
+function cineNext() {
+  if (!cine || cine.t < 0.4) return;                    // случайное двойное нажатие не пропускает кадр
+  cine.n++; cine.t = 0;
+  if (cine.n >= cine.def.shots.length) return endCine();
+  showCineText();
+}
+function endCine() {
+  const done = cine.done; cine = null; sfx.fire(-1);
+  document.body.classList.remove('cine'); $('cine').className = ''; done();
+}
+function showCineText() {
+  const s = cine.def.shots[cine.n], el = $('cine');
+  el.innerHTML = (s.fact ? '<div class="fact"><b>' + s.fact.title + '</b><p>' + s.fact.text + '</p></div>' : '') +
+    (s.text ? '<div class="cap">' + s.text + '</div>' : '') + '<small>E — дальше · Esc — пропустить</small>';
+  el.className = 'on'; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+const shotHeat = () => { const s = cine.def.shots[cine.n], k = ease(Math.min(1, cine.t / s.time)); return s.heat[0] + (s.heat[1] - s.heat[0]) * k; };
+function updateCine(dt) {
+  const s = cine.def.shots[cine.n]; cine.t += dt;
+  if (cine.t >= s.time) { cine.t = s.time; cineNext(); if (!cine) return; }
+  const heat = shotHeat(), b = cine.def.built;
+  sfx.fire(heat);
+  if (heat > 0.25 && (cine.bellT -= dt) < 0) { sfx.nabat(); cine.bellT = 2.6; }   // набат: били в колокола, созывая на пожар
+  b.fires.forEach(f => { if (heat < f.th || Math.random() > dt * (f.layer === 'far' ? 1.2 : 2.2) * heat) return;
+    cine.smoke.push({ layer: f.layer, x: f.x + rnd(-4, 4), y: b[f.layer + 'Top'][Math.round(f.x)] - f.s * 0.6, r: f.s * 0.35, vx: rnd(-10, -4), vy: rnd(-14, -8), age: 0, life: rnd(5, 9) }); });
+  if (Math.random() < dt * 60 * Math.max(0, heat - 0.25)) cine.embers.push({ x: rnd(0, W + 120), y: H - CINE.bar + 4, vx: rnd(-14, 4), vy: rnd(-34, -16), age: 0, life: rnd(3, 6), seed: rnd(0, 9) });
+  [cine.smoke, cine.embers].forEach(list => list.forEach(p => { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.r) p.r += dt * 2.2; }));
+  cine.smoke = cine.smoke.filter(p => p.age < p.life).slice(-160); cine.embers = cine.embers.filter(p => p.age < p.life && p.y > 0).slice(-140);
+}
+function flame(x, y, s, t, seed) {                      // язык пламени из пиксельных строк: снаружи тёмно-оранжевый, внутри жёлтый
+  const h = Math.round(s * (0.8 + 0.2 * Math.sin(t * 5 + seed)));
+  for (let i = 0; i < h; i++) { const k = i / h, off = Math.round(Math.sin(t * 6 + seed + i * 0.35) * k * 3), w = Math.max(1, Math.round(s * 0.4 * (1 - k) * (1 + 0.25 * Math.sin(t * 9 + seed + i * 0.6))));
+    rect(k > 0.7 ? '#C15309' : '#D95E07', x + off - w, y - i, w * 2, 1);
+    if (k < 0.75 && w > 1) rect('#FA9521', x + off - Math.ceil(w * 0.55), y - i, Math.ceil(w * 0.55) * 2, 1);
+    if (k < 0.4 && w > 2) rect('#FBB956', x + off - Math.ceil(w * 0.25), y - i, Math.ceil(w * 0.25) * 2, 1); }
+}
+function drawCine() {
+  const def = cine.def, b = def.built, s = def.shots[cine.n], heat = shotHeat(), t = performance.now() / 1000;
+  const cam = Math.round(s.cam[0] + (s.cam[1] - s.cam[0]) * ease(Math.min(1, cine.t / s.time)));
+  if (canvas.style.filter) canvas.style.filter = '';
+  let y = 0; CINE.bands.forEach((h, i) => { rect(mixPal(CINE.sky[0][i], CINE.sky[1][i], heat), 0, y, W, h); y += h; });   // небо полосами, без плавного перехода
+  if (heat < 0.35) b.stars.forEach(([x, sy], i) => { if ((i + Math.floor(t * 0.7)) % 7) rect(rgba('#EFDCBA', 1 - heat * 3), x, sy, 1, 1); });
+  const layer = k => {
+    const ox = -Math.round(cam * b[k + 'Par']);
+    ctx.drawImage(tinted(b[k], mixPal(CINE[k][0], CINE[k][1], heat)), ox, 0);
+    ctx.drawImage(tinted(b[k + 'Rim'], mixPal(CINE[k + 'Rim'][0], CINE[k + 'Rim'][1], heat)), ox, 0);
+    if (b[k + 'Win'] && heat > 0.2) { ctx.globalAlpha = Math.min(1, (heat - 0.2) * 2) * (0.8 + 0.2 * flick(t, 3, 1)); ctx.drawImage(tinted(b[k + 'Win'], mixPal(CINE.win[0], CINE.win[1], heat)), ox, 0); ctx.globalAlpha = 1; }
+    ctx.save(); ctx.translate(ox, 0);
+    const lit = b.fires.filter(f => f.layer === k && heat >= f.th);
+    ctx.globalCompositeOperation = 'lighter';           // зарево над очагами
+    lit.forEach(f => { const fy = b[k + 'Top'][Math.round(f.x)], R = f.s * 3.2, gr = ctx.createRadialGradient(f.x, fy, 0, f.x, fy, R);
+      gr.addColorStop(0, rgba('#F47106', 0.35 * flick(t, f.seed, 0.15))); gr.addColorStop(1, rgba('#F47106', 0)); ctx.fillStyle = gr; ctx.fillRect(f.x - R, fy - R, R * 2, R * 2); });
+    ctx.globalCompositeOperation = 'source-over';
+    const sm = cine.smoke.filter(p => p.layer === k);   // дым одним пятном: клубы сливаются в столб, без тёмных наложений
+    if (sm.length) { sg.clearRect(0, 0, W, H); sg.fillStyle = '#000';
+      sm.forEach(p => { const rr = Math.round(p.r * Math.min(1, p.age * 1.5) * (1 - 0.5 * p.age / p.life)); if (rr > 0) { sg.beginPath(); sg.arc(Math.round(p.x + ox), Math.round(p.y), rr, 0, Math.PI * 2); sg.fill(); } });
+      crisp(smokeCv); ctx.save(); ctx.setTransform(px, 0, 0, px, 0, 0); ctx.globalAlpha = 0.72; ctx.drawImage(tinted0(smokeCv, mixPal(CINE.smoke[0], CINE.smoke[1], heat)), 0, 0); ctx.restore(); }
+    lit.forEach(f => { const fy = b[k + 'Top'][Math.round(f.x)] + 2, grow = Math.min(1, (heat - f.th) * 4);
+      for (let j = -1; j <= 1; j++) flame(Math.round(f.x + j * f.s * 0.45), fy, f.s * grow * (j ? 0.65 : 1), t, f.seed + j * 2); });
+    ctx.restore();
+  };
+  layer('far'); layer('mid'); layer('near');
+  if (s.figures) {                                      // Андрей и мать смотрят на пожар
+    const fx = def.figures.x - cam, fy = def.figures.y, rim = mixPal(CINE.figRim[0], CINE.figRim[1], heat);
+    const fig = (cv, rimCv, x, sp, fallbackH) => { if (cv) { ctx.drawImage(tinted(cv, CINE.fig), x - sp.anchorX, fy - sp.floorY); ctx.drawImage(tinted(rimCv, rim), x - sp.anchorX, fy - sp.floorY); }
+      else { rect(CINE.fig, x - 8, fy - fallbackH, 16, fallbackH); rect(rim, x + 7, fy - fallbackH, 1, fallbackH); } };
+    fig(b.mother, b.motherRim, fx - 34, MOTHER.sprite, 90); fig(b.andrey, b.andreyRim, fx + 6, ANDREY, 100);
+  }
+  cine.embers.forEach(p => { const a = 1 - p.age / p.life; rect(rgba(p.seed > 4.5 ? '#FBB956' : '#FA9521', a), Math.round(p.x - cam * 0.15 + Math.sin(t * 2 + p.seed) * 3), Math.round(p.y), p.seed > 7 ? 2 : 1, 1); });
+  if (heat > 0.5) { ctx.globalCompositeOperation = 'lighter'; rect(rgba('#911104', (heat - 0.5) * 0.25 * flick(t, 1, 0.2)), 0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; }   // красный отсвет на всём
+  const fade = s.fade || 0, k = fade ? Math.max(0, 1 - Math.min(cine.t, s.time - cine.t) / fade) : 0;
+  if (k > 0) rect(rgba('#05070d', k), 0, 0, W, H);
+  rect('#000', 0, 0, W, CINE.bar); rect('#000', 0, H - CINE.bar, W, CINE.bar);
+}
+
 // ================= ГЛАВНЫЙ ЦИКЛ =================
 let last = performance.now();
 function loop(now) {
@@ -1196,7 +1551,9 @@ function loop(now) {
   update(dt); draw(); requestAnimationFrame(loop);
 }
 placeVisitor(); renderDlg(); renderNotes(); requestAnimationFrame(loop);
-if (!loaded) intro();                                  // новая игра (сохранения нет): заголовок первой главы
+const askScene = new URLSearchParams(location.search).get('scene');   // index.html?scene=fire — посмотреть сцену без прохождения
+if (askScene && CUTSCENES[askScene]) { sleeping = true; playCutscene(askScene).then(() => { sleeping = false; if (!loaded) intro(); }); }
+else if (!loaded) intro();                             // новая игра (сохранения нет): заголовок первой главы
 </script>
 </body>
 </html>
