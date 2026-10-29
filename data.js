@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 20;
+const DATA_VERSION = 21;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -16,10 +16,15 @@ const DATA_VERSION = 20;
 // portrait — размер крупного портрета в режиме обслуживания (пути портретов лежат у персонажей); goodsIcon — размер значка товара в панели.
 // stockMarks — временные квадратики остатка товара: show 'auto' = рисовать только пока фон ещё заглушка; true/false — принудительно.
 //   Нарисованные на фоне мешки и корзины ОСТАТОК НЕ ПОКАЗЫВАЮТ: точный остаток — только в торговой панели.
+// hd — те же слои в высоком разрешении (в hdScale раз крупнее, без палитры; собирает tools/make_shop_hd.py). Если файл есть,
+//   игра рисует его вместо обычного слоя, плавно уменьшая под окно: фон чёткий, а персонажи остаются пиксельными на сетке 480×270.
+//   hdNight — ночная версия тех же слоёв (рисуется в части дня с night: true, см. TIME.light). ?hd=0 в адресе — обычные пиксельные слои.
 const ART = {
-  background:   { src: 'assets/places/shop/shop.png' },
-  counterFront: { src: 'assets/places/shop/shop_counter.png', rect: { x: 202, y: 142, w: 328, h: 62 } },
-  foreground:   { src: 'assets/places/shop/shop_front.png' },
+  hdScale: 3,
+  background:   { src: 'assets/places/shop/shop.png', hd: 'assets/places/shop/shop_hd.png', hdNight: 'assets/places/shop/shop_night_hd.png' },
+  counterFront: { src: 'assets/places/shop/shop_counter.png', hd: 'assets/places/shop/shop_counter_hd.png', hdNight: 'assets/places/shop/shop_counter_night_hd.png',
+                  rect: { x: 202, y: 142, w: 328, h: 62 } },
+  foreground:   { src: 'assets/places/shop/shop_front.png', hd: 'assets/places/shop/shop_front_hd.png', hdNight: 'assets/places/shop/shop_front_night_hd.png' },
   glass:        { src: 'assets/places/shop/shop_glass.png' },   // стёкла окна (по ним проходят прохожие), собирает tools/make_shop.py
   portrait:  { w: 180, h: 204 },
   goodsIcon: { w: 36, h: 36 },
@@ -44,7 +49,11 @@ const ANDREY = {                      // утверждённые парамет
 const GOODS = {
   grain:  { name: 'Крупа',          unit: 'мешочек', stock: 10, cost: 6, price: 10, color: '#c9893a', icon: 'assets/goods/grain.png' },
   bread:  { name: 'Хлеб',           unit: 'буханку', stock: 8,  cost: 3, price: 5,  color: '#a8672a', icon: 'assets/goods/bread.png' },
-  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0', icon: 'assets/goods/apples.png' }
+  apples: { name: 'Сушёные яблоки', unit: 'свёрток', stock: 6,  cost: 4, price: 7,  color: '#d8d0a0', icon: 'assets/goods/apples.png' },
+  // Товары лабаза Сорокина (21.10.2026): в лавке на старте их нет, появляются только после заказа. Покупателей на них пока нет.
+  flour:  { name: 'Мука',           unit: 'мешочек', stock: 0,  cost: 5, price: 8,  color: '#e6dcc4', icon: 'assets/goods/flour.png' },
+  millet: { name: 'Пшено',          unit: 'мешочек', stock: 0,  cost: 5, price: 8,  color: '#e0b84a', icon: 'assets/goods/millet.png' },
+  peas:   { name: 'Горох',          unit: 'мешочек', stock: 0,  cost: 4, price: 7,  color: '#9aa84e', icon: 'assets/goods/peas.png' }
 };
 const START = { money: 30 };
 
@@ -57,19 +66,27 @@ const TIME = {
   year: 1812,
   phases: { morning: 'утро', day: 'день', evening: 'вечер' },
   travelWhenOpen: false,
+  lightFade: 2.5,
   // Свет и цвет в разное время суток (как свет рисуется — см. lights у сцены):
   //   dark — насколько темнеет сцена (0 — нисколько, 1 — полностью), darkColor — цвет сумрака;
   //   window — сила света из окна, warm — сила свечей и лампад (1 — полная);
-  //   grade — цветокоррекция всей сцены (CSS-фильтр: saturate — насыщенность, contrast — контраст, brightness — яркость).
+  //   grade — цветокоррекция всей сцены (CSS-фильтр: saturate — насыщенность, contrast — контраст, brightness — яркость);
+  //   vignette — затемнение краёв кадра (0 — нет, 1 — края чёрные), vignetteColor — его цвет;
+  //   night: true — рисовать ночную версию фона лавки (ART …hdNight). Она уже тёмная, поэтому сумрак dark слабее;
+  //   darkNoNight — сумрак, когда ночного фона нет (другие места, ?hd=0);
+  //   ambient — общий тон персонажей (умножение цвета: белый — без изменений; вечером темнее, чтобы фигуры не «светились»).
+  //   lightFade — за сколько секунд свет, фон и тон персонажей плавно переходят при смене части дня.
+  //   Насыщенность снижена 26.10.2026: фон лавки в высоком разрешении (shop_hd.png) ярче пиксельного.
   light: {
-    morning: { dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, grade: 'saturate(1.25) contrast(1.08) brightness(1.03)' },
-    day:     { dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  grade: 'saturate(1.3) contrast(1.1) brightness(1.03)' },
-    evening: { dark: 0.55, darkColor: '#160c12', window: 0.1, warm: 1.0,  grade: 'saturate(1.22) contrast(1.12) brightness(1.0)' }
+    morning: { ambient: '#c8cde0', dark: 0.16, darkColor: '#1a2444', window: 1.0, warm: 0.45, vignette: 0.35, vignetteColor: '#0b1022', grade: 'saturate(1.05) contrast(1.06) brightness(1.02)' },
+    day:     { ambient: '#e8e0d2', dark: 0,    darkColor: '#000000', window: 0.8, warm: 0.4,  vignette: 0.28, vignetteColor: '#140c08', grade: 'saturate(1.1) contrast(1.08) brightness(1.03)' },
+    evening: { ambient: '#8c8299', dark: 0, darkNoNight: 0.55, night: true, darkColor: '#160c12', window: 0.1, warm: 1.0,  vignette: 0.4,  vignetteColor: '#080406', grade: 'saturate(1.08) contrast(1.1) brightness(1.0)' }
   }
 };
 // Играбельные дни по порядку. date — [число, месяц] по старому стилю. Дни можно пропускать: между главами время перематывается.
 // chapter — название главы (показывается перед первым днём главы); skip — текст перемотки (что случилось за пропущенное время);
 // visits — какие приходы покупателей (id из VISITS) будут в этот день, по порядку. Один человек может прийти в разные дни.
+// cutscene — сцена-ролик (id из CUTSCENES), которая играет, когда игрок заканчивает этот день («E — Закончить день»).
 // После последнего дня игра сообщает, что это конец текущей версии.
 // ЧЕРНОВИК: главы, даты и тексты перемоток предложены для обсуждения, исторические подробности проверяем отдельно.
 // Покупатели пока есть только в первую неделю (1–7 июня).
@@ -121,23 +138,69 @@ const DAYS = [
   { date: [30, 8], visits: [] },
   { date: [31, 8], visits: [] },
   { date: [1, 9], visits: [] },
-  { date: [2, 9], chapter: 'Финал', visits: [] }
+  { date: [2, 9], chapter: 'Финал', visits: [], cutscene: 'fire' }
 ];
+
+// Сцены-ролики (синематики) в духе Valiant Hearts: плоские рисованные слои с параллаксом, силуэты, короткие подписи, в конце историческая справка.
+// Играют поверх игры на сетке 480×270; управление у игрока отбирается. E, пробел, Enter или щелчок — следующий кадр, Esc — пропустить сцену.
+// Посмотреть сцену без прохождения: index.html?scene=fire (сохранение не меняется).
+// worldW — ширина мира сцены (камера ездит по нему); layers — слои от дальних к ближним:
+//   par — параллакс (0 — неподвижен, 1 — движется вместе с камерой), src — картинка worldW×270 с прозрачностью (необязательна:
+//   пока файла нет, слой рисуется временной графикой кодом, в палитре игры).
+// shots — кадры по порядку: time — секунд (потом сам переходит дальше), cam — [откуда, куда] камера по x,
+//   heat — [в начале, в конце] сила пожара 0…1 (небо, огонь, дым, искры), figures — показывать Андрея и мать спиной к зрителю,
+//   text — подпись внизу, fact — историческая справка карточкой (вместо подписи), fade — затемнение в начале и в конце кадра, секунд.
+// ЧЕРНОВИК: тексты и цифры справки проверить с Кириллом по источникам.
+const CUTSCENES = {
+  fire: {
+    title: 'Пожар Москвы',
+    sound: 'fire',
+    worldW: 760,
+    layers: {
+      sky:     { par: 0 },
+      far:     { par: 0.25, src: 'assets/cutscenes/fire/fire_far.png' },    // дальний город: Кремль, колокольня Ивана Великого, купола
+      mid:     { par: 0.6,  src: 'assets/cutscenes/fire/fire_mid.png' },    // крыши Китай-города, Гостиный двор
+      near:    { par: 1,    src: 'assets/cutscenes/fire/fire_near.png' }    // улица у лавки: забор, ворота, телега
+    },
+    figures: { x: 330, y: 262 },       // где стоят Андрей и мать (координаты мира ближнего слоя), рисуются силуэтами из их спрайтов
+    shots: [
+      { time: 7,  cam: [0, 60],   heat: [0, 0.05],  fade: 1.2,
+        text: '2 сентября 1812 года. Русская армия прошла через Москву и ушла по Рязанской дороге. Город опустел.' },
+      { time: 7,  cam: [60, 130], heat: [0.05, 0.3], fade: 0.6,
+        text: 'Днём в город вошли французы. А ночью над Китай-городом поднялось зарево.' },
+      { time: 8,  cam: [150, 170], heat: [0.35, 0.6], fade: 0.6, figures: true,
+        text: 'Горели Гостиный двор и торговые ряды. Огонь шёл по крышам, от лавки к лавке.' },
+      { time: 8,  cam: [170, 280], heat: [0.6, 0.9],  fade: 0.6,
+        text: 'Ветер раздувал пламя. Тушить было нечем: пожарные трубы увезли из города.' },
+      { time: 9,  cam: [280, 150], heat: [0.95, 1],   fade: 0.6, figures: true,
+        text: 'Над Кремлём стояло красное небо. Москва горела.' },
+      { time: 12, cam: [150, 150], heat: [0.7, 0.7],  fade: 1.2,
+        fact: { title: 'Как это было', text: 'Первые пожары вспыхнули в ночь со 2 на 3 сентября, а пожар бушевал до 6 сентября (по новому стилю 14–18 сентября). Из 9 тысяч домов сгорело около 6,5 тысячи, вместе с ними тысячи лавок, церкви, усадьбы, университет. Кто поджигал город, спорят до сих пор: сами москвичи по приказу Ростопчина, французские мародёры или случайный огонь в брошенных домах.' } }
+    ]
+  }
+};
 
 // Сцена: координаты МИРА в пикселях (экран 480×270 показывает часть лавки, камера следует за Андреем).
 // worldW — ширина лавки (= ширина фона), lane — линия пола перед прилавком (по ней Андрей ходит свободно),
-// walkMin / walkMax — границы ходьбы по x: слева табурет и мешки; справа дверь (за 558 — стена). У двери Андрей проходит ПОЗАДИ ящиков (слой foreground),
+// walkMin / walkMax — границы ходьбы по x: слева мешки и мать (за табуретом идём по floorPath вглубь); справа дверь (за 558 — стена). У двери Андрей проходит ПОЗАДИ ящиков (слой foreground),
 // workX — рабочее место: здесь подсказка «E — Встать за прилавок» и здесь Андрей стоит за прилавком (ноги на линии serviceY):
 //   x = 448 — голова и торс на гладкой стенной панели (x ≈ 395–468), у правого края книги; фигура целиком левее панели цены; лицом влево, к покупателю;
-// customerX — где стоит покупатель (перед прилавком), motherX — мать, talkRange — на каком расстоянии можно заговорить,
+// customerX — где стоит покупатель (перед прилавком), motherX — мать (у мешков с крупой слева, motherY — глубже линии ходьбы, на одной
+// линии пола с мешками, чтобы табурет на переднем плане был перед ней; motherDir -1 — лицом к мешкам;
+// Андрей ближе 162 не подходит, поэтому с матерью можно заговорить с motherTalk пикселей), talkRange — на каком расстоянии можно заговорить,
+// talkGap — на каком расстоянии от собеседника Андрей встаёт в разговоре (если подошёл ближе, сам отходит шагами),
 // counter — границы прилавка (нужны только для заглушки).
 // doorX — дверь (справа на фоне): отсюда покупатели входят и сюда уходят; customerSpeed — их скорость (пикселей в секунду);
 // arrivalDelay — через сколько секунд после ухода одного покупателя в двери появляется следующий.
 // charScale — во сколько раз игра увеличивает всех персонажей при рисовании. 1 = как нарисовано (Андрей 104 пикселя в ячейке 144×120).
 // placeholderScale — во сколько раз крупнее рисуются человечки-заглушки (они задуманы ростом 66 для старой сетки 320×180).
 // Сетка 480×270 с 21.10.2026 (раньше 320×180, все координаты умножены на 1,5).
-const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, startX: 225, walkMin: 162, walkMax: 558, talkRange: 35,
-                workX: 448, serviceY: 200, customerX: 387, motherX: 177, counter: { l: 202, r: 530 },
+const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, startX: 225, walkMin: 140, walkMax: 558, talkRange: 35, talkGap: 40,
+                // floorPath — линия пола, если она не прямая: точки [x, y]; между ними плавно, за крайними — как у крайней точки.
+                // Слева за табуретом переднего плана линия уходит вглубь (на линию мешков и матери), чтобы табурет был перед
+                // персонажем, а не под его ногами. По ней ходят Андрей и будущие персонажи.
+                floorPath: [[146, 212], [172, 225]],
+                workX: 448, serviceY: 200, customerX: 387, motherX: 112, motherY: 212, motherDir: -1, motherTalk: 55, counter: { l: 202, r: 530 },
                 doorX: 558, customerSpeed: 60, arrivalDelay: 1.5,
                 // Свет лавки (координаты мира, по фону): window — окно (стекло x0..x1, y0..y1) и косой луч beam на пол с пылинками;
                 // flame — пламя (мерцает, flicker — насколько); glow — ровное тёплое свечение. r — радиус света, color — цвет.
@@ -148,6 +211,10 @@ const SCENE = { charScale: 1, placeholderScale: 1.5, worldW: 594, lane: 225, sta
                   { kind: 'glow', x: 357, y: 122, r: 90, color: '#ff9c44', flicker: 0.03 }
                 ],
                 shadow: { w: 26, h: 6, alpha: 0.35 },   // тень под ногами персонажей (ширина, высота, плотность)
+                // Свет на персонажах: side — сила мягкой заливки со стороны источника, rim — сила блика по краю силуэта,
+                // rimWidth — толщина блика (пиксели), rimFade — на какой доле роста (сверху) блик гаснет, reach — во сколько раз дальше радиуса r источник ещё светит на фигуру,
+                // windowR — радиус света окна для фигур (окно светит от пятна луча на полу).
+                charLight: { side: 0.55, rim: 0.9, rimWidth: 1, rimFade: 0.75, reach: 1.6, windowR: 110 },
                 // Прохожие за окном: тёмные силуэты в длинной одежде видны только на стекле (позади рамы и кувшинов).
                 // x0..x1 — где идут (за окном), feetY — линия ног (ниже подоконника), height — рост, speed — скорость,
                 // every — через сколько секунд появляется следующий, phases — в какие части дня ходят.
@@ -219,9 +286,11 @@ const VISITS = {
 // npcs — персонажи сцены: x — где стоит, color — цвет заглушки, portrait — портрет 180×204, sprite — фигура (как у покупателей), node — первая реплика (NODES).
 // Чтобы сцена была доступна, у места на карте (MAP) указывается scene с её id.
 const SCENES = {
-  labaz: { name: 'Лабаз Сорокина', worldW: 480, lane: 225, startX: 75, walkMin: 36, walkMax: 444, talkRange: 35,
-    background: 'assets/places/labaz/labaz.png', wall: '#3a2c1e', floor: '#6b5236',
-    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 345, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
+  // лабаз: фон 594×270 с прокруткой (tools/make_labaz.py); вход от ворот слева; front — передние бочки, ящики и мешки,
+  // персонажи проходят за ними; Сорокин у своей конторки справа
+  labaz: { name: 'Лабаз Сорокина', worldW: 594, lane: 225, startX: 75, walkMin: 40, walkMax: 520, talkRange: 35, talkGap: 44,
+    background: 'assets/places/labaz/labaz.png', front: 'assets/places/labaz/labaz_front.png', wall: '#3a2c1e', floor: '#6b5236',
+    npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
@@ -232,14 +301,27 @@ const SCENES = {
 //   (заказывать нельзя: привезти будет некуда); doneNode — реплика после заказа; backNode — куда ведёт «Назад».
 // ТЕСТОВОЕ: цены, количества, реплики.
 const SUPPLY = {
-  sorokin: { title: 'Заказ у Сорокина', goods: { grain: { cost: 6, max: 20 } },
-    askMsg: 'Сколько мешочков возьмёшь? Деньги вперёд, а завтра поутру работник привезёт к лавке.',
+  // Сорокин — хлебный лабаз: крупа, мука, пшено, горох и сушёные яблоки (сушка — тоже лабазный товар).
+  sorokin: { title: 'Заказ у Сорокина',
+    goods: { grain: { cost: 6, max: 20 }, flour: { cost: 5, max: 20 }, millet: { cost: 5, max: 20 }, peas: { cost: 4, max: 20 }, apples: { cost: 4, max: 10 } },
+    askMsg: 'Что возьмёшь и сколько? Деньги вперёд, а завтра поутру работник привезёт к лавке.',
     noMoneyMsg: 'На столько у тебя денег не хватит, Андрей.',
     lastDayMsg: 'Не сегодня, Андрей. (Это последний день в текущей версии игры: привезти заказ будет некуда.)',
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
 };
 const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a', node: 'mother_hub',
-  sprite: { src: 'assets/characters/mother/mother_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } };
+  // мать за делом: перебирает крупу в миске, 8 кадров PixelLab со стабилизацией (tools/make_mother_work.py), цикл без пауз;
+  // прежняя фигура без миски — mother_idle.png
+  sprite: { src: 'assets/characters/mother/mother_work.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 8, frameTime: 0.18 },
+  // дела матери: каждый день она случайно выбирает одно (не то же, что вчера; выбор дня не меняется после перезагрузки).
+  // Лист кадров в ряд (ячейка 144×120, опора 72/114, нарисована лицом вправо), x/y — где стоит, dir -1 — лицом влево.
+  // Дело без файла пропускается; если нет ни одного — мать стоит в SCENE.motherX/motherY со sprite выше.
+  activities: [
+    { id: 'sort', name: 'перебирает крупу', src: 'assets/characters/mother/mother_work.png', frames: 8, frameTime: 0.18, x: 112, y: 212, dir: -1 },
+    { id: 'broom', name: 'метёт пол', src: 'assets/characters/mother/mother_broom.png', frames: 8, frameTime: 0.16, x: 182, y: 225, dir: -1 },
+    { id: 'wipe', name: 'протирает бочонки', src: 'assets/characters/mother/mother_wipe.png', frames: 8, frameTime: 0.18, x: 172, y: 212, dir: -1 },
+    { id: 'bags', name: 'насыпает крупу в мешочки', src: 'assets/characters/mother/mother_bags.png', frames: 8, frameTime: 0.18, x: 112, y: 212, dir: -1 },
+  ] };
 
 // Сведения: topic — тема, source — исходный источник, kind — тип (пересказ или личное свидетельство)
 const RUMORS = {
@@ -351,13 +433,13 @@ const NODES = {
   mother_price: { who: 'Мать', context: 'mother_same_source', text: 'Сосед и мне то же говорил. Это всё один рассказ. У Сорокина сам спроси.', choices: [
     { text: 'Ещё вопрос', goto: 'mother_hub' }, { text: 'Понятно.', do: 'end' }] },
   // Купец Сорокин (лабаз в Зарядье). Тестовые реплики; заказ товара — SUPPLY.sorokin.
-  sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, гречневая и овсяная, мешками.', choices: [
-    { text: 'Хочу заказать крупы', do: 'order', seller: 'sorokin' },
+  sorokin_hub: { who: 'Сорокин', text: 'А, Андрей! Чем могу служить? Крупа есть, мука, пшено, горох. Сушёные яблоки тоже имеются.', choices: [
+    { text: 'Хочу заказать товар', do: 'order', seller: 'sorokin' },
     { text: 'Почём нынче крупа?', goto: 'sorokin_price' },
     { text: 'Говорят, крупа у тебя подорожает?', need: { heard: 'pavel_neighbor_price' }, id: 'c_s_price', once: true, goto: 'sorokin_rumor' },
     { text: 'Что слышно на реке?', goto: 'sorokin_news', id: 'c_sorokin_news', once: true },
     { text: 'Пока ничего, зайду позже.', do: 'end' }] },
-  sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: шесть за мешочек. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
+  sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: крупа по шесть, мука и пшено по пять, горох и яблоки по четыре. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
   sorokin_ordered: { who: 'Сорокин', text: 'Сговорились. Завтра поутру будет у тебя в лавке.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Спасибо.', do: 'end' }] },
