@@ -134,7 +134,7 @@
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 23) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 24) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -483,7 +483,7 @@ const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, di
 const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
 const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
-const nearExit = () => !inShop() && !dlg ? (scn().exits || []).find(e => near(e.x)) : null;   // проход в соседнее место
+const nearExit = () => !dlg && !serving ? (scn().exits || []).find(e => near(e.x)) : null;   // проход в соседнее место (и из лавки на улицу)
 
 // ================= УПРАВЛЕНИЕ =================
 const keys = {};
@@ -803,7 +803,7 @@ function renderMap() {
   const status = p === here ? '<p><i>Вы здесь.</i></p>' : p.scene && shopOpenBlocks() ? '<p><i>Лавка открыта: уйти можно, когда закроете её.</i></p>'
     : !p.scene ? '<p><i>Сюда пока нельзя: сцена ещё не готова.</i></p>'
     : eveningTaken() ? '<p><i>Вечер прошёл здесь: отсюда только домой, спать.</i></p><p><button id="maphome">Домой, спать</button></p>'
-    : closedNow(p.scene) ? '<p><i>' + SCENES[p.scene].closedMsg + '</i></p>' : '<p><button id="mapgo">Отправиться</button></p>';
+    : closedNow(p.scene) ? '<p><i>' + (SCENES[p.scene].closedMsg || TIME.closedMsg) + '</i></p>' : '<p><button id="mapgo">Отправиться</button></p>';
   $('mapcard').innerHTML = '<b>' + p.name + '</b>' + (MAP.kinds[p.kind].name !== p.name ? '<i>' + MAP.kinds[p.kind].name + '</i>' : '') + p.desc + status;
   if ($('mapgo')) $('mapgo').onclick = () => travel(p.scene, p.name);
   if ($('maphome')) $('maphome').onclick = () => { mapOpen = false; renderMap(); goHome(); };
@@ -816,8 +816,12 @@ function goHome() {                                    // из места, ко�
   if (eveningTaken()) return finishDay();               // сначала итоги, если после закрытия была закупка
   travel('shop', 'Лавка Андрея');
 }
-function passage(e) {                                  // проход без карты (трактир ↔ переулок): вечер не кончается
-  const to = SCENES[e.to], from = state.scene; if (!to || closedNow(e.to)) return;
+const sceneOf = id => id === 'shop' ? SCENE : SCENES[id];
+function passage(e) {                                  // проход без карты (лавка ↔ улица ↔ трактир ↔ переулок): вечер не кончается
+  const to = sceneOf(e.to), from = state.scene; if (!to) return;
+  if (inShop() && shopOpenBlocks()) { toast(TIME.shopOpenMsg); return; }   // пока лавка открыта, не уйти — как и через карту
+  if (eveningTaken() && !to.endsEvening) return goHome();   // из трактира и переулка наружу — только домой, спать
+  if (closedNow(e.to)) { toast(to.closedMsg || TIME.closedMsg); return; }
   state.scene = e.to; dlg = null; resetPlayer();
   const back = (to.exits || []).find(x => x.to === from); if (back) { player.x = back.x; player.y = laneAt(back.x); player.dir = back.x > to.worldW / 2 ? -1 : 1; }
   save(); renderDlg(); toast(to.name);
@@ -1381,7 +1385,7 @@ function drawPlace() {
   if (bg && bg.ok) { ctx.drawImage(bg, 0, 0); drawPassersby(); }
   else {                                               // заглушка: стена, пол, мешки у стены
     rect(c.wall, 0, 0, c.worldW, c.lane - 42); rect(c.floor, 0, c.lane - 42, c.worldW, H - c.lane + 42);
-    for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
+    if (c.props !== false) for (let x = 18; x < c.worldW - 30; x += 39) { rect('#2a1f14', x - 1, c.lane - 75, 33, 35); rect('#cbb88e', x, c.lane - 73, 30, 32); rect('#b3a077', x + 4, c.lane - 73, 21, 6); }
   }
   if (!(bg && bg.ok)) (c.exits || []).forEach(e => { rect('#0b0806', e.x - 15, c.lane - 78, 30, 78); rect('#3a2c1e', e.x - 17, c.lane - 80, 34, 3); });   // заглушка прохода
   drawExtras(c.extras, c.lane, c.depth);

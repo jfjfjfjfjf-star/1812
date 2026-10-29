@@ -1,0 +1,34 @@
+// Проходы между местами без карты (лавка ↔ Ильинка ↔ трактир ↔ переулок). Запуск: node tests/street.test.js [папка для снимков]
+const { chromium } = require('playwright'); const path = require('path');
+(async () => {
+  const dir = path.resolve(__dirname, '..'), out = process.argv[2] || path.join(__dirname, 'out');
+  require('fs').mkdirSync(out, { recursive: true });
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.goto('file://' + path.resolve(dir, 'index.html')); await p.waitForTimeout(2000);
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(2500);
+  await p.keyboard.press('Enter'); await p.waitForFunction(() => !sleeping, null, { timeout: 15000 });
+  let fails = 0; const check = (ok, w) => { console.log((ok ? 'ок   ' : 'ОШИБКА ') + w); if (!ok) fails++; };
+  const at = x => p.evaluate(x => { player.x = x; player.y = laneAt(x); }, x);
+  const E = async () => { await p.keyboard.press('KeyE'); await p.waitForTimeout(300); };
+  const st = () => p.evaluate(() => ({ scene: state.scene, x: player.x, phase: state.phase, day: state.day, hint: $('hint').style.display !== 'none' ? $('hint').textContent : '', dlg: dlg && (dlg.summary ? 'summary' : 'x'), sleeping }));
+  await at(552); await p.waitForTimeout(200); let s = await st();
+  check(s.hint === 'E — Выйти на улицу', 'утро, лавка: у двери подсказка (' + s.hint + ')');
+  await E(); s = await st(); check(s.scene === 'street' && s.x === 330, 'утро: из лавки на улицу, у двери лавки (' + s.scene + ' ' + s.x + ')');
+  await p.screenshot({ path: out + '/street_morning.png' });
+  await at(900); await p.waitForTimeout(200); await E(); s = await st(); check(s.scene === 'street', 'утро: трактир закрыт, остаёмся на улице');
+  await p.reload(); await p.waitForTimeout(2500); s = await st(); check(s.scene === 'street', 'F5 на улице сохраняет место');
+  await at(330); await p.waitForTimeout(200); await E(); s = await st(); check(s.scene === 'shop' && s.x === 552, 'с улицы в лавку, у двери (' + s.x + ')');
+  await p.evaluate(() => openShop()); await p.waitForTimeout(300); await at(552); await p.waitForTimeout(200); await E(); s = await st();
+  check(s.scene === 'shop' && s.phase === 'day', 'днём из открытой лавки не выйти');
+  await p.evaluate(() => { state.phase = 'evening'; visitor.phase = 'none'; }); await at(552); await p.waitForTimeout(200); await E();
+  await at(900); await p.waitForTimeout(200); await E(); s = await st(); check(s.scene === 'traktir' && s.x === 40, 'вечер: улица → трактир, у двери (' + s.scene + ' ' + s.x + ')');
+  await at(440); await p.waitForTimeout(200); await E(); s = await st(); check(s.scene === 'pereulok', 'трактир → переулок, вечер идёт');
+  await at(40); await p.waitForTimeout(200); await E(); s = await st(); check(s.scene === 'traktir' && s.x === 440, 'переулок → трактир, к чёрному ходу');
+  await at(40); await p.waitForTimeout(200); s = await st(); check(s.hint === 'E — Выйти на улицу', 'в трактире подсказка выхода');
+  await E(); await p.waitForTimeout(500); s = await st(); check(s.sleeping || s.dlg === 'summary', 'из трактира на улицу = домой, спать');
+  await p.waitForFunction(() => !sleeping && state.phase === 'morning', null, { timeout: 30000 }).catch(() => {});
+  s = await st(); check(s.day === 1 && s.scene === 'shop' && s.phase === 'morning', 'утро следующего дня в лавке');
+  check(!errs.length, 'ошибок страницы нет ' + errs.join('; '));
+  console.log(fails ? 'Провалы: ' + fails : 'Все проверки пройдены'); await b.close(); process.exit(fails ? 1 : 0);
+})();

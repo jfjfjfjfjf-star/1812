@@ -35,4 +35,4 @@ platform:
 
 # Сборки нет: игра открывается файлом index.html. Проверки — tests/README.md.
 commands:
-  test: "node tests/shop_hd.test.js && python3 tests/check_night_alignment.py"
+  test: "node tests/shop_hd.test.js && node tests/street.test.js && python3 tests/check_night_alignment.py"
