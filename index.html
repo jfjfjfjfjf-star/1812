@@ -48,6 +48,12 @@
            background: rgba(20,12,6,.96); border: 2px solid #c9a96a; color: #f0e2c0; padding: calc(var(--u) * 4px) calc(var(--u) * 8px);
            font-size: calc(var(--u) * 6px); line-height: 1.35; }
   #notes h3 { margin: 0 0 calc(var(--u) * 3px); } #notes p { margin: 0 0 calc(var(--u) * 3px); }
+  #notes h4 { margin: calc(var(--u) * 5px) 0 calc(var(--u) * 2px); color: #e8c36a; font-size: calc(var(--u) * 6px); }
+  /* Отладочная панель отношений: только с ?debug=1, открывается клавишей ` (Ё). Игроку не показывается. */
+  #reldbg { position: absolute; right: 0; top: 0; bottom: 0; width: 46%; display: none; overflow: auto; box-sizing: border-box; z-index: 6;
+            background: rgba(8,10,14,.94); border-left: 2px solid #5a7aa8; color: #cfe0f0; padding: 6px 8px; font: 11px/1.35 monospace; white-space: pre-wrap; }
+  #reldbg b { color: #ffd98a; } #reldbg .no { color: #ff8f7a; } #reldbg .ok { color: #9be39b; }
+  #reldbg button { font: 11px monospace; margin: 0 4px 4px 0; cursor: pointer; }
   #notesbtn { position: absolute; left: calc(var(--u) * 52px); top: calc(var(--u) * 3px); background: none; border: 1px solid #f0e2c066;
               color: #f0e2c0; font-family: inherit; font-size: calc(var(--u) * 5px); opacity: .6; cursor: pointer; }
   /* Режим обслуживания (по макету): портрет слева внизу, реплика внизу, панель справа. Всё размещено в единицах --u (доли прежней сетки 320×180). */
@@ -128,13 +134,13 @@
   <div id="hint"></div>
   <div id="dbg"></div>
   <div id="dlg"><div id="portrait"></div><div id="col"><div id="box"><div id="who"></div><div id="text"></div></div><div id="choices"></div></div><div id="panel"></div></div>
-  <div id="toast"></div><div id="notes"></div><div id="night"></div><div id="cine"></div>
+  <div id="toast"></div><div id="notes"></div><div id="reldbg"></div><div id="night"></div><div id="cine"></div>
   <div id="map"><svg viewBox="0 0 1000 560" preserveAspectRatio="none"><g id="mapbase"></g><g id="mapmarks"></g></svg><button id="mapclose">← Вернуться (M)</button><button id="mapswitch"></button><div id="mapcard"></div></div>
 </div>
 <script src="data.js"></script>
 <script>
 // ================= ПРОВЕРКА data.js (чтобы вместо чёрного экрана было понятное сообщение) =================
-if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 23) {
+if (typeof DATA_VERSION === 'undefined' || DATA_VERSION !== 24) {
   const why = typeof DATA_VERSION === 'undefined'
     ? 'Рядом с index.html не найден data.js или он старой версии.'
     : 'Файл data.js от другой версии игры.';
@@ -186,9 +192,59 @@ const profit = d => C().qty * (d.price - G().cost);
 const fmt = (t, v) => t.replace(/\{(\w+)\}/g, (_, k) => (v && v[k] !== undefined ? v[k] : ''));
 const dealVars = d => ({ rev: total(d), profit: profit(d), left: state.stock[C().want] });
 const heard = id => !!state.heard[id];
-// Условие need: heard — слух известен; ctx — запись уже дополнена (CONTEXT); sold — в указанном приходе была продажа;
+// ----- Условия need (в репликах, вариантах первой реплики, у гостей CALLERS) -----
+// Прежние: heard — слух известен; ctx — запись уже дополнена (CONTEXT); sold — в указанном приходе была продажа;
 // notSold — продажи не было (или приход ещё не был).
-const okNeed = n => !n || ((!n.heard || heard(n.heard)) && (!n.ctx || !!state.ctx[n.ctx]) && (!n.sold || !!(state.deals[n.sold] || {}).sold) && (!n.notSold || !(state.deals[n.notSold] || {}).sold));
+// Новые (DATA_VERSION 24): on / from / to — день [число, месяц]; phase — часть дня; stock — { товар: [от, до] };
+// promiseOpen / promiseDone / promiseBroken / noPromise — состояние обещания; event / noEvent — событие отношений было / не было;
+// seen / notSeen — сцена пройдена / нет; relationship — { id, trustMin, trustMax, closenessMin, closenessMax, tensionMin, tensionMax,
+// status, memory, noMemory, conflict: { id, stage } } (stage 'none' — конфликта нет; можно список);
+// story — имя сюжетного условия из STORY_NEEDS (или строка вместо условия); all / any / not — сочетания.
+// needFails возвращает причины, по которым условие не выполнено (их показывает отладочная панель); пустой список — выполнено.
+const dateKey = ([d, m]) => m * 100 + d;
+const todayKey = () => dateKey(DAYS[state.day].date);
+const dstr = ([d, m]) => d + '.' + String(m).padStart(2, '0');
+const promiseOpen = id => { const p = state.promises[id]; return !!p && !p.done && !p.broken; };
+function needFails(n, out = []) {
+  if (!n) return out;
+  if (typeof n === 'string') { if (!STORY_NEEDS[n]) out.push('нет сюжетного условия ' + n); else if (needFails(STORY_NEEDS[n]).length) out.push('сюжетное условие ' + n + ': ' + needFails(STORY_NEEDS[n]).join('; ')); return out; }
+  const S = state, R = S.relationships, P = id => S.promises[id], f = (bad, why) => { if (bad) out.push(why); };
+  f(n.heard && !heard(n.heard), 'не известно сведение ' + n.heard);
+  f(n.ctx && !S.ctx[n.ctx], 'нет дополнения ' + n.ctx);
+  f(n.sold && !(S.deals[n.sold] || {}).sold, 'не было продажи ' + n.sold);
+  f(n.notSold && (S.deals[n.notSold] || {}).sold, 'была продажа ' + n.notSold);
+  f(n.on && todayKey() !== dateKey(n.on), 'не тот день (нужно ' + (n.on && dstr(n.on)) + ')');
+  f(n.from && todayKey() < dateKey(n.from), 'ещё рано (с ' + (n.from && dstr(n.from)) + ')');
+  f(n.to && todayKey() > dateKey(n.to), 'уже поздно (до ' + (n.to && dstr(n.to)) + ')');
+  f(n.phase && ![].concat(n.phase).includes(S.phase), 'не та часть дня (' + n.phase + ')');
+  if (n.stock) Object.keys(n.stock).forEach(k => f(S.stock[k] < n.stock[k][0] || S.stock[k] > n.stock[k][1], 'товар ' + k + ' не в пределах ' + n.stock[k].join('–')));
+  f(n.promiseOpen && !promiseOpen(n.promiseOpen), 'обещание ' + n.promiseOpen + ' не открыто');
+  f(n.promiseDone && !(P(n.promiseDone) || {}).done, 'обещание ' + n.promiseDone + ' не выполнено');
+  f(n.promiseBroken && !(P(n.promiseBroken) || {}).broken, 'обещание ' + n.promiseBroken + ' не нарушено');
+  f(n.noPromise && P(n.noPromise), 'обещание ' + n.noPromise + ' уже дано');
+  f(n.event && !R.appliedEvents[n.event], 'не было события ' + n.event);
+  f(n.noEvent && R.appliedEvents[n.noEvent], 'уже было событие ' + n.noEvent);
+  f(n.seen && !R.seenScenes[n.seen], 'сцена ' + n.seen + ' не пройдена');
+  f(n.notSeen && R.seenScenes[n.notSeen], 'сцена ' + n.notSeen + ' уже пройдена');
+  if (n.relationship) relFails(n.relationship, out);
+  if (n.story) needFails(n.story, out);
+  (n.all || []).forEach(x => needFails(x, out));
+  f(n.any && !n.any.some(x => !needFails(x).length), 'не выполнен ни один вариант any');
+  f(n.not && !needFails(n.not).length, 'выполнено запрещённое условие not');
+  return out;
+}
+function relFails(r, out) {
+  const b = bond(r.id); if (!b) { out.push('нет связи ' + r.id); return; }
+  ['trust', 'closeness', 'tension'].forEach(k => {
+    if (r[k + 'Min'] !== undefined && b[k] < r[k + 'Min']) out.push(r.id + ': ' + k + ' ' + b[k] + ' < ' + r[k + 'Min']);
+    if (r[k + 'Max'] !== undefined && b[k] > r[k + 'Max']) out.push(r.id + ': ' + k + ' ' + b[k] + ' > ' + r[k + 'Max']);
+  });
+  if (r.status && ![].concat(r.status).includes(b.status)) out.push(r.id + ': статус ' + b.status + ', нужен ' + r.status);
+  if (r.memory && !b.memories[r.memory]) out.push(r.id + ': нет воспоминания ' + r.memory);
+  if (r.noMemory && b.memories[r.noMemory]) out.push(r.id + ': есть воспоминание ' + r.noMemory);
+  if (r.conflict) { const st = conflictStage(r.id, r.conflict.id); if (![].concat(r.conflict.stage).includes(st)) out.push(r.id + ': конфликт ' + r.conflict.id + ' — ' + st + ', нужно ' + r.conflict.stage); }
+}
+const okNeed = n => !needFails(n).length;
 const okChoice = c => okNeed(c.need) && !(c.once && c.id && state.asked[c.id]);
 const pickNode = x => typeof x === 'string' ? x : x.find(o => okNeed(o.need)).node;   // первая реплика: строка или список вариантов
 
@@ -203,6 +259,51 @@ function learnContext(id) {                            // дополняет с�
   if (!x || state.ctx[id] || !heard(x.to)) return;
   state.ctx[id] = true; state.heard[x.to].ctx.push(x.text); toast('Запись дополнена'); save();
 }
+// ----- Отношения (RELATIONS, REL_EVENTS, MEMORIES, CONFLICTS — в data.js) -----
+// state.relationships = { schemaVersion, bonds, appliedEvents, seenScenes }. bonds.andrey_tatiana — отношение Татьяны к Андрею:
+// { trust, closeness, tension (0–100), status, memories: { id: { day, ev } }, conflicts: { id: { stage, day, log: [[стадия, день]] } } }.
+// Числа игроку не показываются: игрок видит реплики и заметки «Люди». appliedEvents — какие события уже применены (каждое один раз
+// за сохранение), seenScenes — какие сцены пройдены (гость после сцены уходит).
+const REL_SCHEMA = 1;
+const REL_KEYS = ['trust', 'closeness', 'tension'];
+const newBond = id => Object.assign({ status: RELATIONS[id].status, memories: {}, conflicts: {} }, RELATIONS[id].start);
+const newRelations = () => ({ schemaVersion: REL_SCHEMA, bonds: Object.fromEntries(Object.keys(RELATIONS).map(id => [id, newBond(id)])), appliedEvents: {}, seenScenes: {} });
+const bond = id => state.relationships.bonds[id];
+const conflictStage = (b, id) => { const c = bond(b) && bond(b).conflicts[id]; return c ? c.stage : 'none'; };
+const clamp100 = v => Math.max(0, Math.min(100, Math.round(v)));
+// Применяет события отношений (id или список id из REL_EVENTS). Только при подтверждённом выборе игрока (act), не при показе реплики.
+// Повтор того же события (повторный разговор, загрузка, перерисовка) ничего не меняет. Воспоминания не стираются.
+function applyRel(ids) {
+  [].concat(ids || []).forEach(id => {
+    const R = state.relationships, e = REL_EVENTS[id];
+    if (!e || R.appliedEvents[id] || !bond(e.bond)) return;
+    const b = bond(e.bond);
+    REL_KEYS.forEach(k => { if (e[k]) b[k] = clamp100(b[k] + e[k]); });
+    [].concat(e.memory || []).forEach(m => { if (!b.memories[m]) b.memories[m] = { day: state.day, ev: id }; });
+    if (e.conflict) {
+      const c = b.conflicts[e.conflict.id] = b.conflicts[e.conflict.id] || { stage: e.conflict.stage, day: state.day, log: [] };
+      c.stage = e.conflict.stage; c.log.push([e.conflict.stage, state.day]);
+    }
+    if (e.status) b.status = e.status;                 // статус меняет только сюжетное событие, а не порог чисел
+    R.appliedEvents[id] = { day: state.day };
+  });
+}
+// Ночью: обещания, у которых прошёл срок (PROMISES[id].due), помечаются late — это факт, а не реакция человека: что обещание
+// не выполнено, человек узнаёт в следующей встрече. Мелкое напряжение утихает по правилу связи (RELATIONS[id].calm), но не при
+// открытом конфликте этой связи.
+function relNight() {
+  Object.keys(state.promises).forEach(k => { const p = state.promises[k], due = (PROMISES[k] || {}).due;
+    if (due && !p.done && todayKey() >= dateKey(due)) p.late = true; });
+  Object.keys(RELATIONS).forEach(id => { const calm = RELATIONS[id].calm, b = bond(id);
+    if (!calm || !b || b.tension > calm.below) return;
+    if (Object.values(b.conflicts).some(c => ['open', 'acknowledged', 'repairing'].includes(c.stage))) return;
+    b.tension = Math.max(0, b.tension - calm.step); });
+}
+// Гости (CALLERS): человек появляется в месте в указанный день и часть дня, если выполнено условие; после сцены (scene) уходит.
+const callerOf = c => Object.assign({}, CUSTOMERS.find(p => p.id === c.who), c, { id: c.who });
+const callerSlot = c => (c.at || []).find(a => (!a.on || todayKey() === dateKey(a.on)) && (!a.phase || a.phase === state.phase) &&
+  !(a.scene && state.relationships.seenScenes[a.scene]) && okNeed(a.need));
+const callersHere = () => CALLERS.filter(c => (c.scene || 'shop') === state.scene && callerSlot(c)).map(callerOf);
 function showNode(id) { const n = NODES[id]; learn(n.learn); learnContext(n.context); dlg = { node: n }; renderDlg(); }
 function showTrade(msg) { if (msg) deal().msg = msg; dlg = { trade: true }; renderDlg(); }
 function leave(nodeId) { const d = deal(); d.stage = 'after'; d.afterNode = nodeId; save(); showNode(nodeId); }
@@ -293,10 +394,16 @@ function stepAway() {                                  // сделка не пр
 }
 const endDlg = () => { dlg = serving ? { idle: true } : null; renderDlg(); };
 function act(c) {
+  if (c.pay && state.money < c.pay) { toast('Не хватает монет'); return; }   // сначала ресурсы: при отказе ничего не меняется
   if (c.id) state.asked[c.id] = true;
-  if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false };
-  if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) { state.promises[c.keep].done = true; toast('Обещание выполнено'); }
-  if (c.pay) { if (state.money < c.pay) { toast('Не хватает монет'); return; } state.money -= c.pay; save(); }
+  if (c.promise && !state.promises[c.promise]) state.promises[c.promise] = { done: false, day: state.day };
+  if (c.keep && state.promises[c.keep] && !state.promises[c.keep].done) {
+    const p = state.promises[c.keep]; p.done = true; if (p.broken) p.late = true; toast(p.late ? 'Обещание выполнено, хоть и с опозданием' : 'Обещание выполнено'); }
+  if (c.breakPromise && state.promises[c.breakPromise] && !state.promises[c.breakPromise].done) state.promises[c.breakPromise].broken = true;
+  if (c.pay) state.money -= c.pay;
+  applyRel(c.rel);                                     // затем отношения (события из REL_EVENTS, каждое один раз)
+  if (c.scene) state.relationships.seenScenes[c.scene] = { day: state.day };   // сцена пройдена: гость уходит
+  if (c.pay || c.rel || c.scene || c.promise || c.keep || c.breakPromise) save();
   const op = c.do || '', cu = C(), d = cu && deal();
   if (op === 'home') return goHome();
   if (op === 'order') return showOrder(c.seller);
@@ -320,6 +427,7 @@ function act(c) {
 const SAVE_KEY = 'letopisi1812_save_v7';               // v7: дни и части дня (сохранения v6 не загружаются — новая игра)
 const newDeal = c => ({ stage: 'open', price: GOODS[c.want].price, fails: 0, counter: 0, counterUnit: 0, msg: '', afterNode: '', sold: false });
 const newState = () => ({ day: 0, phase: 'morning', today: newToday(), scene: 'shop', money: START.money, visit: 0, heard: {}, asked: {}, promises: {}, ctx: {}, orders: {},
+  relationships: newRelations(),
   stock: Object.fromEntries(Object.keys(GOODS).map(k => [k, GOODS[k].stock])),
   deals: Object.fromEntries(Object.keys(VIS).map(v => [v, newDeal(VIS[v])])) });   // сделка у каждого прихода своя
 const loaded = load();
@@ -365,10 +473,36 @@ function load() {                                      // старое сохр�
       Object.keys(s.orders).forEach(id => { const o = s.orders[id];      // неизвестный продавец или товар, нелепое количество — отбрасываются
         if (!SUPPLY[id] || !o || typeof o !== 'object') return delete s.orders[id];
         Object.keys(o).forEach(k => { if (!GOODS[k] || !Number.isInteger(o[k]) || o[k] <= 0) delete o[k]; }); });
+      migrateRelations(s);
       return s;
     }
   } catch (e) {}
   return null;
+}
+
+// Миграция отношений (DATA_VERSION 24): в старом сохранении их нет — добавляются стартовые связи без событий и воспоминаний
+// (сохранение не хранит, что было сказано, поэтому поступков игроку не приписываем). Прогресс лавки не трогается.
+// Новые связи из RELATIONS дополняются, неизвестные события, воспоминания и конфликты отбрасываются, числа — в пределах 0–100.
+function migrateRelations(s) {
+  const num = v => typeof v === 'number' && isFinite(v);
+  let R = s.relationships;
+  if (!R || typeof R !== 'object' || !R.bonds || typeof R.bonds !== 'object') R = s.relationships = { schemaVersion: REL_SCHEMA, bonds: {}, appliedEvents: {}, seenScenes: {} };
+  R.schemaVersion = REL_SCHEMA;
+  ['appliedEvents', 'seenScenes'].forEach(k => { if (!R[k] || typeof R[k] !== 'object') R[k] = {}; });
+  Object.keys(R.appliedEvents).forEach(k => { if (!REL_EVENTS[k]) delete R.appliedEvents[k]; });
+  Object.keys(R.bonds).forEach(id => { if (!RELATIONS[id]) delete R.bonds[id]; });
+  Object.keys(RELATIONS).forEach(id => {
+    const b = R.bonds[id] = R.bonds[id] && typeof R.bonds[id] === 'object' ? R.bonds[id] : newBond(id);
+    REL_KEYS.forEach(k => { b[k] = num(b[k]) ? Math.max(0, Math.min(100, b[k])) : RELATIONS[id].start[k]; });
+    if (!REL_STATUS[b.status]) b.status = RELATIONS[id].status;
+    if (!b.memories || typeof b.memories !== 'object') b.memories = {};
+    Object.keys(b.memories).forEach(m => { if (!MEMORIES[m]) delete b.memories[m]; });
+    if (!b.conflicts || typeof b.conflicts !== 'object') b.conflicts = {};
+    Object.keys(b.conflicts).forEach(c => { const x = b.conflicts[c];
+      if (!CONFLICTS[c] || !x || !['open', 'acknowledged', 'repairing', 'resolved', 'unresolved'].includes(x.stage)) delete b.conflicts[c];
+      else if (!Array.isArray(x.log)) x.log = []; });
+  });
+  Object.keys(s.promises).forEach(k => { const p = s.promises[k]; if (!p || typeof p !== 'object') s.promises[k] = { done: false }; });
 }
 
 // ================= ЭКРАН =================
@@ -482,7 +616,7 @@ function motherAct() {
 const motherPos = () => { const a = motherAct(); return a ? { x: a.x, y: a.y, dir: a.dir } : { x: SCENE.motherX, y: SCENE.motherY || LANE, dir: SCENE.motherDir || 1 }; };
 const nearMom = () => inShop() && !dlg && !serving && near(motherPos().x, SCENE.motherTalk);
 const nearWork = () => inShop() && !dlg && !serving && near(SCENE.workX);      // рабочее место за прилавком
-const nearNpc = () => !inShop() && !dlg ? (scn().npcs || []).find(n => near(n.x)) : null;   // персонаж другого места
+const nearNpc = () => !dlg && !serving ? [...(inShop() ? [] : scn().npcs || []), ...callersHere()].find(n => near(n.x)) : null;   // персонаж места или гость (CALLERS)
 const nearExit = () => !inShop() && !dlg ? (scn().exits || []).find(e => near(e.x)) : null;   // проход в соседнее место
 
 // ================= УПРАВЛЕНИЕ =================
@@ -498,12 +632,13 @@ addEventListener('keydown', e => {
   if (sleeping) return;                                // ночью остальной ввод не действует
   if (e.code === 'KeyM' && !serving) { mapOpen = !mapOpen; if (mapOpen) mapId = MAP.start; renderMap(); return; }
   if (mapOpen) { if (e.code === 'Escape') { mapOpen = false; renderMap(); } return; }   // пока открыта карта, остальные клавиши не действуют
+  if (e.code === 'Backquote' && DEBUG_ON) { relDbgOpen = !relDbgOpen; renderRelDebug(); return; }   // отладка отношений (?debug=1)
   if (e.code === 'KeyN' || (e.code === 'Escape' && notesOpen)) { notesOpen = !notesOpen; renderNotes(); return; }
   if (e.code === 'Escape' && serving) { stepAway(); return; }
   if (e.code !== 'KeyE' || notesOpen) return;
-  if (nearMom()) { faceSpeaker(motherPos().x); showNode(MOTHER.node); }
+  if (nearMom()) { faceSpeaker(motherPos().x); showNode(pickNode(MOTHER.node)); }
   else if (nearWork()) ({ morning: openShop, day: enterService, evening: finishDay })[state.phase]();
-  else if (nearNpc()) { const n = nearNpc(); faceSpeaker(n.x); showNode(n.node); }
+  else if (nearNpc()) { const n = nearNpc(), slot = n.at ? callerSlot(n) : null; faceSpeaker(n.x); showNode(pickNode(slot ? slot.node : n.node)); }
   else if (nearExit()) passage(nearExit());
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
@@ -537,12 +672,13 @@ function setPortrait(sp) {
 }
 // товары, которых не было на старте (только под заказ), показываются, когда они появились в лавке
 function stockList() { return Object.keys(GOODS).filter(k => GOODS[k].stock > 0 || state.stock[k] > 0).map(k => GOODS[k].name + ': ' + state.stock[k]).join('<br>'); }
+const stockVars = () => Object.fromEntries(Object.keys(GOODS).map(k => ['stock_' + k, state.stock[k]]));   // {stock_grain} в тексте реплики
 function renderDlg() {
   const box = $('dlg'), ch = $('choices'), pn = $('panel');
   ch.innerHTML = ''; pn.innerHTML = ''; pn.style.display = 'none'; pn.className = '';
   document.body.classList.toggle('serving', serving); $('back').style.display = serving ? 'block' : 'none';
   document.body.classList.remove('paneled', 'wide');
-  if (!dlg) { box.style.display = 'none'; return; }
+  if (!dlg) { box.style.display = 'none'; renderRelDebug(); return; }
   const c = C(), d = c ? deal() : null; let who, text, list, target = ch, sp = null;
   if (dlg.idle) {                                      // между покупателями или пустая очередь
     const ready = c && visitorReady();
@@ -584,7 +720,7 @@ function renderDlg() {
       '<div class="row">' + (pf < 0 ? 'Убыток' : 'Прибыль') + ': <b>' + Math.abs(pf) + '</b></div><i>выручка минус закупка проданного</i><div id="pact"></div>';
     $('pm').onclick = () => step(-1); $('pp').onclick = () => step(1); target = $('pact');
   } else {
-    who = dlg.node.who || ''; text = fmt(dlg.node.text, d ? dealVars(d) : {}); list = dlg.node.choices.filter(okChoice);
+    who = dlg.node.who || ''; text = fmt(dlg.node.text, Object.assign(stockVars(), d ? dealVars(d) : {})); list = dlg.node.choices.filter(okChoice);
     sp = speakers().find(x => x.name === who) || null;
     if (c && who === c.name && d.stage === 'after' && d.sold) {          // итог продажи — в интерфейсе, а не в речи покупателя
       pn.style.display = 'flex';
@@ -603,6 +739,7 @@ function renderDlg() {
   box.style.display = 'block';
   $('who').textContent = who; $('text').textContent = text;
   list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x.text; b.disabled = !!x.off; if (target !== ch && i === 0) b.className = 'main'; b.onclick = () => act(x); target.appendChild(b); });
+  renderRelDebug();
 }
 function renderNotes() {
   const el = $('notes'); el.style.display = notesOpen ? 'block' : 'none';
@@ -612,10 +749,69 @@ function renderNotes() {
     return '<p><b>' + r.title + '</b><br>' + r.note + '<br><i>Сообщил: ' + r.who + '. Источник: ' + r.source + ' (' + r.kind + ')</i>' +
       h.ctx.map(t => '<br>' + t).join('') + '</p>';
   });
-  const pr = Object.keys(state.promises).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + (state.promises[k].done ? ' — выполнено' : ' — не выполнено') + '</p>')
+  const pr = Object.keys(state.promises).filter(k => !PROMISES[k].bond).map(k => '<p><b>Обещание:</b> ' + PROMISES[k].title + ' — ' + promiseState(k) + '</p>')
     .concat(Object.keys(state.orders).filter(s => Object.keys(state.orders[s]).length)
       .map(s => '<p><b>' + SUPPLY[s].title + ':</b> ' + orderText(state.orders[s]) + ' — оплачено, привезут завтра утром</p>'));
-  el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + '<p><i>N — закрыть</i></p>';
+  const ppl = peopleNotes();
+  el.innerHTML = '<h3>Заметки</h3>' + (rows.concat(pr).join('') || '<p>Пока пусто.</p>') + (ppl ? '<h4>Люди</h4>' + ppl : '') + '<p><i>N — закрыть</i></p>';
+  renderRelDebug();
+}
+const promiseState = k => { const p = state.promises[k];
+  return p.done ? (p.late ? 'выполнено, но с опозданием' : 'выполнено') : p.broken ? 'не выполнено, она знает' : p.late ? 'срок прошёл, не выполнено' : 'не выполнено'; };
+// Заметки «Люди»: только то, что знает Андрей, — кто это, что важного было (воспоминания), обещания этой связи, нерешённые ссоры.
+// Чисел, «правильных ответов» и чужих скрытых чувств здесь нет. Связь появляется в заметках после первого события с человеком.
+function peopleNotes() {
+  const CST = { open: 'не уладили', acknowledged: 'я признал, но дело не сделано', repairing: 'пытаюсь исправить', resolved: 'уладили', unresolved: 'так и осталось' };
+  return Object.keys(RELATIONS).map(id => {
+    const r = RELATIONS[id], b = bond(id), mem = Object.keys(b.memories).sort((x, y) => b.memories[x].day - b.memories[y].day || 0);
+    const prom = Object.keys(state.promises).filter(k => PROMISES[k].bond === id), conf = Object.keys(b.conflicts);
+    if (!mem.length && !prom.length && !conf.length) return '';
+    const about = typeof r.about === 'string' ? r.about : r.about[b.status] || r.about.default || '';
+    return '<p><b>' + r.who + '.</b> ' + about +
+      mem.filter(m => MEMORIES[m].note).map(m => '<br>— ' + MEMORIES[m].note).join('') +
+      prom.map(k => '<br><b>Обещание:</b> ' + PROMISES[k].title + ' — ' + promiseState(k)).join('') +
+      conf.filter(c => b.conflicts[c].stage !== 'resolved').map(c => '<br><b>Нерешённое:</b> ' + CONFLICTS[c].title + ' — ' + CST[b.conflicts[c].stage]).join('') + '</p>';
+  }).join('');
+}
+// ----- Скрытая отладочная панель отношений: index.html?debug=1, клавиша ` (Ё) -----
+// Параметры связей, воспоминания, конфликты, применённые события, обещания и почему доступна или скрыта каждая ветка
+// текущей реплики. Кнопки «Состояние: …» загружают воспроизводимые состояния из DEBUG_STATES (data.js).
+const DEBUG_ON = /[?&]debug=1\b/.test(location.search);
+let relDbgOpen = false;
+function renderRelDebug() {
+  const el = $('reldbg'); el.style.display = DEBUG_ON && relDbgOpen ? 'block' : 'none';
+  if (!DEBUG_ON || !relDbgOpen) return;
+  const R = state.relationships, esc = t => String(t).replace(/</g, '&lt;');
+  let h = '<b>Отношения (отладка)</b> — ' + dateOf(state.day) + ', ' + state.phase + '\n';
+  h += Object.keys(DEBUG_STATES).map(k => '<button data-st="' + k + '">' + DEBUG_STATES[k].title + '</button>').join('') + '\n';
+  Object.keys(R.bonds).forEach(id => { const b = R.bonds[id];
+    h += '\n<b>' + id + '</b>  доверие ' + b.trust + '  близость ' + b.closeness + '  напряжение ' + b.tension + '  статус ' + b.status + '\n';
+    Object.keys(b.memories).forEach(m => { h += '  память: ' + m + ' (день ' + (b.memories[m].day + 1) + ', ' + b.memories[m].ev + ')\n'; });
+    Object.keys(b.conflicts).forEach(c => { h += '  конфликт: ' + c + ' — ' + b.conflicts[c].stage + ' [' + b.conflicts[c].log.map(x => x[0] + '@' + (x[1] + 1)).join(' → ') + ']\n'; });
+  });
+  h += '\n<b>Обещания</b>\n' + (Object.keys(state.promises).map(k => '  ' + k + ': ' + JSON.stringify(state.promises[k])).join('\n') || '  нет') + '\n';
+  h += '\n<b>События</b>\n' + (Object.keys(R.appliedEvents).map(k => '  ' + k + ' (день ' + (R.appliedEvents[k].day + 1) + ')').join('\n') || '  нет') + '\n';
+  h += '<b>Сцены</b>: ' + (Object.keys(R.seenScenes).join(', ') || 'нет') + '\n';
+  const here = callersHere().map(c => c.name + ' (' + callerSlot(c).node + ')').join(', ');
+  h += '<b>Гости здесь</b>: ' + (here || 'нет') + '\n';
+  if (dlg && dlg.node) {
+    h += '\n<b>Ветки реплики «' + esc(dlg.node.who || '') + '»</b>\n';
+    dlg.node.choices.forEach(c => { const why = needFails(c.need), once = c.once && c.id && state.asked[c.id];
+      h += (why.length || once ? '<span class="no">✗ ' : '<span class="ok">✓ ') + esc(c.text) + '</span>' + (c.rel ? '  [' + [].concat(c.rel).join(', ') + ']' : '') +
+        (why.length ? '\n     ' + esc(why.join('; ')) : '') + (once ? '\n     уже спрошено' : '') + '\n'; });
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('button[data-st]').forEach(b => { b.onclick = () => { loadDebugState(b.dataset.st); b.blur(); }; });
+}
+// Воспроизводимое состояние: новая игра, переход к дню, обещания и события применяются тем же путём, что и в игре.
+function loadDebugState(k) {
+  const d = DEBUG_STATES[k];
+  state = newState(); state.day = DAYS.findIndex(x => dateKey(x.date) === dateKey(d.on)); state.phase = d.phase || 'evening';
+  Object.keys(d.promises || {}).forEach(p => { state.promises[p] = Object.assign({ done: false, day: 0 }, d.promises[p]); });
+  (d.heard || []).forEach(id => { state.heard[id] = { n: Object.keys(state.heard).length + 1, day: 0, visit: 0, ctx: [] }; });
+  (d.events || []).forEach(e => applyRel(e));
+  (d.scenes || []).forEach(sc => { state.relationships.seenScenes[sc] = { day: state.day }; });
+  dlg = null; serving = false; resetPlayer(); placeVisitor(); save(); renderDlg(); renderNotes(); toast('Отладка: ' + d.title);
 }
 
 // ================= КАРТЫ (экран поверх сцены; карты, места и география — в data.js, блок MAP) =================
@@ -861,11 +1057,12 @@ async function endDay() {                              // ночь, затем �
   if (scene) await playCutscene(scene);                // сцена-ролик в конце дня (в финале — пожар Москвы)
   if (lastOne) { sleeping = false; theEnd(); return; }
   await card('Ночь', 1300);
+  relNight();                                          // обещания с прошедшим сроком, утихание мелкого напряжения
   Object.assign(state, { day: state.day + 1, phase: 'morning', visit: 0, today: newToday(), scene: 'shop' });
   const got = deliver();                               // заказ у оптовика привезли ночью
   resetPlayer(); placeVisitor(); save();
   const d = DAYS[state.day];
-  await (d.chapter || d.skip ? chapterCard(state.day) : card('Утро, ' + dateOf(state.day) + ' года', 1600));
+  await (d.chapter || d.skip ? chapterCard(state.day) : d.morning ? card('Утро, ' + dateOf(state.day) + ' года<p>' + d.morning + '</p><small>E — продолжить</small>', 0) : card('Утро, ' + dateOf(state.day) + ' года', 1600));
   $('night').classList.remove('on'); sleeping = false;
   if (got) toast(got);
 }
@@ -1385,7 +1582,7 @@ function drawPlace() {
   }
   if (!(bg && bg.ok)) (c.exits || []).forEach(e => { rect('#0b0806', e.x - 15, c.lane - 78, 30, 78); rect('#3a2c1e', e.x - 17, c.lane - 80, 34, 3); });   // заглушка прохода
   drawExtras(c.extras, c.lane, c.depth);
-  (c.npcs || []).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
+  (c.npcs || []).concat(callersHere()).forEach(n => drawPerson(n, n.x, c.lane, player.x < n.x ? -1 : 1));   // смотрит в сторону Андрея
   drawAndrey(player.x, player.y, player.dir, player.moving);
   const fr = spr['fr_' + state.scene]; if (fr && fr.ok) ctx.drawImage(fr, 0, 0);   // передний план места: персонажи за ним
   drawExtras(c.extras, c.lane, c.depth, true);
@@ -1410,6 +1607,7 @@ function draw() {
   drawCounterFront();
   drawExtras(shopExtras(), LANE, SCENE.depth);
   drawVisitors();
+  callersHere().forEach(n => drawPerson(n, n.x, laneAt(n.x), serving || player.x < n.x ? -1 : 1));   // гости лавки (CALLERS)
   if (!serving) drawAndrey(player.x, player.y, player.dir, player.moving);
   drawFront();
   drawExtras(shopExtras(), LANE, SCENE.depth, true);   // передний план: ближе ящиков и табурета

@@ -3,7 +3,7 @@
 // Игра начинается 1 июня 1812 года по старому стилю (подтверждено Кириллом). Валюту, меры и исторические обстоятельства проверяем отдельно.
 
 // Версия формата данных. index.html работает только с data.js той же версии (иначе покажет понятное сообщение).
-const DATA_VERSION = 23;
+const DATA_VERSION = 24;
 
 // Графика. ВСЕ файлы необязательны: пока файла нет (или у него не тот размер), рисуется временная заглушка.
 // background — цельный фон лавки в координатах мира, ровно SCENE.worldW × 270 (594×270), без прозрачности.
@@ -87,16 +87,17 @@ const TIME = {
 // chapter — название главы (показывается перед первым днём главы); skip — текст перемотки (что случилось за пропущенное время);
 // visits — какие приходы покупателей (id из VISITS) будут в этот день, по порядку. Один человек может прийти в разные дни.
 // cutscene — сцена-ролик (id из CUTSCENES), которая играет, когда игрок заканчивает этот день («E — Закончить день»).
+// morning — строка на утренней заставке дня (ждёт E), например «Мать с утра сидит над тетрадью».
 // После последнего дня игра сообщает, что это конец текущей версии.
 // ЧЕРНОВИК: главы, даты и тексты перемоток предложены для обсуждения, исторические подробности проверяем отдельно.
 // Покупатели пока есть только в первую неделю (1–7 июня).
 const DAYS = [
-  { date: [1, 6], chapter: 'Глава 1. Мирная Москва', visits: ['pavel_1', 'darya_1'] },
+  { date: [1, 6], chapter: 'Глава 1. Окна на Ильинку', visits: ['pavel_1', 'darya_1', 'tatiana_1'] },
   { date: [2, 6], visits: ['fedor_1'] },
   { date: [3, 6], visits: ['darya_2'] },
   { date: [4, 6], visits: ['fedor_2'] },
   { date: [5, 6], visits: ['pavel_2'] },
-  { date: [6, 6], visits: ['fedor_3'] },
+  { date: [6, 6], visits: ['fedor_3'], morning: 'Мать с утра сидит над какой-то тетрадью.' },
   { date: [7, 6], visits: ['darya_3', 'pavel_3'] },
   { date: [24, 6], chapter: 'Глава 2. Первые вести', visits: [],
     skip: 'Прошло больше двух недель. По городу ползут слухи: французы перешли Неман, началась война.' },
@@ -297,7 +298,12 @@ const CUSTOMERS = [
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/characters/darya/darya_portrait.png', color: '#7a4a6b',
     sprite: npcSprite('woman', 3) },
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
-    sprite: npcSprite('peasant', 4) }
+    sprite: npcSprite('peasant', 4) },
+  // Татьяна (20): служит в доме неподалёку, по вечерам шьёт на заказ. 1 июня приходит по поручению хозяйки, потом — гость по вечерам
+  // (CALLERS). Портрет и фигура — из генераций GPT (tools/make_tatiana.py, исходники в assets/characters/tatiana/source/); фигура — лист из
+  // 4 кадров покоя, как у типовых NPC.
+  { id: 'tatiana', name: 'Татьяна', kind: 'story', portrait: 'assets/characters/tatiana/tatiana_portrait.png', color: '#6b4a7a',
+    sprite: { src: 'assets/characters/tatiana/tatiana_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true } }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -342,7 +348,11 @@ const VISITS = {
     soldNode: 'pavel3_sold', refusedNode: 'pavel3_refused', leaveNode: 'pavel3_leave',
     priceMsg: 'Четыре мешочка. Почём?', counterMsg: 'По-соседски — {counter} за все?',
     tradeTalk: [{ text: 'Я спросил у Сорокина: цена пока прежняя.', need: { ctx: 'sorokin_says_price' }, id: 'c_p2_told', once: true,
-                  goto: 'pavel3_told', keep: 'tell_pavel_price' }] }
+                  goto: 'pavel3_told', keep: 'tell_pavel_price' }] },
+  // 1 июня: Татьяна по поручению хозяйки (сушёные яблоки к пирогу). ЧЕРНОВИК реплик — утверждает Кирилл.
+  tatiana_1: { who: 'tatiana', want: 'apples', qty: 1, budget: 7, wantUnit: 6, maxUnit: 7,
+    openNode: 'tat1_open', soldNode: 'tat1_sold', refusedNode: 'tat1_refused', leaveNode: 'tat1_leave',
+    priceMsg: 'Почём свёрток?', counterMsg: 'Шесть. Хозяйка больше не дала.', tradeTalk: [] }
 };
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
 // Другие места (сцены), куда Андрей приходит через карту. Лавка описана выше (SCENE, ART), здесь — остальные.
@@ -384,7 +394,7 @@ const SCENES = {
     npcs: [{ id: 'sorokin', name: 'Сорокин', x: 440, color: '#3b4a6b', portrait: 'assets/characters/sorokin/sorokin_portrait.png', node: 'sorokin_hub',
              sprite: { src: 'assets/characters/sorokin/sorokin_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }] },
   // ТЕСТОВОЕ: название, реплики, цены. Фона и фигуры трактирщика пока нет — заглушки.
-  traktir: { name: 'Ильинский трактир', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
+  traktir: { name: 'Трактир Сысалина', worldW: 480, lane: 225, startX: 60, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
     background: 'assets/places/traktir/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
     open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
     npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/characters/traktirshchik/traktirshchik_portrait.png', node: 'traktir_hub',
@@ -414,7 +424,9 @@ const SUPPLY = {
     lastDayMsg: 'Не сегодня, Андрей. (Это последний день в текущей версии игры: привезти заказ будет некуда.)',
     doneNode: 'sorokin_ordered', backNode: 'sorokin_hub' }
 };
-const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a', node: 'mother_hub',
+const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'assets/characters/mother/mother_portrait.png', color: '#8a5a5a',
+  // node — строка или список вариантов [{ need, node }, …, { node }]: берётся первый, чьё условие выполнено (STORY_NEEDS)
+  node: [{ need: { story: 'mom_jun6_topic' }, node: 'mom6_hub' }, { need: { story: 'mom_cool' }, node: 'mom7_cool' }, { node: 'mother_hub' }],
   // мать за делом: перебирает крупу в миске, 8 кадров PixelLab со стабилизацией (tools/make_mother_work.py), цикл без пауз;
   // прежняя фигура без миски — mother_idle.png
   sprite: { src: 'assets/characters/mother/mother_work.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 8, frameTime: 0.18 },
@@ -432,7 +444,10 @@ const MOTHER = { id: 'mother', name: 'Мать', kind: 'family', portrait: 'asse
 const RUMORS = {
   pavel_neighbor_price: { topic: 'grain_price', title: 'Крупа подорожает?', who: 'Павел', source: 'его сосед', kind: 'пересказ',
     note: 'Павел передал слова соседа: Сорокин будто бы собирается поднять цену на крупу. Сам Павел у Сорокина не спрашивал.',
-    toast: 'Новый слух: «Крупа подорожает?»' }
+    toast: 'Новый слух: «Крупа подорожает?»' },
+  sorokin_shirts: { topic: 'shirts', title: 'Рубахи для людей Сорокина', who: 'Сорокин', source: 'сам Сорокин', kind: 'личное свидетельство',
+    note: 'Работникам рубахи не нужны, но двум приказчикам он, может быть, возьмёт: пусть швея принесёт образец. Десяток разом не закажет.',
+    toast: 'Узнал у Сорокина про рубахи' }
 };
 // Дополнение к уже известной записи (новой записи не создаёт)
 const CONTEXT = {
@@ -441,7 +456,14 @@ const CONTEXT = {
   sorokin_says_price: { to: 'pavel_neighbor_price',
     text: 'Сорокин сам: цена пока прежняя, по шести за мешочек; что будет к осени, не обещает. Прямой источник, независимый от соседа.' } };
 // Обещания. В реплике promise — дать обещание; keep — выполнить (в заметках «выполнено»).
-const PROMISES = { tell_pavel_price: { title: 'Сказать Павлу, правда ли Сорокин поднимет цену на крупу' } };
+// bond — обещание связано с человеком и показывается в заметках «Люди»; due — [число, месяц]: ночью после этого дня оно помечается late
+// (срок прошёл). Новые поля обещания в сохранении: day (когда дано), broken (нарушено — человек знает), late (просрочено, выполнено позже).
+const PROMISES = {
+  tell_pavel_price: { title: 'Сказать Павлу, правда ли Сорокин поднимет цену на крупу' },
+  ask_sorokin_shirts: { bond: 'andrey_tatiana', due: [7, 6], title: 'спросить у Сорокина, не нужны ли рубахи его людям (до пятницы)' },
+  get_sorokin_order: { bond: 'andrey_tatiana', due: [7, 6], title: 'выхлопотать Татьяне у Сорокина заказ на десять рубах (до пятницы)' },
+  bring_sample: { bond: 'andrey_tatiana', title: 'показать Сорокину образец её работы, когда она его сошьёт' }
+};
 
 // Реплики. choices: goto — другая реплика; do — действие (trade, refuse, back, finish, end; order + seller — заказ у оптовика, см. SUPPLY);
 // need — условие {heard, ctx, sold, notSold}; once+id — вопрос задаётся один раз; learn — запись; context — дополнение к записи;
@@ -543,7 +565,14 @@ const NODES = {
     { text: 'Почём нынче крупа?', goto: 'sorokin_price' },
     { text: 'Говорят, крупа у тебя подорожает?', need: { heard: 'pavel_neighbor_price' }, id: 'c_s_price', once: true, goto: 'sorokin_rumor' },
     { text: 'Что слышно на реке?', goto: 'sorokin_news', id: 'c_sorokin_news', once: true },
+    { text: 'Не нужны ли твоим людям рубахи? Есть хорошая швея.', need: { all: [{ promiseOpen: 'ask_sorokin_shirts' }, { noPromise: 'get_sorokin_order' }] },
+      id: 'c_s_shirts_a', once: true, goto: 'sorokin_shirts', keep: 'ask_sorokin_shirts' },
+    { text: 'Мне нужен заказ для швеи: десять рубах.', need: { promiseOpen: 'get_sorokin_order' }, id: 'c_s_shirts_b', once: true, goto: 'sorokin_shirts_big' },
     { text: 'Пока ничего, зайду позже.', do: 'end' }] },
+  sorokin_shirts: { who: 'Сорокин', learn: 'sorokin_shirts', text: 'Рубахи? Работникам их жёны шьют. А вот двум приказчикам, пожалуй, взял бы, если шов крепкий. Пусть принесёт образец — гляну.', choices: [
+    { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Передам.', do: 'end' }] },
+  sorokin_shirts_big: { who: 'Сорокин', learn: 'sorokin_shirts', text: 'Десять рубах? Да что ты, Андрей! Работникам жёны шьют. Приказчикам две, может, и возьму, если шов хорош. Образец пусть несёт — гляну, а десятка не жди.', choices: [
+    { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понял.', do: 'end' }] },
   sorokin_price: { who: 'Сорокин', text: 'Пока по-старому: крупа по шесть, мука и пшено по пять, горох и яблоки по четыре. Закажешь — к утру привезу в лавку. А дальше кто знает.', choices: [
     { text: 'Ещё вопрос', goto: 'sorokin_hub' }, { text: 'Понятно.', do: 'end' }] },
   sorokin_ordered: { who: 'Сорокин', text: 'Сговорились. Завтра поутру будет у тебя в лавке.', choices: [
@@ -572,12 +601,193 @@ const NODES = {
     { text: 'Некогда мне.', do: 'end' }] },
   pereulok_who: { who: 'Незнакомец', text: 'Кто надо. Спроси у полового, он скажет: человек тихий, платит сразу.', choices: [
     { text: 'Так какое дело?', goto: 'pereulok_offer' }, { text: 'Некогда мне.', do: 'end' }] },
-  pereulok_offer: { who: 'Незнакомец', text: 'Есть мешки муки, задёшево. Откуда — не спрашивай. А к осени, помяни моё слово, хлеб вдвое подорожает: кто придержит, тот и при деньгах.', choices: [
+  pereulok_offer: { who: 'Незнакомец', text: 'Есть мешки муки, задёшево. Откуда — не спрашивай. А к осени, помяни моё слово, хлеб подорожает: извоз дорожает, а с ним и всё прочее. Кто придержит, тот и при деньгах.', choices: [
     { text: 'Подумаю.', do: 'end' },
     { text: 'Нет. Я честно торгую.', goto: 'pereulok_refused' }] },
   pereulok_refused: { who: 'Незнакомец', text: 'Честно... Ну-ну. Передумаешь — я тут по вечерам.', choices: [
     { text: 'Уйти', do: 'end' }] }
 };
+
+// ================= ОТНОШЕНИЯ (DATA_VERSION 24) =================
+// Устройство и правила — docs/RELATIONSHIPS.md. ВСЕ числа здесь — рабочие настройки, не утверждённый баланс; ВСЕ реплики — ЧЕРНОВИК
+// для Кирилла. Игроку числа не показываются: он видит реакции в сценах и заметки «Люди».
+// RELATIONS — связи. Запись bonds.<id> хранит отношение ВТОРОГО человека к Андрею (andrey_tatiana — отношение Татьяны к Андрею).
+//   who — имя в заметках; status — стартовый статус (REL_STATUS); start — стартовые trust / closeness / tension (0–100);
+//   about — строка для заметок «Люди» или { статус: строка, default };
+//   calm — { below, step }: мелкое напряжение (не выше below) каждую ночь падает на step, если по этой связи нет открытого конфликта.
+// Статус меняет только сюжетное событие (REL_EVENTS.status), а не порог чисел: роман и ссора сами из чисел не начинаются.
+const REL_STATUS = { acquaintance: 'знакомые', interest: 'взаимный интерес', closer: 'сближение', together: 'вместе', distance: 'дистанция', parted: 'расстались', family: 'семья' };
+const RELATIONS = {
+  andrey_tatiana: { who: 'Татьяна', status: 'acquaintance', start: { trust: 40, closeness: 25, tension: 0 }, calm: { below: 15, step: 1 },
+    about: { default: 'Служит в доме неподалёку, по ночам шьёт на заказ. Мы пока знакомые.' } },
+  andrey_mother: { who: 'Мать', status: 'family', start: { trust: 60, closeness: 70, tension: 10 }, calm: { below: 20, step: 2 },
+    about: 'Строга, потому что тревожится. К торговой славе лавки это не относится.' }
+};
+// MEMORIES — что запомнил человек (только то, что он действительно видел и слышал). note — строка для заметок Андрея (то, что знает он сам).
+const MEMORIES = {
+  tat_met: { note: 'Пришла за яблоками по поручению хозяйки.' },
+  tat_banter: { note: 'Перекинулись шутками про хозяйкиного кота.' },
+  tat_dream: { note: 'Рассказала, что хочет жить шитьём: днём служит, по ночам шьёт. Взяла у соседки-купчихи две рубахи и передник.' },
+  tat_support: { note: 'Я сказал ей: если что понадобится, пусть говорит.' },
+  tat_worry: { note: 'Спросил, не надорвётся ли она. Отмахнулась: справится.' },
+  promised_ask: { note: 'Предложил только спросить у Сорокина про рубахи. Решать ей самой.' },
+  promised_order: { note: 'Обещал выхлопотать ей у Сорокина заказ на десять рубах.' },
+  declined_promise: { note: 'Сказал честно, что не знаю, нужны ли Сорокину рубахи, и обещать не стал.' },
+  kept_ask: { note: 'Спросил Сорокина и рассказал ей: образец принести можно.' },
+  admitted_overpromise: { note: 'Признался ей, что обещал лишнее: десять рубах Сорокин не закажет.' },
+  promised_sample: { note: 'Предложил сам показать Сорокину её образец.' },
+  bluffed: { note: 'Ответил ей уклончиво, хотя знал, что десять рубах не будет.' },
+  promise_late: { note: 'Не успел спросить у Сорокина до пятницы, как обещал.' },
+  closing_talk: { note: 'Поговорили после закрытия лавки.' },
+  mom_checked: { note: 'Объяснил матери, что сам спрашивал у Сорокина: цена прежняя.' },
+  mom_wait: { note: 'Попросил мать подождать, пока сам спрошу у Сорокина.' },
+  snapped: { note: 'Резко ответил матери, что в лавке решаю я.' },
+  yielded: { note: 'Согласился с матерью без спора.' },
+  mom_apologized: { note: 'Извинился перед матерью за резкость.' },
+  mom_explained: { note: 'Мать рассказала, чего боится, и мы решили, как быть дальше.' }
+};
+// CONFLICTS — важные ссоры. Стадии: open, acknowledged, repairing, resolved, unresolved. title — строка для заметок «Люди».
+const CONFLICTS = {
+  decided_for_her: { title: 'пообещал Татьяне больше, чем мог, и решил за неё' },
+  unkept_promise: { title: 'не сдержал слово Татьяне в срок' },
+  mother_say: { title: 'поссорился с матерью из-за закупки' }
+};
+// REL_EVENTS — эффекты выбора. Применяются ровно один раз за сохранение (id входит в appliedEvents) и только при нажатии выбора (rel: id).
+// bond — связь; trust / closeness / tension — изменение; memory — id воспоминания (или список); conflict — { id, stage }; status — новый статус.
+// Ориентиры: небольшой поступок 2–4, выполненное обещание 5–8, нарушение доверия 10–15, приветствие 0.
+const REL_EVENTS = {
+  ch1_jun01_tatiana_met: { bond: 'andrey_tatiana', memory: 'tat_met' },
+  ch1_jun01_tatiana_joke: { bond: 'andrey_tatiana', closeness: 2, memory: 'tat_met' },
+  ch1_jun03_tatiana_banter: { bond: 'andrey_tatiana', closeness: 2, memory: 'tat_banter' },
+  ch1_jun03_tatiana_listened: { bond: 'andrey_tatiana', closeness: 4, memory: 'tat_dream' },
+  ch1_jun03_tatiana_support: { bond: 'andrey_tatiana', memory: 'tat_support' },
+  ch1_jun03_tatiana_worry: { bond: 'andrey_tatiana', tension: 2, memory: 'tat_worry' },
+  ch1_jun05_tatiana_small_promise: { bond: 'andrey_tatiana', memory: 'promised_ask' },
+  ch1_jun05_tatiana_big_promise: { bond: 'andrey_tatiana', closeness: 2, tension: 4, memory: 'promised_order', conflict: { id: 'decided_for_her', stage: 'open' } },
+  ch1_jun05_tatiana_declined: { bond: 'andrey_tatiana', trust: 2, memory: 'declined_promise' },
+  ch1_jun07_tatiana_kept: { bond: 'andrey_tatiana', trust: 6, closeness: 3, tension: -2, memory: 'kept_ask' },
+  ch1_jun07_tatiana_admitted: { bond: 'andrey_tatiana', trust: -3, tension: -3, memory: 'admitted_overpromise', conflict: { id: 'decided_for_her', stage: 'acknowledged' } },
+  ch1_jun07_tatiana_repair: { bond: 'andrey_tatiana', trust: 2, memory: 'promised_sample', conflict: { id: 'decided_for_her', stage: 'repairing' } },
+  ch1_jun07_tatiana_bluff: { bond: 'andrey_tatiana', trust: -6, tension: 6, memory: 'bluffed' },
+  ch1_jun07_tatiana_excuse: { bond: 'andrey_tatiana', trust: -4, tension: 3, memory: 'promise_late', conflict: { id: 'unkept_promise', stage: 'open' } },
+  ch1_jun07_tatiana_apology: { bond: 'andrey_tatiana', trust: -4, tension: 1, memory: 'promise_late', conflict: { id: 'unkept_promise', stage: 'acknowledged' } },
+  ch1_jun07_tatiana_warm: { bond: 'andrey_tatiana', closeness: 3, memory: 'closing_talk' },
+  ch1_jun06_mother_grounded: { bond: 'andrey_mother', trust: 4, tension: -2, memory: 'mom_checked' },
+  ch1_jun06_mother_wait: { bond: 'andrey_mother', memory: 'mom_wait' },
+  ch1_jun06_mother_snapped: { bond: 'andrey_mother', trust: -3, tension: 8, memory: 'snapped', conflict: { id: 'mother_say', stage: 'open' } },
+  ch1_jun06_mother_yielded: { bond: 'andrey_mother', closeness: 2, memory: 'yielded' },
+  ch1_jun07_mother_apology: { bond: 'andrey_mother', tension: -4, memory: 'mom_apologized', conflict: { id: 'mother_say', stage: 'acknowledged' } },
+  ch1_jun07_mother_resolved: { bond: 'andrey_mother', trust: 3, tension: -4, memory: 'mom_explained', conflict: { id: 'mother_say', stage: 'resolved' } }
+};
+// STORY_NEEDS — именованные сюжетные условия (need: { story: 'имя' }), чтобы не писать длинную формулу в каждой реплике.
+const STORY_NEEDS = {
+  mom_jun6_topic: { on: [6, 6], notSeen: 'mom_jun6' },
+  mom_cool: { from: [7, 6], notSeen: 'mom_jun7', relationship: { id: 'andrey_mother', conflict: { id: 'mother_say', stage: ['open', 'acknowledged'] } } }
+};
+// CALLERS — гости: человек стоит в месте scene (по умолчанию в лавке, x — где) и ждёт разговора, пока выполнен хотя бы один слот at.
+// Слот: on — день, phase — часть дня, scene — id сцены: после её завершения гость уходит (seenScenes), need — условие, node — реплика (строка или список).
+// Если Андрей не пришёл (был в лабазе, трактире), сцена не проходится и пропущенная встреча не считается пренебрежением.
+const CALLERS = [
+  { who: 'tatiana', scene: 'shop', x: 300, at: [
+    { on: [3, 6], phase: 'evening', scene: 'tat_jun3', node: 'tat3_hub' },
+    { on: [5, 6], phase: 'evening', scene: 'tat_jun5', node: [{ need: { relationship: { id: 'andrey_tatiana', memory: 'tat_dream' } }, node: 'tat5_warm' }, { node: 'tat5_cool' }] },
+    { on: [7, 6], phase: 'evening', scene: 'tat_jun7', node: [
+      { need: { all: [{ promiseDone: 'ask_sorokin_shirts' }, { noPromise: 'get_sorokin_order' }] }, node: 'tat7_kept' },
+      { need: { all: [{ promiseOpen: 'get_sorokin_order' }, { heard: 'sorokin_shirts' }] }, node: 'tat7_big' },
+      { need: { any: [{ promiseOpen: 'ask_sorokin_shirts' }, { promiseOpen: 'get_sorokin_order' }] }, node: 'tat7_unkept' },
+      { need: { relationship: { id: 'andrey_tatiana', memory: 'tat_dream' } }, node: 'tat7_none_warm' },
+      { node: 'tat7_none_cool' }] }
+  ] }
+];
+// DEBUG_STATES — воспроизводимые состояния для отладочной панели (?debug=1): день, часть дня, события, обещания, пройденные сцены.
+const DEBUG_STATES = {
+  closer: { title: 'Сближение', on: [5, 6], events: ['ch1_jun01_tatiana_joke', 'ch1_jun03_tatiana_banter', 'ch1_jun03_tatiana_listened'], scenes: ['tat_jun3'] },
+  grudge: { title: 'Обида', on: [7, 6], events: ['ch1_jun03_tatiana_listened', 'ch1_jun05_tatiana_big_promise'], scenes: ['tat_jun3', 'tat_jun5'],
+    promises: { get_sorokin_order: {} }, heard: ['sorokin_shirts'] },
+  acknowledged: { title: 'Признанная ошибка', on: [7, 6], phase: 'evening', events: ['ch1_jun03_tatiana_listened', 'ch1_jun05_tatiana_big_promise', 'ch1_jun07_tatiana_admitted'],
+    scenes: ['tat_jun3', 'tat_jun5', 'tat_jun7'], promises: { get_sorokin_order: { broken: true } } },
+  repairing: { title: 'Исправление', on: [7, 6], phase: 'evening', events: ['ch1_jun03_tatiana_listened', 'ch1_jun05_tatiana_big_promise', 'ch1_jun07_tatiana_admitted', 'ch1_jun07_tatiana_repair'],
+    scenes: ['tat_jun3', 'tat_jun5', 'tat_jun7'], promises: { get_sorokin_order: { broken: true }, bring_sample: {} } },
+  tension_high_closeness: { title: 'Близость при ссоре', on: [7, 6], phase: 'evening', events: ['ch1_jun01_tatiana_joke', 'ch1_jun03_tatiana_banter', 'ch1_jun03_tatiana_listened', 'ch1_jun05_tatiana_big_promise', 'ch1_jun07_tatiana_bluff'],
+    scenes: ['tat_jun3', 'tat_jun5', 'tat_jun7'], promises: { get_sorokin_order: {} } }
+};
+
+Object.assign(NODES, {
+  // ---- Татьяна, 1 июня (приход, торговля) ----
+  tat1_open: { who: 'Татьяна', text: 'Добрый день. Хозяйка пирог затеяла, велела свёрток сушёных яблок. Только не дороже семи, а то она спросит с меня.', choices: [
+    { text: 'Пирог? А кому достанется — тебе или хозяйкиному коту?', goto: 'tat1_joke', id: 'c_t1_joke', once: true, rel: 'ch1_jun01_tatiana_joke' },
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  tat1_joke: { who: 'Татьяна', text: 'Коту, конечно. Он у неё в чинах: ему и сметана, и рыбка. А мне яблочная шкурка, если повезёт.', choices: [
+    { text: 'Перейти к цене', do: 'trade' }, { text: 'Пока не могу продать', do: 'refuse' }] },
+  tat1_sold: { who: 'Татьяна', text: 'Спасибо. Хозяйка будет довольна, а мне меньше ворчанья.', choices: [{ text: 'До свидания.', do: 'finish', rel: 'ch1_jun01_tatiana_met' }] },
+  tat1_refused: { who: 'Татьяна', text: 'Жаль. Попрошу у соседа напротив.', choices: [{ text: 'До свидания.', do: 'finish', rel: 'ch1_jun01_tatiana_met' }] },
+  tat1_leave: { who: 'Татьяна', text: 'Так не пойдёт. Хозяйка каждую монетку считает.', choices: [{ text: 'До свидания.', do: 'finish', rel: 'ch1_jun01_tatiana_met' }] },
+  // ---- Татьяна, 3 июня, вечер: разговор о шитье ----
+  tat3_hub: { who: 'Татьяна', text: 'Добрый вечер, лавочник. Хозяйка послала за нитками в ряды, а я крюк дала: у вас окна светятся. Не гоните?', choices: [
+    { text: 'Заходи. Яблоки у хозяйкиного кота не отбирала?', goto: 'tat3_banter', id: 'c_t3_banter', once: true, rel: 'ch1_jun03_tatiana_banter' },
+    { text: 'Что ты делаешь вечерами, когда хозяйка спит?', goto: 'tat3_sewing', id: 'c_t3_sew', once: true, rel: 'ch1_jun03_tatiana_listened' },
+    { text: 'Рад бы, да надо считать выручку. Заходи завтра.', goto: 'tat3_bye' }] },
+  tat3_banter: { who: 'Татьяна', text: 'Не отбирала, но подумывала. Он на меня косо смотрит: чует, что я его сметану видела. А вы что, вечерами одни со счётами?', choices: [
+    { text: 'Что ты делаешь вечерами, когда хозяйка спит?', goto: 'tat3_sewing', id: 'c_t3_sew', once: true, rel: 'ch1_jun03_tatiana_listened' },
+    { text: 'Беги за нитками, а то ряды закроют.', goto: 'tat3_bye' }] },
+  tat3_sewing: { who: 'Татьяна', text: 'Шью. Днём я хозяйкина, а ночью своя. Взяла у соседки-купчихи две рубахи и передник к воскресенью. Хочу, чтобы шитьё меня кормило, а не я его. Справляюсь.', choices: [
+    { text: 'Хорошо придумала. Если что понадобится, говори.', goto: 'tat3_bye', rel: 'ch1_jun03_tatiana_support' },
+    { text: 'Смотри, не надорвись: и день у хозяйки, и ночь.', goto: 'tat3_worry', rel: 'ch1_jun03_tatiana_worry' }] },
+  tat3_worry: { who: 'Татьяна', text: 'Не надорвусь, я привычная. Вы лучше свою крупу считайте, лавочник.', choices: [{ text: 'Ладно, ладно.', goto: 'tat3_bye' }] },
+  tat3_bye: { who: 'Татьяна', text: 'Побегу, а то ряды закроют. Спокойной ночи.', choices: [{ text: 'Спокойной ночи.', do: 'end', scene: 'tat_jun3' }] },
+  // ---- Татьяна, 5 июня, вечер: просьба и обещание ----
+  tat5_warm: { who: 'Татьяна', text: 'Лавочник! Заказ сдала, купчиха осталась довольна. Только мне нужна ещё работа, а где её взять, я не знаю. Ты же в округе всех знаешь.', choices: 'TAT5' },
+  tat5_cool: { who: 'Татьяна', text: 'Добрый вечер. Дело есть, только неловко. Я иногда шью на заказ и хочу найти ещё заказчиков, а знакомых у меня здесь мало. Ты же в округе всех знаешь.', choices: 'TAT5' },
+  tat5_small: { who: 'Татьяна', text: 'Договорились. Спроси, а я пока образец сошью. До пятницы.', choices: [{ text: 'До пятницы.', do: 'end', scene: 'tat_jun5' }] },
+  tat5_big: { who: 'Татьяна', text: 'Десять?! Погоди, я же не просила... Ну, спасибо. Только смотри, не говори потом, что я тебя заставила. Я и сама могу.', choices: [{ text: 'Устрою, не бойся.', do: 'end', scene: 'tat_jun5' }] },
+  tat5_decline: { who: 'Татьяна', text: 'Честно. На том и спасибо. Сама поищу.', choices: [{ text: 'Если услышу про заказ, скажу.', do: 'end', scene: 'tat_jun5' }] },
+  // ---- Татьяна, 7 июня, вечер, после закрытия: разное по тому, что было сделано ----
+  tat7_kept: { who: 'Татьяна', text: 'Ну что, лавочник? Ходил к Сорокину? Пятница сегодня.', choices: [
+    { text: 'Ходил. Работникам рубахи не нужны, а двум приказчикам, может, и возьмёт. Просил принести образец.', goto: 'tat7_kept_ok', rel: 'ch1_jun07_tatiana_kept' },
+    { text: 'Потом расскажу, я устал.', goto: 'tat7_later' }] },
+  tat7_kept_ok: { who: 'Татьяна', text: 'Спросил и сказал как есть, без сказок. Образец у меня готов. Спасибо, Андрей. Правда.', choices: [{ text: 'Спокойной ночи, Татьяна.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_later: { who: 'Татьяна', text: 'Ладно. Только не тяни. Мне же надо знать, шить на приказчиков или нет.', choices: [{ text: 'Не буду.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_big: { who: 'Татьяна', text: 'Ну что, лавочник? Десять рубах, ты сказал. Я без сна сижу, считаю нитки. Что Сорокин?', choices: [
+    { text: 'Десять он не закажет. Двум приказчикам, может, возьмёт, образец просил. Я обещал лишнее. Прости.', goto: 'tat7_big_honest', rel: 'ch1_jun07_tatiana_admitted', breakPromise: 'get_sorokin_order' },
+    { text: 'Дело движется, не торопи.', goto: 'tat7_big_bluff', rel: 'ch1_jun07_tatiana_bluff' }] },
+  tat7_big_honest: { who: 'Татьяна', text: 'Хоть не соврал. Я так и думала, что много. Только не решай за меня, ладно? Образец сама отнесу.', choices: [
+    { text: 'Давай я сам покажу образец Сорокину. Если захочешь.', goto: 'tat7_repair', rel: 'ch1_jun07_tatiana_repair', promise: 'bring_sample' },
+    { text: 'Как знаешь.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_repair: { who: 'Татьяна', text: 'Посмотрим. Принесу, когда сошью. Но слово ты мне теперь дай крепкое.', choices: [{ text: 'Дам.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_big_bluff: { who: 'Татьяна', text: 'Движется. Не нравится мне, как ты это сказал. Ладно, подожду. Но не затягивай.', choices: [{ text: 'Не затяну.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_unkept: { who: 'Татьяна', text: 'Лавочник, пятница. Ты обещал спросить у Сорокина. Спросил?', choices: [
+    { text: 'Не успел. Завтра схожу.', goto: 'tat7_excuse', rel: 'ch1_jun07_tatiana_excuse' },
+    { text: 'Забыл. Прости, схожу завтра же.', goto: 'tat7_apology', rel: 'ch1_jun07_tatiana_apology' }] },
+  tat7_excuse: { who: 'Татьяна', text: 'Завтра. Я ждала сегодня. Ладно, иди. Только слово у тебя, Андрей, должно быть дороже мешка крупы.', choices: [{ text: 'Хорошо.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_apology: { who: 'Татьяна', text: 'Забыл... Бывает. Прощаю, но пока не сходишь, я не забуду. Иди.', choices: [{ text: 'Схожу.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_none_warm: { who: 'Татьяна', text: 'Шью допоздна, но мне приятно, что ты тогда выслушал. Ты не спешишь с советами, лавочник.', choices: [
+    { text: 'Заходи ещё, если захочешь.', do: 'end', scene: 'tat_jun7', rel: 'ch1_jun07_tatiana_warm' },
+    { text: 'Спокойной ночи.', do: 'end', scene: 'tat_jun7' }] },
+  tat7_none_cool: { who: 'Татьяна', text: 'Добрый вечер. Я мимо, хозяйка послала. Не задерживаю.', choices: [{ text: 'Доброй ночи.', do: 'end', scene: 'tat_jun7' }] },
+  // ---- Мать, 6 июня (утро): закупка впрок ----
+  mom6_hub: { who: 'Мать', text: 'Андрей, сядь. Я всю ночь считала. Если Сорокин вправду поднимет цену, к осени мы без крупы. Давай возьмём у него сразу побольше, пока по шести, на все деньги.', choices: [
+    { text: 'Я сам спрашивал Сорокина: пока по шести. На все деньги не станем, докупать буду по мере продаж.', need: { ctx: 'sorokin_says_price' }, goto: 'mom6_grounded', rel: 'ch1_jun06_mother_grounded' },
+    { text: 'Давай сначала спрошу у самого Сорокина, потом решим.', need: { not: { ctx: 'sorokin_says_price' } }, goto: 'mom6_wait', rel: 'ch1_jun06_mother_wait' },
+    { text: 'Я хозяин в лавке, мама. Решаю я.', goto: 'mom6_snap', rel: 'ch1_jun06_mother_snapped' },
+    { text: 'Хорошо, как скажешь.', goto: 'mom6_yield', rel: 'ch1_jun06_mother_yielded' }] },
+  mom6_grounded: { who: 'Мать', text: 'Сам ходил... Ну, значит, так. Но смотри, чтобы мешки не кончились раньше, чем привезут.', choices: [{ text: 'Пригляжу.', do: 'end', scene: 'mom_jun6' }] },
+  mom6_wait: { who: 'Мать', text: 'Спроси. Только не тяни: тревожно мне.', choices: [{ text: 'Сегодня же схожу.', do: 'end', scene: 'mom_jun6' }] },
+  mom6_snap: { who: 'Мать', text: 'Хозяин, значит. Ну-ну. Чай на столе.', choices: [{ text: 'Уйти.', do: 'end', scene: 'mom_jun6' }] },
+  mom6_yield: { who: 'Мать', text: 'Вот и ладно. Я ведь не со зла, Андрей, а от опыта. Сам увидишь, как дело пойдёт.', choices: [{ text: 'Посмотрим.', do: 'end', scene: 'mom_jun6' }] },
+  // ---- Мать, 7 июня: после резкого ответа ----
+  mom7_cool: { who: 'Мать', text: 'Хозяин пришёл. Чай на столе.', choices: [
+    { text: 'Я вчера погорячился. Расскажи, чего ты боишься.', goto: 'mom7_why', rel: 'ch1_jun07_mother_apology' },
+    { text: 'Мне пора.', do: 'end', scene: 'mom_jun7' }] },
+  mom7_why: { who: 'Мать', text: 'В голодный год ещё при твоём отце мы продали всё, что могли, чтобы закупить крупу, и едва не остались без лавки. С тех пор у меня всё внутри сжимается, когда слышу про подорожание.', choices: [
+    { text: 'Давай решать вместе: ты считаешь, я проверяю у Сорокина.', do: 'end', scene: 'mom_jun7', rel: 'ch1_jun07_mother_resolved' },
+    { text: 'Понятно.', do: 'end', scene: 'mom_jun7' }] }
+});
+// общие выборы Татьяны 5 июня (одни для обоих вариантов реплики)
+const TAT5_CHOICES = [
+  { text: 'Могу спросить у Сорокина, не нужны ли рубахи его людям. Только спрошу, остальное решишь сама. До пятницы.', goto: 'tat5_small', promise: 'ask_sorokin_shirts', rel: 'ch1_jun05_tatiana_small_promise' },
+  { text: 'Это я устрою: выхлопочу у Сорокина заказ на десять рубах. Ты шей.', goto: 'tat5_big', promise: 'get_sorokin_order', rel: 'ch1_jun05_tatiana_big_promise' },
+  { text: 'Не знаю, нужны ли ему рубахи, и обещать не стану. Если услышу про заказ, скажу.', goto: 'tat5_decline', rel: 'ch1_jun05_tatiana_declined' }];
+NODES.tat5_warm.choices = NODES.tat5_cool.choices = TAT5_CHOICES;
 
 // ================= КАРТЫ (экран «Карта», клавиша M) =================
 // Несколько карт одного города в разном масштабе: start — какая открывается первой, кнопка вверху переключает на следующую.
@@ -622,7 +832,7 @@ const MAP = {
           desc: 'Сотни тесных лавок у Красной площади, каждый ряд — свой товар. Здесь узнают цены и новости.' },
         { id: 'gostiny', name: 'Гостиный двор', kind: 'trade', x: 0.72, y: 0.2, at: 'r',
           desc: 'Большой двор оптовой торговли между Ильинкой и Варваркой.' },
-        { id: 'traktir', name: 'Ильинский трактир', kind: 'place', x: 0.62, y: 0.155, at: 'b', scene: 'traktir',
+        { id: 'traktir', name: 'Трактир Сысалина', kind: 'place', x: 0.62, y: 0.155, at: 'b', scene: 'traktir',
           desc: 'Трактир на Ильинке, между рядами и Гостиным двором. По вечерам за столами купцы, приказчики, извозчики; пьют чай и водку, читают вслух газету, на крыльце нищие. Здесь узнают все новости и слухи.' },
         { id: 'krasnaya', name: 'Красная площадь', kind: 'place', x: 0.32, y: 0.12, at: 'l',
           desc: 'Главная площадь у Кремля: торг, толпа, глашатаи.' },
