@@ -300,9 +300,10 @@ const CUSTOMERS = [
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
     sprite: npcSprite('peasant', 4) },
   // Татьяна (20): служит в доме неподалёку, по вечерам шьёт на заказ. 1 июня приходит по поручению хозяйки, потом — гость по вечерам
-  // (CALLERS). Портрета и своей фигуры пока нет: заглушка портрета и типовой NPC.
+  // (CALLERS). Портрет и фигура — из генераций GPT (tools/make_tatiana.py, исходники в assets/characters/tatiana/source/); фигура — лист из
+  // 4 кадров покоя, как у типовых NPC.
   { id: 'tatiana', name: 'Татьяна', kind: 'story', portrait: 'assets/characters/tatiana/tatiana_portrait.png', color: '#6b4a7a',
-    sprite: npcSprite('girl_young', 4) }
+    sprite: { src: 'assets/characters/tatiana/tatiana_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true } }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
