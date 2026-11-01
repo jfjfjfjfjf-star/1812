@@ -561,6 +561,8 @@ if (ART.glass) loadImage('glass', ART.glass.src, SCENE.worldW, H, true);
 Object.keys(SCENES).forEach(id => { loadImage('bg_' + id, SCENES[id].background, SCENES[id].worldW, H); if (SCENES[id].front) loadImage('fr_' + id, SCENES[id].front, SCENES[id].worldW, H, true); });
 (MOTHER.activities || []).forEach(a => loadImage('ma_' + a.id, a.src, 144 * a.frames, 120, true));
 speakers().forEach(x => { if (x.sprite) loadImage('s_' + x.id, x.sprite.src, x.sprite.cellW * (x.sprite.frames || 1), x.sprite.cellH, false, 'Показан человечек-заглушка.'); });
+// Лист ходьбы NPC (необязательный): sprite.walk = { src, frames, cycle } — кадры по пройденному пути, cycle — пикселей на полный цикл.
+speakers().forEach(x => { const w = x.sprite && x.sprite.walk; if (w) loadImage('s_' + x.id + '_walk', w.src, x.sprite.cellW * w.frames, x.sprite.cellH, false, 'Ходьба: показан кадр покоя.'); });
 // типовые NPC: фигуры для extras всех сцен и для прохожих за окном (все варианты перечисленных типов); необязательны
 const npcKey = (t, v) => 'npc_' + t + '_' + v;
 const npcNeed = new Set([...(SCENE.extras || []), ...Object.values(SCENES).flatMap(c => c.extras || [])].map(e => e.type + '_' + e.v));
@@ -1098,7 +1100,7 @@ function updateVisitors(dt) {
 function drawVisitors() {                              // слой 6: покупатели перед прилавком (идут без кадров ходьбы — это не анимация)
   leaving.forEach(l => drawPerson(l.cust, l.x, LANE, 1, null, null, l.x));
   if (visitor.cust && visitor.key === vkey() && visitor.wait <= 0 && visitor.phase !== 'none')
-    drawPerson(visitor.cust, visitor.x, LANE, visitor.phase === 'in' ? -1 : 1, null, null, visitor.phase === 'in' ? visitor.x : 0);
+    drawPerson(visitor.cust, visitor.x, LANE, visitor.phase === 'in' ? -1 : 1, null, null, visitor.phase === 'in' ? SCENE.doorX - visitor.x + 1 : 0);   // путь от двери (кадры идут вперёд)
 }
 
 // ================= ОБНОВЛЕНИЕ =================
@@ -1210,11 +1212,12 @@ function walkOffset(id, dist) {
 }
 function drawPerson(who, x, y, dir, spOver, imOver, walkDist) {     // spOver/imOver — другой лист кадров (например, дело матери); walkDist — путь, если идёт
   shadow(x, y, (spOver || who.sprite || {}).scale || 1);
-  const wo = walkOffset(who.id, walkDist); x += wo.dx; y += wo.dy;
-  const sp = spOver || who.sprite, im = imOver || (sp && spr['s_' + who.id]);
+  const sp = spOver || who.sprite, wk = sp && sp.walk && walkDist ? spr['s_' + who.id + '_walk'] : null, sheet = wk && wk.ok;   // свой лист ходьбы — вместо подскока
+  const wo = sheet ? { dx: 0, dy: 0 } : walkOffset(who.id, walkDist); x += wo.dx; y += wo.dy;
+  const im = sheet ? wk : imOver || (sp && spr['s_' + who.id]);
   if (!im || !im.ok) { person(x, y, who.color, dir); return; }
   const k = SCENE.charScale * (sp.scale || 1), flip = (dir < 0) !== (sp.facing === 'left');   // в файле смотрит в facing; нужна другая сторона — зеркало; scale — глубина
-  const f = sp.frame != null ? sp.frame : sp.idle ? npcIdle(idSeed(who.id))[0]   // кадр задан снаружи; NPC — кадр покоя (дыхание); сдвиг от id, а не от x — на ходу не дрожит
+  const f = sheet ? Math.floor(walkDist / sp.walk.cycle % 1 * sp.walk.frames) : sp.frame != null ? sp.frame : sp.idle ? npcIdle(idSeed(who.id))[0]   // кадр задан снаружи; NPC — кадр покоя (дыхание); сдвиг от id, а не от x — на ходу не дрожит
     : sp.frames > 1 ? Math.floor(performance.now() / 1000 / sp.frameTime) % sp.frames : 0;   // лист кадров в ряд: цикл по времени
   ctx.save(); ctx.translate(Math.round(x), 0);
   if (flip) ctx.scale(-1, 1);
