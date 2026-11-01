@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'assets/mannequin'
 SRC = 'assets/characters/andrey/andrey_walk.png'
 CW, CH, N = 144, 120, 8
-THIGH, SHIN, FOOT, UARM, FARM, TORSO = 22, 19, 10, 15, 14, 35
+THIGH, SHIN, FOOT, UARM, FARM, TORSO = 22, 19, 10, 15, 14, 34
 W = dict(torso=16, thigh=11, shin=9, foot=7, uarm=7, farm=6, hand=6)
 NEAR, FAR, BODY, LINE = (190, 190, 190), (118, 118, 118), (170, 170, 170), (30, 26, 24)
 KEYS = ['lean', 'tn', 'kn', 'tf', 'kf', 'an', 'en', 'af', 'ef']
@@ -20,14 +20,14 @@ r = math.radians
 
 def joints(p, head):
     hx, hy, hr = head
-    sho = (hx - 2, hy + hr + 6)
+    sho = (hx - 2, hy + hr + 7)
     hip = (sho[0] + TORSO * math.sin(r(p['lean'])), sho[1] + TORSO * math.cos(r(p['lean'])))
     J = {'sho': sho, 'hip': hip}
     for s in 'nf':
         t, k = p['t' + s], p['k' + s]
         kn = (hip[0] + THIGH * math.sin(r(t)), hip[1] + THIGH * math.cos(r(t)))
         a = t - k; an = (kn[0] + SHIN * math.sin(r(a)), kn[1] + SHIN * math.cos(r(a)))
-        toe = (an[0] + FOOT * math.cos(r(a * 0.5)), an[1] + FOOT * math.sin(r(a * 0.5)) * 0.4)
+        toe = (an[0] + FOOT * math.cos(r(a)), an[1] - FOOT * math.sin(r(a)) + 1)   # стопа под прямым углом к голени
         J['knee' + s], J['ank' + s], J['toe' + s] = kn, an, toe
         u, e = p['a' + s], p['e' + s]
         el = (sho[0] + UARM * math.sin(r(u)), sho[1] + UARM * math.cos(r(u)))
@@ -35,27 +35,41 @@ def joints(p, head):
         J['elb' + s], J['wri' + s] = el, wr
     return J
 
-def cap(d, p, q, w, col):
-    d.line([p, q], fill=col, width=int(round(w)))
-    for c in (p, q): d.ellipse([c[0] - w / 2, c[1] - w / 2, c[0] + w / 2, c[1] + w / 2], fill=col)
+def taper(d, p, q, w1, w2, col):                           # сужающаяся деталь: у начала ширина w1, у конца w2, концы скруглены
+    dx, dy = q[0] - p[0], q[1] - p[1]; L = math.hypot(dx, dy) or 1; nx, ny = -dy / L, dx / L
+    d.polygon([(p[0] + nx * w1 / 2, p[1] + ny * w1 / 2), (q[0] + nx * w2 / 2, q[1] + ny * w2 / 2),
+               (q[0] - nx * w2 / 2, q[1] - ny * w2 / 2), (p[0] - nx * w1 / 2, p[1] - ny * w1 / 2)], fill=col)
+    for c, w in ((p, w1), (q, w2)): d.ellipse([c[0] - w / 2, c[1] - w / 2, c[0] + w / 2, c[1] + w / 2], fill=col)
 
 def render(p, head, flat=False):
     im = Image.new('RGBA', (CW, CH), (0, 0, 0, 0)); d = ImageDraw.Draw(im); J = joints(p, head)
-    def part(a, b, w, col):
-        if flat: cap(d, J[a] if isinstance(a, str) else a, J[b] if isinstance(b, str) else b, w, (255, 255, 255))
-        else: cap(d, J[a] if isinstance(a, str) else a, J[b] if isinstance(b, str) else b, w + 2, LINE); cap(d, J[a] if isinstance(a, str) else a, J[b] if isinstance(b, str) else b, w, col)
-    for s, col in (('f', FAR),):                                           # дальние рука и нога — позади тела
-        part('sho', 'elb' + s, W['uarm'], col); part('elb' + s, 'wri' + s, W['farm'], col)
-        part('hip', 'knee' + s, W['thigh'], col); part('knee' + s, 'ank' + s, W['shin'], col); part('ank' + s, 'toe' + s, W['foot'], col)
-    part('sho', 'hip', W['torso'], BODY)
-    hx, hy, hr = head
+    def part(a, b, w1, w2, col):
+        a, b = (J[a] if isinstance(a, str) else a), (J[b] if isinstance(b, str) else b)
+        if flat: taper(d, a, b, w1, w2, (255, 255, 255)); return
+        taper(d, a, b, w1 + 2, w2 + 2, LINE); taper(d, a, b, w1, w2, col)
+    def leg(s, col):
+        part('hip' + s, 'knee' + s, 12, 8, col); part('knee' + s, 'ank' + s, 8, 5, col)
+        an, toe = J['ank' + s], J['toe' + s]; heel = (an[0] - 2, an[1] + 1)
+        part(heel, toe, 6, 4, col)                                        # стопа: от пятки к носку, сужается
+    def arm(s, col):
+        part('sho' + s, 'elb' + s, 7, 5, col); part('elb' + s, 'wri' + s, 5, 4, col)
+        w = J['wri' + s]; part(w, (w[0] + 1, w[1] + 3), 5, 4, col)        # кисть
+    hx, hy, hr = head; sho, hip = J['sho'], J['hip']
+    J['shof'], J['shon'] = (sho[0] - 1, sho[1] + 1), (sho[0] + 1, sho[1] + 1)
+    J['hipf'], J['hipn'] = (hip[0] - 1, hip[1]), (hip[0] + 1, hip[1])
+    arm('f', FAR); leg('f', FAR)                                          # дальние — позади тела
+    neck = (hx - 1, hy + hr - 1)
+    part(neck, sho, 5, 6, BODY)                                           # шея
+    chest = (sho[0] + 1.5, sho[1] + 9); waist = (sho[0] + (hip[0] - sho[0]) * 0.62, sho[1] + (hip[1] - sho[1]) * 0.62)
+    body = [((sho[0], sho[1] + 2), chest, 15, 16), (chest, waist, 16, 12), (waist, hip, 12, 14)]   # грудь, талия, таз — один контур
+    for a, b, w1, w2 in body: taper(d, a, b, w1 + (0 if flat else 2), w2 + (0 if flat else 2), (255, 255, 255) if flat else LINE)
+    if not flat:
+        for a, b, w1, w2 in body: taper(d, a, b, w1, w2, BODY)
     if flat: d.ellipse([hx - hr + 1, hy - hr - 1, hx + hr - 1, hy + hr + 1], fill=(255, 255, 255))
     else:
         d.ellipse([hx - hr, hy - hr - 2, hx + hr, hy + hr + 2], fill=LINE); d.ellipse([hx - hr + 1, hy - hr - 1, hx + hr - 1, hy + hr + 1], fill=BODY)
         d.polygon([(hx + hr - 2, hy - 1), (hx + hr + 3, hy + 2), (hx + hr - 2, hy + 4)], fill=LINE)    # нос — куда смотрит
-    s, col = 'n', NEAR
-    part('hip', 'knee' + s, W['thigh'], col); part('knee' + s, 'ank' + s, W['shin'], col); part('ank' + s, 'toe' + s, W['foot'], col)
-    part('sho', 'elb' + s, W['uarm'], col); part('elb' + s, 'wri' + s, W['farm'], col)
+    leg('n', NEAR); arm('n', NEAR)
     return im
 
 def prior(i):
