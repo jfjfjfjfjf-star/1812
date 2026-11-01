@@ -292,18 +292,20 @@ const NPC_IDLE = { breath: 3.6, inhale: 0.4, turn: 3.5, mouth: 0.14, open: 0.45,
 //   facing — куда смотрит фигура в файле ('right' или 'left'), в другую сторону игра её отражает.
 //   Пока файла нет (или размер не тот) — человечек-заглушка. Кадров ходьбы нет: идущий показан тем же кадром (не анимация).
 // kind: story — торговля и личные темы (tradeTalk); regular — общий торговый сценарий без личного разговора; мать — только разговоры, без торговли.
+// Своя фигура персонажа: лист из 4 кадров покоя (дыхание и рот) 576×120, как у типовых NPC; собирает tools/make_character.py
+const idleSprite = id => ({ src: 'assets/characters/' + id + '/' + id + '_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true });
 const CUSTOMERS = [
   { id: 'pavel', name: 'Павел', kind: 'story',   portrait: 'assets/characters/pavel/pavel_portrait.png', color: '#4a5a3a',
-    sprite: npcSprite('merchant', 2) },   // пока свой спрайт не нарисован — типовой NPC (свой: assets/characters/pavel/pavel_idle.png)
+    sprite: idleSprite('pavel') },
   { id: 'darya', name: 'Дарья', kind: 'regular', portrait: 'assets/characters/darya/darya_portrait.png', color: '#7a4a6b',
-    sprite: npcSprite('woman', 3) },
+    sprite: idleSprite('darya') },
   { id: 'fedor', name: 'Фёдор', kind: 'regular', portrait: 'assets/characters/fedor/fedor_portrait.png', color: '#5a4a3a',
-    sprite: npcSprite('peasant', 4) },
+    sprite: idleSprite('fedor') },
   // Татьяна (20): служит в доме неподалёку, по вечерам шьёт на заказ. 1 июня приходит по поручению хозяйки, потом — гость по вечерам
   // (CALLERS). Портрет и фигура — из генераций GPT (tools/make_tatiana.py, исходники в assets/characters/tatiana/source/); фигура — лист из
   // 4 кадров покоя, как у типовых NPC.
   { id: 'tatiana', name: 'Татьяна', kind: 'story', portrait: 'assets/characters/tatiana/tatiana_portrait.png', color: '#6b4a7a',
-    sprite: { src: 'assets/characters/tatiana/tatiana_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right', frames: 4, idle: true } }
+    sprite: idleSprite('tatiana') }
 ];
 // Приходы покупателей. Один человек может прийти много раз (в разные дни); у каждого прихода свой товар, условия торга и реплики.
 // Ключ — id прихода (его ставят в DAYS, visits); who — кто приходит (id из CUSTOMERS). Каждый приход бывает один раз за игру.
@@ -398,14 +400,14 @@ const SCENES = {
     background: 'assets/places/traktir/traktir.png', wall: '#3a2a1c', floor: '#5a4128',
     open: ['evening'], closedMsg: 'Трактир полон по вечерам, а сейчас там только половые моют полы. Приходите, когда закроете лавку.', endsEvening: true,
     npcs: [{ id: 'traktirshchik', name: 'Трактирщик', x: 330, color: '#6b4a2e', portrait: 'assets/characters/traktirshchik/traktirshchik_portrait.png', node: 'traktir_hub',
-             sprite: { src: 'assets/characters/traktirshchik/traktirshchik_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }],
+             sprite: idleSprite('traktirshchik') }],
     exits: [{ x: 440, to: 'pereulok', label: 'Выйти чёрным ходом в переулок' }] },
   // ТЕСТОВОЕ: тёмный переулок за трактиром — место для сомнительных сделок и встреч. На карте его нет: попасть можно только из трактира.
   pereulok: { name: 'Переулок за трактиром', worldW: 480, lane: 225, startX: 40, walkMin: 36, walkMax: 444, talkRange: 35, talkGap: 44,
     background: 'assets/places/pereulok/pereulok.png', wall: '#1c1814', floor: '#2e2620',
     open: ['evening'], endsEvening: true,
     npcs: [{ id: 'neznakomets', name: 'Незнакомец', x: 320, color: '#2b2b33', portrait: 'assets/characters/neznakomets/neznakomets_portrait.png', node: 'pereulok_hub',
-             sprite: { src: 'assets/characters/neznakomets/neznakomets_idle.png', cellW: 144, cellH: 120, anchorX: 72, floorY: 114, facing: 'right' } }],
+             sprite: idleSprite('neznakomets') }],
     exits: [{ x: 40, to: 'traktir', label: 'Вернуться в трактир' }] }
 };
 // Закупка у оптовика. В разговоре выбор с do: 'order' и seller (id персонажа) открывает заказ: Андрей выбирает количество
